@@ -345,3 +345,71 @@ go test ./internal/jira/... -tags=integration -v          # Jira integration
 go test ./internal/confluence/... -tags=integration -v    # Confluence integration
 go test ./internal/integration/... -tags=e2e -v           # E2E tests
 ```
+
+---
+
+## 2026-04-18 | Tracking & Analytics Status
+
+**Components Implemented:**
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Local SQLite tracking | ✅ Done | `~/.dandori/local.db` stores runs, events, audit_log |
+| Event layers (1-3) | ✅ Done | Process, output parsing, skill events |
+| Server PostgreSQL | ✅ Done | Schema, migrations, connection pool |
+| Server REST API | ✅ Done | `/api/events`, `/api/runs`, `/api/fleet/live` |
+| Analytics queries | ✅ Done | AgentStats, CostBreakdown, SprintSummary |
+| Analytics API | ✅ Done | 8 endpoints for analytics |
+| CLI analytics | ✅ Done | `dandori analytics cost|agents|sprint` |
+| Export (CSV/JSON) | ✅ Done | `/api/analytics/export` |
+| Server SSE (real-time) | ✅ Done | `/api/fleet/live` for live updates |
+
+**Testing Requirements:**
+- Server requires PostgreSQL (not SQLite)
+- Docker Compose provided: `docker-compose.yml`
+- Seed script: `scripts/seed-test-data.sql`
+- Test script: `scripts/test-analytics.sh`
+
+**To Test Analytics:**
+```bash
+# 1. Start Docker Desktop
+# 2. Start PostgreSQL
+docker-compose up -d postgres
+
+# 3. Build and run server
+make build-server
+DANDORI_DB_HOST=localhost ./bin/dandori-server &
+
+# 4. Seed test data and verify
+./scripts/test-analytics.sh
+
+# 5. Or run server integration tests
+go test ./internal/server/... -tags=server_integration -v
+```
+
+**Analytics API Endpoints:**
+```
+GET /api/analytics/agents              # Agent performance stats
+GET /api/analytics/agents/compare      # Compare agents side-by-side
+GET /api/analytics/cost                # Cost breakdown by dimension
+GET /api/analytics/cost/trend          # Cost trend over time
+GET /api/analytics/sprints/:id         # Sprint summary
+GET /api/analytics/tasks/:key/cost     # Task cost breakdown
+GET /api/analytics/task-types          # Stats by issue type
+GET /api/analytics/export              # Export CSV/JSON
+```
+
+**CLI Commands:**
+```bash
+dandori analytics agents               # Agent stats table
+dandori analytics agents --compare alpha,beta
+dandori analytics cost --group-by sprint
+dandori analytics sprint 4
+```
+
+**Files Added:**
+- `docker-compose.yml` — PostgreSQL + server
+- `Dockerfile.server` — Server container
+- `scripts/seed-test-data.sql` — Realistic test data
+- `scripts/test-analytics.sh` — Analytics test script
+- `internal/server/integration_test.go` — Server integration tests
