@@ -2,31 +2,35 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/phuc-nt/dandori-cli/internal/config"
 	"github.com/phuc-nt/dandori-cli/internal/db"
+	"github.com/phuc-nt/dandori-cli/internal/sync"
 	"github.com/spf13/cobra"
 )
 
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Upload pending runs and events to monitoring server",
-	Long: `Syncs local runs and events to the central monitoring server.
-Events are batched and uploaded in order. Successfully synced items
-are marked as synced=1 in local.db.
-
-The sync command will be fully implemented in Phase 05 (Monitoring Server).`,
-	RunE: runSync,
+	RunE:  runSync,
 }
 
+var (
+	syncForce  bool
+	syncDryRun bool
+)
+
 func init() {
+	syncCmd.Flags().BoolVar(&syncForce, "force", false, "Sync immediately")
+	syncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false, "Show what would be synced")
 	rootCmd.AddCommand(syncCmd)
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
 	cfg := Config()
 	if cfg == nil || cfg.ServerURL == "" {
-		return fmt.Errorf("server_url not configured. Run 'dandori init' or edit ~/.dandori/config.yaml")
+		return fmt.Errorf("server_url not configured")
 	}
 
 	dbPath, err := config.DBPath()
@@ -49,9 +53,28 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("Pending sync: %d runs, %d events\n", unsyncedRuns, unsyncedEvents)
-	fmt.Printf("Server: %s\n", cfg.ServerURL)
-	fmt.Println("\n[Sync will be implemented in Phase 05 - Monitoring Server]")
+	fmt.Printf("Pending: %d runs, %d events\n", unsyncedRuns, unsyncedEvents)
 
+	if syncDryRun {
+		fmt.Printf("Would sync to: %s\n", cfg.ServerURL)
+		return nil
+	}
+
+	hostname, _ := os.Hostname()
+	workstationID := fmt.Sprintf("ws-%s", hostname)
+
+	uploader := sync.NewUploader(cfg.ServerURL, cfg.APIKey, workstationID)
+
+	batchSize := cfg.Sync.BatchSize
+	if batchSize == 0 {
+		batchSize = 100
+	}
+
+	resp, err := uploader.Sync(localDB, batchSize)
+	if err != nil {
+		return fmt.Errorf("sync failed: %w", err)
+	}
+
+	fmt.Printf("Synced: %d accepted, %d errors\n", resp.Accepted, resp.Errors)
 	return nil
 }

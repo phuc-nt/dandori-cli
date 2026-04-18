@@ -36,4 +36,28 @@ dandori sync      # stub for Phase 05
 dandori version
 ```
 
-**Next:** Phase 04 (Confluence) hoặc Phase 05 (Monitoring Server)
+**Next:** Phase 04 (Confluence), Phase 06 (Assignment), Phase 07 (Analytics)
+
+---
+
+## 2026-04-18 | Phase 05 Monitoring Server
+
+**Done:**
+- Server entrypoint với Chi router
+- PostgreSQL schema + connection pool
+- Event ingest API (`POST /api/events`)
+- Fleet live SSE endpoint
+- Runs REST API
+- CLI sync command với uploader
+
+**Binaries:**
+- `bin/dandori` — CLI
+- `bin/dandori-server` — monitoring server
+
+**Stats:** ~4500 LOC, 95+ tests
+
+**Env vars for server:**
+```
+DANDORI_DB_HOST, DANDORI_DB_NAME, DANDORI_DB_USER, DANDORI_DB_PASSWORD
+DANDORI_LISTEN (default :8080)
+```

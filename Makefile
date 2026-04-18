@@ -9,6 +9,11 @@ LDFLAGS=-ldflags "-X github.com/phuc-nt/dandori-cli/cmd.Version=$(VERSION) -X gi
 build:
 	go build $(LDFLAGS) -o bin/$(BINARY_NAME) .
 
+build-server:
+	go build $(LDFLAGS) -o bin/$(BINARY_NAME)-server ./cmd/server
+
+build-all: build build-server
+
 test:
 	go test -v ./...
 
