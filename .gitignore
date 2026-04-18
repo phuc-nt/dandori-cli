@@ -1,11 +1,51 @@
+# Build output
 bin/
+dist/
 *.exe
+
+# Database
 *.db
+*.db-shm
+*.db-wal
+
+# Test artifacts
 coverage.out
 coverage.html
-.DS_Store
+*.test
+test-*.txt
+test-*.yaml
+test-*.json
 
-# Credentials
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Credentials & secrets
 .env
 .env.*
 *.env
+config.yaml
+config.json
+*.pem
+*.key
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+
+# Local data
+~/.dandori/
+cache/
+tmp/
+*.log
+
+# Go
+go.work
+go.work.sum
