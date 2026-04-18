@@ -40,7 +40,7 @@ func TestParseLineForTokens(t *testing.T) {
 	}{
 		{
 			name: "assistant message with usage",
-			line: `{"type":"assistant","model":"claude-sonnet-4-6","message":{"usage":{"input_tokens":100,"output_tokens":50}}}`,
+			line: `{"type":"assistant","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":50}}}`,
 			expected: TokenUsage{
 				Input:  100,
 				Output: 50,
@@ -49,7 +49,7 @@ func TestParseLineForTokens(t *testing.T) {
 		},
 		{
 			name: "with cache tokens",
-			line: `{"type":"assistant","model":"claude-opus-4-6","message":{"usage":{"input_tokens":200,"output_tokens":100,"cache_creation_input_tokens":50,"cache_read_input_tokens":150}}}`,
+			line: `{"type":"assistant","message":{"model":"claude-opus-4-6","usage":{"input_tokens":200,"output_tokens":100,"cache_creation_input_tokens":50,"cache_read_input_tokens":150}}}`,
 			expected: TokenUsage{
 				Input:      200,
 				Output:     100,

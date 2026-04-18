@@ -1,8 +1,6 @@
 package wrapper
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,19 +87,14 @@ func getClaudeProjectDir(cwd string) string {
 		return ""
 	}
 
-	cwdHash := hashCWD(cwd)
-	projectDir := filepath.Join(home, ".claude", "projects", cwdHash)
+	dirName := strings.ReplaceAll(cwd, "/", "-")
+	projectDir := filepath.Join(home, ".claude", "projects", dirName)
 
 	if _, err := os.Stat(projectDir); os.IsNotExist(err) {
 		return ""
 	}
 
 	return projectDir
-}
-
-func hashCWD(cwd string) string {
-	h := sha256.Sum256([]byte(cwd))
-	return hex.EncodeToString(h[:])[:16]
 }
 
 func GetSessionLogPath(cwd string, before *SessionSnapshot) string {

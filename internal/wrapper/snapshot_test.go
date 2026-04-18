@@ -7,21 +7,21 @@ import (
 	"time"
 )
 
-func TestHashCWD(t *testing.T) {
-	hash1 := hashCWD("/home/user/project")
-	hash2 := hashCWD("/home/user/project")
-	hash3 := hashCWD("/home/user/other")
+func TestGetClaudeProjectDir(t *testing.T) {
+	home, _ := os.UserHomeDir()
 
-	if hash1 != hash2 {
-		t.Error("same cwd should produce same hash")
+	dir := getClaudeProjectDir("/nonexistent/path")
+	if dir != "" {
+		t.Error("should return empty for nonexistent path")
 	}
 
-	if hash1 == hash3 {
-		t.Error("different cwd should produce different hash")
-	}
+	testDir := filepath.Join(home, ".claude", "projects", "-tmp-test-project")
+	os.MkdirAll(testDir, 0755)
+	defer os.RemoveAll(testDir)
 
-	if len(hash1) != 16 {
-		t.Errorf("hash length = %d, want 16", len(hash1))
+	dir = getClaudeProjectDir("/tmp/test-project")
+	if dir != testDir {
+		t.Errorf("dir = %s, want %s", dir, testDir)
 	}
 }
 

@@ -84,8 +84,8 @@ func parseLogFromOffset(path string, offset int64) (TokenUsage, int64) {
 
 type sessionMessage struct {
 	Type    string `json:"type"`
-	Model   string `json:"model"`
 	Message struct {
+		Model string `json:"model"`
 		Usage struct {
 			InputTokens              int `json:"input_tokens"`
 			OutputTokens             int `json:"output_tokens"`
@@ -107,8 +107,8 @@ func parseLineForTokens(line []byte) TokenUsage {
 		return usage
 	}
 
-	if msg.Model != "" {
-		usage.Model = msg.Model
+	if msg.Message.Model != "" {
+		usage.Model = msg.Message.Model
 	}
 
 	usage.Input = msg.Message.Usage.InputTokens
@@ -162,6 +162,12 @@ var defaultPrices = map[string]ModelPrices{
 		CacheRead:  0.30,
 	},
 	"claude-opus-4-6": {
+		Input:      15.00,
+		Output:     75.00,
+		CacheWrite: 18.75,
+		CacheRead:  1.50,
+	},
+	"claude-opus-4-5-20251101": {
 		Input:      15.00,
 		Output:     75.00,
 		CacheWrite: 18.75,

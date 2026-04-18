@@ -243,3 +243,59 @@ func (c *Client) SearchIssues(jql string, maxResults int) ([]Issue, error) {
 	}
 	return issues, nil
 }
+
+func (c *Client) delete(path string) error {
+	resp, err := c.do(http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("jira API error: %d - %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+func (c *Client) DeleteIssue(issueKey string) error {
+	path := fmt.Sprintf("/rest/api/2/issue/%s", issueKey)
+	return c.delete(path)
+}
+
+type CreateIssueRequest struct {
+	ProjectKey  string
+	Summary     string
+	Description string
+	IssueType   string
+}
+
+func (c *Client) CreateIssue(req CreateIssueRequest) (*Issue, error) {
+	issueType := req.IssueType
+	if issueType == "" {
+		issueType = "Task"
+	}
+
+	body := map[string]any{
+		"fields": map[string]any{
+			"project": map[string]string{
+				"key": req.ProjectKey,
+			},
+			"summary":     req.Summary,
+			"description": req.Description,
+			"issuetype": map[string]string{
+				"name": issueType,
+			},
+		},
+	}
+
+	var resp struct {
+		Key string `json:"key"`
+	}
+
+	if err := c.post("/rest/api/2/issue", body, &resp); err != nil {
+		return nil, err
+	}
+
+	return c.GetIssue(resp.Key)
+}

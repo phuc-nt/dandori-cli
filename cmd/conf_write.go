@@ -67,29 +67,35 @@ func runConfWrite(cmd *cobra.Command, args []string) error {
 	var costUSD float64
 	var inputTokens, outputTokens int
 	var gitHeadBefore, gitHeadAfter string
+	var startedAtStr, endedAtStr string
 	var startedAt, endedAt time.Time
 
 	if confWriteRunID != "" {
 		err = localDB.QueryRow(`
-			SELECT id, jira_issue_key, agent_name, status, model,
-			       duration_sec, cost_usd, input_tokens, output_tokens,
-			       git_head_before, git_head_after, started_at, ended_at
+			SELECT id, COALESCE(jira_issue_key, ''), agent_name, status, COALESCE(model, ''),
+			       COALESCE(duration_sec, 0), COALESCE(cost_usd, 0), COALESCE(input_tokens, 0), COALESCE(output_tokens, 0),
+			       COALESCE(git_head_before, ''), COALESCE(git_head_after, ''), started_at, COALESCE(ended_at, '')
 			FROM runs WHERE id = ?`, confWriteRunID).Scan(
 			&runID, &issueKey, &agentName, &status, &model,
 			&durationSec, &costUSD, &inputTokens, &outputTokens,
-			&gitHeadBefore, &gitHeadAfter, &startedAt, &endedAt,
+			&gitHeadBefore, &gitHeadAfter, &startedAtStr, &endedAtStr,
 		)
 	} else {
 		err = localDB.QueryRow(`
-			SELECT id, jira_issue_key, agent_name, status, model,
-			       duration_sec, cost_usd, input_tokens, output_tokens,
-			       git_head_before, git_head_after, started_at, ended_at
+			SELECT id, COALESCE(jira_issue_key, ''), agent_name, status, COALESCE(model, ''),
+			       COALESCE(duration_sec, 0), COALESCE(cost_usd, 0), COALESCE(input_tokens, 0), COALESCE(output_tokens, 0),
+			       COALESCE(git_head_before, ''), COALESCE(git_head_after, ''), started_at, COALESCE(ended_at, '')
 			FROM runs WHERE jira_issue_key = ?
 			ORDER BY started_at DESC LIMIT 1`, confWriteTaskKey).Scan(
 			&runID, &issueKey, &agentName, &status, &model,
 			&durationSec, &costUSD, &inputTokens, &outputTokens,
-			&gitHeadBefore, &gitHeadAfter, &startedAt, &endedAt,
+			&gitHeadBefore, &gitHeadAfter, &startedAtStr, &endedAtStr,
 		)
+	}
+
+	if err == nil {
+		startedAt, _ = time.Parse(time.RFC3339, startedAtStr)
+		endedAt, _ = time.Parse(time.RFC3339, endedAtStr)
 	}
 
 	if err != nil {

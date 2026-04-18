@@ -120,12 +120,16 @@ func Run(ctx context.Context, localDB *db.LocalDB, opts Options) (*Result, error
 		}
 	}()
 
-	var tokenUsage TokenUsage
+	tailerCtx, tailerCancel := context.WithCancel(context.Background())
+	usageChan := make(chan TokenUsage, 1)
+
 	if !opts.NoTailer {
 		go func() {
-			usage := TailSessionLog(ctx, cwd, sessionSnapshot)
-			tokenUsage = usage
+			usage := TailSessionLog(tailerCtx, cwd, sessionSnapshot)
+			usageChan <- usage
 		}()
+	} else {
+		usageChan <- TokenUsage{}
 	}
 
 	err := <-doneChan
@@ -152,7 +156,8 @@ func Run(ctx context.Context, localDB *db.LocalDB, opts Options) (*Result, error
 		status = model.StatusError
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	tailerCancel()
+	tokenUsage := <-usageChan
 
 	costUSD := ComputeCost(tokenUsage)
 

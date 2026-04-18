@@ -413,3 +413,58 @@ dandori analytics sprint 4
 - `scripts/seed-test-data.sql` — Realistic test data
 - `scripts/test-analytics.sh` — Analytics test script
 - `internal/server/integration_test.go` — Server integration tests
+
+---
+
+## 2026-04-18 | Full E2E Testing with Real Atlassian + Claude
+
+**Done:**
+- Fixed token tracking race condition in wrapper (tailer goroutine sync)
+- Fixed session directory path detection (hash → path replacement)
+- Fixed Confluence write timestamp parsing (string → time.Time)
+- Deleted old test data, created fresh Jira tasks
+- Full workflow tested with real Claude Code
+
+**Test Run Results:**
+```
+Task: CLITEST-5 → Created README.md
+Task: CLITEST-6 → Created hello.txt ($0.13, 81k tokens)
+Task: CLITEST-7 → Created VERSION file ($0.13, 81k tokens)
+Total: $0.27, 3 runs, 100% success
+```
+
+**Workflow Verified:**
+1. `dandori task start CLITEST-X` → Jira In Progress ✅
+2. `dandori run --task X -- claude "..."` → Real execution ✅
+3. Token/cost tracking from session logs ✅
+4. `dandori jira-sync` → Jira Done + comment ✅
+5. `dandori conf-write --task X` → Confluence report ✅
+6. `dandori dashboard` → Web UI with charts ✅
+
+**Bugs Fixed:**
+- Wrapper: tailer goroutine not synchronized with main thread
+- Snapshot: used SHA-256 hash instead of path replacement for Claude project dir
+- Confluence: QueryRow scanning string into time.Time
+
+**Stats:** 308 tests pass, ~5500 LOC, 90 Go files
+
+---
+
+## Progress Summary
+
+| Phase | Status | Items |
+|-------|--------|-------|
+| 01 Foundation | ✅ Complete | 9/9 |
+| 02 Agent Wrapper | ✅ Complete | 12/12 |
+| 03 Jira Integration | ✅ Complete | 11/11 |
+| 04 Confluence Integration | ✅ Complete | 11/11 |
+| 05 Monitoring Server | ✅ Complete | 15/15 |
+| 06 Agent Assignment | ✅ Complete | 14/14 |
+| 07 Analytics | ✅ Complete | 15/15 |
+| 08 E2E Flow | 🔄 80% | 8/10 |
+
+**Overall Progress: 95/97 items = 97.9%**
+
+**Remaining (Phase 08):**
+- [ ] Setup guide documentation
+- [ ] FAQ / troubleshooting documentation
