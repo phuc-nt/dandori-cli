@@ -104,9 +104,19 @@
 | I2 | `conf-write --task NONEXISTENT` | Graceful error |
 | I3 | Run with invalid command | Failure tracked |
 
+### Group J: Long-running / Heavy Task (5 cases)
+
+| ID | Test Case | Verify |
+|----|-----------|--------|
+| J1 | Multi-step task (read + analyze + write) | Completes without error |
+| J2 | Heavy task has > 100 tokens | Token count reflects work |
+| J3 | Heavy task has non-zero cost | Cost > 0 |
+| J4 | Duration >= 3 seconds | Real long-running capture |
+| J5 | Heavy run syncs to Jira Done | Full pipeline on long task |
+
 ## Summary
 
-**Total: 42 test cases across 9 groups**
+**Total: 47 test cases across 10 groups**
 
 - Configuration: 3
 - Jira Lifecycle: 4
@@ -117,6 +127,7 @@
 - Analytics: 5
 - Dashboard: 4
 - Edge Cases: 3
+- Heavy Task: 5
 
 ## Execution Strategy
 

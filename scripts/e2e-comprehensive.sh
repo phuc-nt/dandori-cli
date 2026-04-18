@@ -73,9 +73,21 @@ jira_api() {
 create_jira_task() {
     local summary="$1"
     local description="$2"
-    local resp=$(jira_api POST "/rest/api/2/issue" \
-        "{\"fields\":{\"project\":{\"key\":\"CLITEST\"},\"summary\":\"$summary\",\"description\":\"$description\",\"issuetype\":{\"name\":\"Task\"}}}")
-    echo "$resp" | jq -r '.key // empty'
+    local key=""
+    # Retry up to 2 times on transient failures
+    for attempt in 1 2; do
+        local resp=$(jira_api POST "/rest/api/2/issue" \
+            "{\"fields\":{\"project\":{\"key\":\"CLITEST\"},\"summary\":\"$summary\",\"description\":\"$description\",\"issuetype\":{\"name\":\"Task\"}}}")
+        key=$(echo "$resp" | jq -r '.key // empty')
+        if [ -n "$key" ]; then
+            echo "$key"
+            return 0
+        fi
+        echo "WARN: task creation attempt $attempt failed: $resp" >&2
+        sleep 1
+    done
+    echo "ERROR: failed to create task '$summary' after 2 attempts" >&2
+    return 1
 }
 
 # ============================================================================
@@ -96,11 +108,17 @@ setup() {
     cd "$PROJECT_DIR"
 
     echo "Creating fresh Jira tasks..."
-    TASKS+=($(create_jira_task "[E2E] Task Alpha - file creation" "Test file creation flow"))
-    TASKS+=($(create_jira_task "[E2E] Task Beta - simple task" "Test simple execution"))
-    TASKS+=($(create_jira_task "[E2E] Task Gamma - invalid task" "Test error handling"))
+    local expected=4
+    TASKS+=($(create_jira_task "[E2E] Task Alpha file creation" "Test file creation flow"))
+    TASKS+=($(create_jira_task "[E2E] Task Beta simple task" "Test simple execution"))
+    TASKS+=($(create_jira_task "[E2E] Task Gamma error handling" "Test error handling"))
+    TASKS+=($(create_jira_task "[E2E] Task Delta heavy workload" "Test long running task"))
 
     echo "Created tasks: ${TASKS[*]}"
+    if [ "${#TASKS[@]}" -lt "$expected" ]; then
+        echo "ERROR: expected $expected tasks, got ${#TASKS[@]}" >&2
+        exit 1
+    fi
     echo "" > /tmp/dandori-e2e-results.log
 }
 
@@ -377,6 +395,49 @@ test_group_i() {
 }
 
 # ============================================================================
+# Group J: Long-running / Heavy Task
+# ============================================================================
+
+test_group_j() {
+    log_section "Group J: Long-running / Heavy Task"
+
+    local task="${TASKS[3]}"
+    "$DANDORI" task start "$task" > /dev/null 2>&1
+
+    log_test "J1" "Heavy task: multi-file analysis"
+    local start_ts=$(date +%s)
+    # Ask Claude to do multi-step work: read, analyze, write
+    "$DANDORI" run --task "$task" -- claude -p \
+        "Read these 3 files in /tmp/dandori-e2e-test/ (create them first with numbers 1, 2, 3), sum the numbers, write result to /tmp/dandori-e2e-test/sum.txt" \
+        --allowedTools "Read,Write,Bash" > /tmp/heavy-run.log 2>&1
+    local rc=$?
+    local end_ts=$(date +%s)
+    local duration=$((end_ts - start_ts))
+
+    [ $rc -eq 0 ] && pass "J1" "Heavy task completed in ${duration}s" || fail "J1" "Heavy task failed (rc=$rc)"
+
+    log_test "J2" "Heavy run has larger token count"
+    local heavy_tokens=$(sqlite3 "$DB" "SELECT input_tokens+output_tokens FROM runs WHERE jira_issue_key='$task' ORDER BY started_at DESC LIMIT 1")
+    [ "${heavy_tokens:-0}" -gt 100 ] && pass "J2" "Tokens: $heavy_tokens" || fail "J2" "Too few tokens: $heavy_tokens"
+
+    log_test "J3" "Heavy run has higher cost"
+    local heavy_cost=$(sqlite3 "$DB" "SELECT cost_usd FROM runs WHERE jira_issue_key='$task' ORDER BY started_at DESC LIMIT 1")
+    local has_cost=$(echo "${heavy_cost:-0}" | awk '{print ($1 > 0)}')
+    [ "$has_cost" = "1" ] && pass "J3" "Cost: \$$heavy_cost" || fail "J3" "No cost"
+
+    log_test "J4" "Heavy run has non-trivial duration"
+    local heavy_dur=$(sqlite3 "$DB" "SELECT duration_sec FROM runs WHERE jira_issue_key='$task' ORDER BY started_at DESC LIMIT 1")
+    local is_long=$(echo "${heavy_dur:-0}" | awk '{print ($1 >= 3)}')
+    [ "$is_long" = "1" ] && pass "J4" "Duration: ${heavy_dur}s" || fail "J4" "Too fast: ${heavy_dur}s"
+
+    log_test "J5" "Sync heavy run to Jira"
+    "$DANDORI" jira-sync --task "$task" > /dev/null 2>&1
+    sleep 1
+    local status=$(jira_api GET "/rest/api/2/issue/$task" | jq -r '.fields.status.name')
+    [ "$status" = "Done" ] && pass "J5" "Synced to Done" || fail "J5" "Status=$status"
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -396,6 +457,7 @@ main() {
     test_group_g
     test_group_h
     test_group_i
+    test_group_j
 
     # Summary
     log_section "SUMMARY"
