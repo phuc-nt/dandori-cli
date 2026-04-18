@@ -301,3 +301,47 @@ dandori assign set CLITEST-1 alpha ✅ (comment posted)
 **Stats:** 208 unit tests + 3 E2E tests = 211 total
 
 **Phase 08 Complete**
+
+---
+
+## 2026-04-18 | Comprehensive Integration Test Coverage
+
+**Done:**
+- Expanded Jira integration tests from 6 to 22 test functions
+- Expanded Confluence integration tests from 4 to 18 test functions
+- Fixed test uniqueness issues (RunID with nanoseconds for unique page titles)
+
+**Jira Integration Tests (22 tests):**
+- GetIssue, GetIssueNotFound, GetIssueFields
+- GetBoards, GetBoardsInvalidProject
+- GetActiveSprint, GetActiveSprintInvalidBoard
+- GetSprintIssues, GetSprintIssuesTypes
+- SearchIssues, SearchIssuesByType, SearchIssuesByStatus, SearchIssuesInvalidJQL
+- AddComment, AddCommentWithMarkdown, AddCommentInvalidIssue
+- GetRemoteLinks, GetTransitions, AddLabel
+- PollerSinglePoll, PollerNoNewTasks
+- ExtractConfluenceLinks
+
+**Confluence Integration Tests (18 tests):**
+- SearchPages, SearchPagesWithTitle, SearchPagesInvalidSpace
+- CreateAndGetPage, CreatePageWithParent, CreatePageWithRichContent
+- GetPageNotFound, UpdatePage
+- CreateReport, CreateReportWithDecisions, CreateReportWithLargeDiff
+- ReaderCache, ReaderCacheMultiplePages, ReaderCacheInvalidation
+- ContextAssembler, ContextAssemblerWithErrors
+- StorageToMarkdownRealPage, RoundTripConversion
+
+**E2E Tests (3 tests):**
+- FullSprintCycle: Sprint → Assign → Comment → Run → Report → Verify
+- ConfluenceContextFetch: Search → Cache → Assemble
+- JiraPollerFlow: Detect → Suggest → Post
+
+**Stats:** 265 unit tests + 22 Jira + 18 Confluence + 3 E2E = 308 total tests
+
+**Run Commands:**
+```bash
+go test ./... -count=1                                    # unit tests
+go test ./internal/jira/... -tags=integration -v          # Jira integration
+go test ./internal/confluence/... -tags=integration -v    # Confluence integration
+go test ./internal/integration/... -tags=e2e -v           # E2E tests
+```

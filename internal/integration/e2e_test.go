@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -155,7 +156,7 @@ func TestE2E_FullSprintCycle(t *testing.T) {
 
 	// Simulate a completed run
 	runReport := confluence.RunReport{
-		RunID:        "e2e-" + time.Now().Format("20060102-150405"),
+		RunID:        fmt.Sprintf("e%d", time.Now().UnixNano()),
 		IssueKey:     testIssue.Key,
 		AgentName:    topAgent.AgentName,
 		Status:       "done",
