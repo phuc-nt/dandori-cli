@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/phuc-nt/dandori-cli/internal/confluence"
 	"github.com/phuc-nt/dandori-cli/internal/config"
@@ -101,6 +104,7 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 
 	// Fetch task context
 	var contextFile string
+	var taskDescription string
 	if !taskRunNoContext {
 		fmt.Printf("Fetching context for %s...\n", issueKey)
 
@@ -109,6 +113,8 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("fetch context: %w", err)
 		}
+
+		taskDescription = taskCtx.Description // Save for AC extraction later
 
 		fmt.Printf("  Issue: %s\n", taskCtx.Summary)
 		fmt.Printf("  Type: %s | Priority: %s | Status: %s\n", taskCtx.IssueType, taskCtx.Priority, taskCtx.Status)
@@ -138,6 +144,9 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 
 		fmt.Printf("  Context written to: %s\n\n", contextFile)
 	}
+
+	// Capture git HEAD before run
+	gitHeadBefore := getGitHead()
 
 	// Transition Jira to In Progress
 	fmt.Printf("Starting task %s...\n", issueKey)
@@ -229,17 +238,12 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Warning: could not transition to Done: %v\n", err)
 		}
 
-		// Add completion comment
-		doneComment := fmt.Sprintf(`✅ *Agent Run Completed*
+		// Get git changes for the report (compare before vs after)
+		gitHeadAfter := getGitHead()
+		gitChanges := getGitChangesBetween(gitHeadBefore, gitHeadAfter)
 
-*Agent:* %s
-*Duration:* %s
-*Cost:* $%.4f
-*Tokens:* %d in / %d out
-
-_Task completed by AI agent._`,
-			agentName, result.Duration, result.CostUSD,
-			result.TokenUsage.Input, result.TokenUsage.Output)
+		// Build comprehensive completion comment
+		doneComment := buildCompletionComment(agentName, result, gitChanges, issueKey, taskDescription)
 
 		jiraClient.AddComment(issueKey, doneComment)
 		fmt.Println("  ✓ Jira updated")
@@ -247,12 +251,168 @@ _Task completed by AI agent._`,
 		// Write Confluence report if configured
 		if cfg.Confluence.AutoPost && confClient != nil {
 			fmt.Println("Writing Confluence report...")
-			// This uses existing conf-write logic
-			// For now, just note it
 			fmt.Printf("  → Run: dandori conf-write --run %s\n", result.RunID)
 		}
 	}
 
 	os.Exit(result.ExitCode)
 	return nil
+}
+
+// GitChanges holds information about code changes
+type GitChanges struct {
+	FilesChanged []string
+	Commits      []string
+	DiffSummary  string
+	HeadBefore   string
+	HeadAfter    string
+}
+
+// getGitHead gets current git HEAD
+func getGitHead() string {
+	if out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		return strings.TrimSpace(string(out))
+	}
+	return ""
+}
+
+// getGitChangesBetween gets changes between two commits
+func getGitChangesBetween(before, after string) GitChanges {
+	var changes GitChanges
+	changes.HeadBefore = before
+	changes.HeadAfter = after
+
+	if before == "" || after == "" || before == after {
+		// No changes or can't determine
+		return changes
+	}
+
+	// Get changed files between before and after
+	if out, err := exec.Command("git", "diff", "--name-only", before, after).Output(); err == nil {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, line := range lines {
+			if line != "" {
+				changes.FilesChanged = append(changes.FilesChanged, line)
+			}
+		}
+	}
+
+	// Get commits between before and after
+	if out, err := exec.Command("git", "log", "--oneline", before+".."+after).Output(); err == nil {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, line := range lines {
+			if line != "" {
+				changes.Commits = append(changes.Commits, line)
+			}
+		}
+	}
+
+	// Get diff stat
+	if out, err := exec.Command("git", "diff", "--stat", before, after).Output(); err == nil {
+		changes.DiffSummary = strings.TrimSpace(string(out))
+	}
+
+	return changes
+}
+
+// extractAcceptanceCriteria extracts AC items from task description
+func extractAcceptanceCriteria(description string) []string {
+	var acs []string
+	lines := strings.Split(description, "\n")
+
+	inACSection := false
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Check if entering AC section
+		if strings.Contains(strings.ToLower(line), "acceptance criteria") {
+			inACSection = true
+			continue
+		}
+
+		// Check if leaving AC section (new header)
+		if inACSection && (strings.HasPrefix(line, "**") || strings.HasPrefix(line, "##") || strings.HasPrefix(line, "h3.")) {
+			if !strings.Contains(strings.ToLower(line), "acceptance") {
+				inACSection = false
+				continue
+			}
+		}
+
+		// Extract checkbox items
+		if strings.HasPrefix(line, "- [ ]") || strings.HasPrefix(line, "- [x]") || strings.HasPrefix(line, "* [ ]") {
+			ac := strings.TrimPrefix(line, "- [ ]")
+			ac = strings.TrimPrefix(ac, "- [x]")
+			ac = strings.TrimPrefix(ac, "* [ ]")
+			ac = strings.TrimSpace(ac)
+			if ac != "" {
+				acs = append(acs, ac)
+			}
+		}
+	}
+
+	return acs
+}
+
+// buildCompletionComment creates a comprehensive Jira comment
+func buildCompletionComment(agentName string, result *wrapper.Result, changes GitChanges, issueKey string, taskDescription string) string {
+	var sb strings.Builder
+
+	sb.WriteString("✅ *Agent Run Completed*\n\n")
+
+	// Run stats
+	sb.WriteString("h3. Run Statistics\n")
+	sb.WriteString(fmt.Sprintf("||Agent||%s||\n", agentName))
+	sb.WriteString(fmt.Sprintf("||Duration||%s||\n", result.Duration.Round(time.Second)))
+	sb.WriteString(fmt.Sprintf("||Cost||$%.4f||\n", result.CostUSD))
+	sb.WriteString(fmt.Sprintf("||Tokens||%d in / %d out||\n", result.TokenUsage.Input, result.TokenUsage.Output))
+	sb.WriteString(fmt.Sprintf("||Model||%s||\n", result.TokenUsage.Model))
+	sb.WriteString(fmt.Sprintf("||Run ID||%s||\n", result.RunID))
+	if changes.HeadBefore != "" && changes.HeadAfter != "" {
+		sb.WriteString(fmt.Sprintf("||Git||%s → %s||\n", changes.HeadBefore, changes.HeadAfter))
+	}
+	sb.WriteString("\n")
+
+	// Files changed (only if there are actual changes in this run)
+	if len(changes.FilesChanged) > 0 {
+		sb.WriteString("h3. Files Changed\n")
+		sb.WriteString("{code}\n")
+		for _, f := range changes.FilesChanged {
+			sb.WriteString(fmt.Sprintf("  %s\n", f))
+		}
+		sb.WriteString("{code}\n\n")
+	} else if changes.HeadBefore == changes.HeadAfter {
+		sb.WriteString("h3. Files Changed\n")
+		sb.WriteString("_No code changes in this run_\n\n")
+	}
+
+	// Commits in this run
+	if len(changes.Commits) > 0 {
+		sb.WriteString("h3. Commits\n")
+		sb.WriteString("{code}\n")
+		for _, c := range changes.Commits {
+			sb.WriteString(fmt.Sprintf("  %s\n", c))
+		}
+		sb.WriteString("{code}\n\n")
+	}
+
+	// Output location
+	sb.WriteString("h3. Output Location\n")
+	sb.WriteString("* *Code:* See commits/files above\n")
+	sb.WriteString(fmt.Sprintf("* *Report:* {{dandori conf-write --run %s}}\n\n", result.RunID))
+
+	// Acceptance Criteria from task
+	acs := extractAcceptanceCriteria(taskDescription)
+	if len(acs) > 0 {
+		sb.WriteString("h3. Acceptance Criteria (from task)\n")
+		sb.WriteString("_Please verify each item:_\n")
+		for _, ac := range acs {
+			sb.WriteString(fmt.Sprintf("* (?) %s\n", ac))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("---\n")
+	sb.WriteString("_Generated by dandori-cli_")
+
+	return sb.String()
 }
