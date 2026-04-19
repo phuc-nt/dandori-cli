@@ -225,6 +225,52 @@ Each machine has its own `~/.dandori/local.db`. For now, analytics are per-works
 
 ---
 
+## Cost Calculation
+
+Dandori tracks token usage and calculates cost using model-specific pricing:
+
+| Model | Input | Output | Cache Write | Cache Read |
+|-------|-------|--------|-------------|------------|
+| Sonnet 4.6 | $3.00 | $15.00 | $3.75 | $0.30 |
+| Opus 4.5/4.6 | $15.00 | $75.00 | $18.75 | $1.50 |
+| Haiku 4.5 | $0.80 | $4.00 | $1.00 | $0.08 |
+
+*Prices per 1M tokens*
+
+Formula: `cost = (input × price) + (output × price) + (cache_write × price) + (cache_read × price)`
+
+---
+
+## Jira Completion Comment Format
+
+When a task completes, dandori posts a structured comment:
+
+```
+✅ Agent Run Completed
+
+h3. Run Statistics
+||Agent||alpha||
+||Duration||45s||
+||Cost||$0.42||
+||Tokens||1234 in / 567 out||
+||Model||claude-sonnet-4-6||
+||Git||abc123 → def456||
+
+h3. Files Changed
+  src/auth/token.go
+  src/auth/session.go
+
+h3. Acceptance Criteria (from task)
+* (?) Token refresh works silently
+* (?) No 401 during valid session
+
+h3. Output Location
+* Code: See commits above
+* Report: {{dandori conf-write --run abc123}}
+```
+
+---
+
 ## Troubleshooting
 
 See [FAQ](faq.md) for known issues and fixes.

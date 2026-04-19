@@ -70,6 +70,23 @@ confluence:
 
 ## Basic Workflow
 
+### Recommended: Task Run with Context
+
+```bash
+# Single command: fetch context → run agent → sync results
+dandori task run PROJ-123
+
+# This automatically:
+# 1. Fetches Jira issue + linked Confluence docs
+# 2. Generates context file for agent
+# 3. Transitions Jira to In Progress
+# 4. Runs Claude with context injected
+# 5. Tracks tokens, cost, duration
+# 6. Transitions Jira to Done + posts detailed comment
+```
+
+### Alternative: Manual Steps
+
 ```bash
 # 1. Start a task
 dandori task start PROJ-123

@@ -7,26 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-04-19
+
+Major feature release: Context injection and enhanced tracking.
+
 ### Added
-- Shell alias transparency: `dandori init` installs `claude` / `codex` aliases to `.zshrc` / `.bashrc` (vision pillar: wrapper invisibility)
-- Watch daemon: `dandori watch [--once]` captures orphan runs made without the wrapper
-- `internal/shellrc/` package — idempotent rc file management
-- `internal/watcher/` package — session log polling
-- E2E test groups K (shell alias, 5 cases) and L (watch daemon, 5 cases)
-- `docs/user-guide.md` — step-by-step use cases
-- `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`
+- **Task Run with Context** (`dandori task run KEY`):
+  - Auto-fetch Jira issue (summary, description, AC)
+  - Extract Confluence links from description
+  - Fetch linked Confluence page content
+  - Generate markdown context file for agent
+  - Auto-sync results to Jira on completion
+- **Enhanced Jira Completion Comment**:
+  - Run statistics (agent, duration, cost, tokens, model)
+  - Git HEAD before/after comparison
+  - Files changed during the run
+  - Acceptance Criteria extracted from task
+  - Output location with report command
+- **Cost Calculation** with model-specific pricing:
+  - Sonnet 4.6: $3/$15 per 1M tokens (in/out)
+  - Opus 4.5/4.6: $15/$75 per 1M tokens
+  - Haiku 4.5: $0.80/$4 per 1M tokens
+- Shell alias transparency via `dandori init`
+- Watch daemon: `dandori watch [--once]`
+- goreleaser for multi-platform releases
+- GitHub Actions release workflow
 
 ### Fixed
-- Tailer race condition: main thread no longer reads token data before the goroutine finishes
-- Claude session directory detection: use path-with-dashes convention instead of SHA-256 hash
-- Confluence write: parse `started_at` / `ended_at` timestamp strings into `time.Time`
-- Jira client: add `CreateIssue` and `DeleteIssue` methods
-- Pricing table: add `claude-opus-4-5-20251101` model
+- Tailer race condition: use channel for synchronization
+- Context injection: prepend to user's -p prompt
+- Claude session directory detection
 
 ### Tests
-- 308 unit tests pass across 16 packages
-- 57/57 E2E tests pass (10 groups, real Jira + Confluence + Claude Code)
-- Fixed bash `local out=$(...)` exit-code masking in E2E script
+- 66 E2E tests across 15 groups (A-O)
+- Real Jira + Confluence + Claude Code integration
+
+## [0.1.0] — 2026-04-18 (Unreleased preparation)
+
+### Added
+- Shell alias transparency
+- Watch daemon for orphan runs
+- `internal/shellrc/` and `internal/watcher/` packages
+- User guide documentation
 
 ## [0.1.0] — 2026-04-18
 
