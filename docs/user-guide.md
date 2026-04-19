@@ -38,22 +38,30 @@ dandori dashboard
 
 ---
 
-## Use Case 2 — Track Agent Runs Tied to Jira Tasks
+## Use Case 2 — Run Agent with Full Task Context (Recommended)
 
-**Goal:** Each agent run is linked to a Jira task. Jira status updates automatically when the task completes.
+**Goal:** Agent automatically receives full context from Jira issue + linked Confluence docs. No manual copy-paste.
 
 ```bash
-# Configure Jira (first time only)
+# Configure Jira + Confluence (first time only)
 vim ~/.dandori/config.yaml
 
-# Start a task (transitions Jira to In Progress + adds comment)
-dandori task start PROJ-123
+# Run agent with auto-context injection
+dandori task run PROJ-123
 
-# Run agent tied to the task
-claude "implement feature X"   # or: dandori run --task PROJ-123 -- claude "..."
+# What happens:
+# 1. Fetches Jira issue (summary, description, acceptance criteria)
+# 2. Extracts Confluence links from description
+# 3. Fetches linked Confluence page content
+# 4. Writes context to temp file
+# 5. Runs agent with context
+# 6. Tracks run (tokens, cost, duration)
+# 7. On success: transitions Jira to Done + adds completion comment
+```
 
-# Sync completed runs to Jira (transitions to Done + posts completion comment)
-dandori jira-sync
+**Preview context without running:**
+```bash
+dandori task run PROJ-123 --dry-run
 ```
 
 **Config snippet:**
@@ -64,11 +72,32 @@ jira:
   token: "YOUR_API_TOKEN"
   project_key: "PROJ"
   cloud: true
+confluence:
+  base_url: "https://YOUR-DOMAIN.atlassian.net/wiki"
+  space_key: "PROJ"
+  cloud: true
 ```
 
 ---
 
-## Use Case 3 — Post Reports to Confluence
+## Use Case 3 — Manual Task Lifecycle (Alternative)
+
+**Goal:** More control over task lifecycle — start, run, and sync separately.
+
+```bash
+# Start a task (transitions Jira to In Progress + adds comment)
+dandori task start PROJ-123
+
+# Run agent tied to the task (manual prompt)
+dandori run --task PROJ-123 -- claude "implement feature X"
+
+# Sync completed runs to Jira (transitions to Done + posts completion comment)
+dandori jira-sync
+```
+
+---
+
+## Use Case 4 — Post Reports to Confluence
 
 **Goal:** After each run, a Confluence page is created with run metadata, files changed, cost, and git diff.
 
@@ -94,7 +123,7 @@ confluence:
 
 ---
 
-## Use Case 4 — Capture Runs Even Without the Wrapper
+## Use Case 5 — Capture Runs Even Without the Wrapper
 
 **Goal:** You (or a teammate) ran `\claude` to bypass the wrapper, or forgot the alias. Catch those runs after the fact.
 
@@ -118,7 +147,7 @@ launchctl submit -l com.phuc.dandori-watch -- /usr/local/bin/dandori watch
 
 ---
 
-## Use Case 5 — View Team Analytics
+## Use Case 6 — View Team Analytics
 
 **Goal:** See which agents are used most, cost trends, success rates.
 
@@ -140,7 +169,7 @@ The dashboard has:
 
 ---
 
-## Use Case 6 — PO/PDM: Assign Agent to a New Task
+## Use Case 7 — PO/PDM: Assign Agent to a New Task
 
 **Goal:** Sprint poller suggests an agent when new tasks appear; PO confirms in Jira.
 
@@ -161,7 +190,7 @@ Scoring: capability 40%, issue type 30%, history 20%, load balance 10%.
 
 ---
 
-## Use Case 7 — Bypass the Wrapper Once
+## Use Case 8 — Bypass the Wrapper Once
 
 ```bash
 \claude "..."                   # leading backslash bypasses the alias
@@ -171,7 +200,7 @@ The run is NOT tracked. Use sparingly; `dandori watch` can catch it later.
 
 ---
 
-## Use Case 8 — Multi-workstation: Same Engineer, Different Machines
+## Use Case 9 — Multi-workstation: Same Engineer, Different Machines
 
 Each machine has its own `~/.dandori/local.db`. For now, analytics are per-workstation. Cross-workstation aggregation uses the optional monitoring server (`dandori sync` → PostgreSQL).
 
@@ -182,7 +211,8 @@ Each machine has its own `~/.dandori/local.db`. For now, analytics are per-works
 | Command | Purpose |
 |---------|---------|
 | `dandori init` | Config + DB + shell aliases |
-| `dandori task start/done/info KEY` | Jira task lifecycle |
+| `dandori task run KEY` | Run agent with full Jira+Confluence context |
+| `dandori task start/done/info KEY` | Manual Jira task lifecycle |
 | `dandori run --task KEY -- <cmd>` | Explicit wrapper (for cron/scripts) |
 | `dandori watch [--once]` | Catch orphan runs |
 | `dandori jira-sync` | Push run status to Jira |

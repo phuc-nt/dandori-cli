@@ -14,6 +14,7 @@ See [Outer Harness](https://phuc-nt.github.io/dandori-pitch/outer-harness.html) 
 
 ## Features
 
+- **Context injection** — `dandori task run KEY` auto-fetches Jira issue + linked Confluence docs
 - **Transparent wrapper** — `claude "..."` is auto-tracked via shell aliases
 - **Background watcher** — `dandori watch` catches runs even when the wrapper is bypassed
 - **3-layer instrumentation** — fork/exec + session log tailer + semantic events
@@ -52,7 +53,11 @@ sudo mv dandori /usr/local/bin/
 dandori init
 source ~/.zshrc
 
-# Use Claude normally — wrapper transparently tracks
+# Option 1: Run agent with full Jira+Confluence context (recommended)
+dandori task run PROJ-123
+# → Fetches issue + linked docs → injects context → runs agent → syncs results
+
+# Option 2: Use Claude normally — wrapper transparently tracks
 claude "fix the auth bug"
 
 # View analytics
@@ -66,7 +71,8 @@ See [User Guide](docs/user-guide.md) for step-by-step use cases.
 | Command | Purpose |
 |---------|---------|
 | `dandori init` | Config + DB + shell aliases |
-| `dandori task start/done/info` | Jira task lifecycle |
+| `dandori task run KEY` | Run with full Jira+Confluence context |
+| `dandori task start/done/info` | Manual Jira task lifecycle |
 | `dandori run --task KEY -- <cmd>` | Explicit wrapper (for scripts) |
 | `dandori watch [--once]` | Capture orphan runs |
 | `dandori jira-sync` | Transition Jira + add comments |

@@ -533,6 +533,57 @@ test_group_j() {
 }
 
 # ============================================================================
+# Group M: Task Run with Context Injection
+# ============================================================================
+
+test_group_m() {
+    log_section "Group M: Task Run with Context Injection"
+
+    # Use the pre-created CLITEST-21 which has Confluence link
+    local task="CLITEST-21"
+
+    log_test "M1" "task run --dry-run shows context preview"
+    local out=$("$DANDORI" task run "$task" --dry-run 2>&1)
+    echo "$out" | grep -q "Auth Module Architecture" && pass "M1" "Confluence doc title found" || fail "M1" "Missing doc"
+
+    log_test "M2" "dry-run extracts Confluence content"
+    echo "$out" | grep -q "TokenService" && pass "M2" "Doc content extracted" || fail "M2" "No content"
+
+    log_test "M3" "dry-run shows issue summary"
+    echo "$out" | grep -q "Fix auth token refresh" && pass "M3" "Summary present" || fail "M3" "No summary"
+
+    log_test "M4" "dry-run shows linked docs count"
+    echo "$out" | grep -q "Linked docs: 1" && pass "M4" "1 linked doc" || fail "M4" "Wrong count"
+
+    log_test "M5" "dry-run generates markdown"
+    echo "$out" | grep -q "## Related Documentation" && pass "M5" "Markdown section present" || fail "M5" "No markdown"
+
+    # Create a fresh task with Confluence link for run test
+    log_test "M6" "task run executes with context"
+    local new_task=$(create_jira_task "E2E test task run with context" "Test issue with conf link: https://fooknt.atlassian.net/wiki/pages/360635")
+    if [ -z "$new_task" ]; then
+        fail "M6" "Failed to create task"
+        return
+    fi
+    TASKS+=("$new_task")
+
+    "$DANDORI" task run "$new_task" --no-sync -- claude -p \
+        "Just confirm you can see the task context. Reply only: CONTEXT_RECEIVED" \
+        --allowedTools "" > /tmp/m6-out.log 2>&1
+    local rc=$?
+    [ $rc -eq 0 ] && pass "M6" "Run completed" || fail "M6" "Run failed rc=$rc"
+
+    log_test "M7" "Run tracked in DB with task key"
+    local run_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM runs WHERE jira_issue_key='$new_task'")
+    [ "${run_count:-0}" -ge 1 ] && pass "M7" "Run tracked ($run_count)" || fail "M7" "Not tracked"
+
+    log_test "M8" "Run has tokens and cost"
+    local cost=$(sqlite3 "$DB" "SELECT cost_usd FROM runs WHERE jira_issue_key='$new_task' ORDER BY started_at DESC LIMIT 1")
+    local has_cost=$(echo "${cost:-0}" | awk '{print ($1 > 0)}')
+    [ "$has_cost" = "1" ] && pass "M8" "Cost: \$$cost" || fail "M8" "No cost"
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -555,6 +606,7 @@ main() {
     test_group_j
     test_group_k
     test_group_l
+    test_group_m
 
     # Summary
     log_section "SUMMARY"
