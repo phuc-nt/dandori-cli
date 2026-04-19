@@ -206,6 +206,42 @@ Each machine has its own `~/.dandori/local.db`. For now, analytics are per-works
 
 ---
 
+## Use Case 10 — Compare Agent Code Quality
+
+**Goal:** Answer "Does Team A's agent write better code than Team B?"
+
+```bash
+# View quality comparison by agent
+dandori analytics quality
+
+# Compare specific agents
+dandori analytics quality --compare alpha,beta
+
+# Export as JSON for external analysis
+dandori analytics quality --format json
+```
+
+**Output:**
+```
+=== Agent Quality Comparison ===
+Lint Δ: negative = fewer errors | Tests Δ: positive = more passing
+
+AGENT  RUNS  LINT Δ  TESTS Δ  LINES  COMMITS  MSG QUAL  IMPROVED
+-----  ----  ------  -------  -----  -------  --------  --------
+alpha  10    -2.3    +15.0    450    12       85%       80%
+beta   8     +1.0    +5.0     820    8        60%       50%
+```
+
+**Metrics tracked per run:**
+- **Lint delta**: Change in lint errors (negative = improvement)
+- **Tests delta**: Change in passing tests (positive = improvement)
+- **Lines changed**: Lines added + removed
+- **Commits**: Number of commits made during run
+- **Msg Quality**: Conventional commit adherence (0-100%)
+- **Improved**: % of runs that improved code quality
+
+---
+
 ## Common Commands Reference
 
 | Command | Purpose |
@@ -217,7 +253,7 @@ Each machine has its own `~/.dandori/local.db`. For now, analytics are per-works
 | `dandori watch [--once]` | Catch orphan runs |
 | `dandori jira-sync` | Push run status to Jira |
 | `dandori conf-write --task KEY` | Confluence report |
-| `dandori analytics {runs\|agents\|cost}` | Terminal analytics |
+| `dandori analytics {runs\|agents\|cost\|quality}` | Terminal analytics |
 | `dandori dashboard` | Web UI |
 | `dandori status` | Recent runs summary |
 | `dandori assign suggest/set` | Agent assignment |

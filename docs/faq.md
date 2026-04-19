@@ -145,6 +145,35 @@ confluence:
 
 **Fix:** Ensure agent commits changes during the run. Git HEAD is compared before/after.
 
+### Quality Metrics Show Zero
+
+**Symptom:** `dandori analytics quality` shows all zeros for lint/test.
+
+**Cause:** Quality config not set, or lint/test commands failed.
+
+**Fix:**
+1. Ensure quality is enabled in `~/.dandori/config.yaml`:
+   ```yaml
+   quality:
+     enabled: true
+     lint_command: "golangci-lint run --json 2>/dev/null || true"
+     test_command: "go test -json ./... 2>&1 || true"
+     timeout: "30s"
+   ```
+2. Verify commands work in your project directory
+3. For non-Go projects, customize lint/test commands
+
+### Commit Quality Score Low
+
+**Symptom:** MSG QUAL shows low percentage in quality analytics.
+
+**Cause:** Commits don't follow conventional commit format.
+
+**Best practice:** Use conventional commits:
+- `feat: add user login`
+- `fix(auth): resolve token expiration`
+- `docs: update README`
+
 ## Command Reference
 
 | Command | Purpose |

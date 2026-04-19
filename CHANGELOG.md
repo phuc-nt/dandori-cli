@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-04-19
+
+Agent Quality Comparison: Measure and compare code quality across agents.
+
+### Added
+- **Quality Metrics Tracking** (`internal/quality/`):
+  - Lint errors/warnings delta (before/after run)
+  - Test pass/fail delta (before/after run)
+  - Git diff stats (lines added/removed, files changed)
+  - Commit count and message quality scoring
+  - Composite quality score (0-100)
+- **Quality Analytics** (`dandori analytics quality`):
+  - Agent comparison table with quality metrics
+  - `--compare alpha,beta` flag for specific agents
+  - `--format json` for export
+- **Commit Scorer**: Conventional commit adherence scoring (0-1)
+- **Git Analyzer**: Diff stats between commits
+- **Schema v2**: `quality_metrics` table for storing metrics
+- **Config**: `quality.enabled`, `quality.lint_command`, `quality.test_command`
+
+### Technical
+- `internal/quality/collector.go` — Lint/test snapshot collection
+- `internal/quality/git_analyzer.go` — Git diff analysis
+- `internal/quality/commit_scorer.go` — Commit message scoring
+- `internal/db/quality.go` — Quality metrics storage/queries
+
 ## [0.2.0] — 2026-04-19
 
 Major feature release: Context injection and enhanced tracking.
