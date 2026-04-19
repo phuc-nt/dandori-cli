@@ -156,11 +156,29 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	// Build agent command with context
 	finalCmd := agentCmd
 	if contextFile != "" {
-		// For claude, we can use --context-file or prepend to prompt
-		// Since claude CLI doesn't have --context-file, we'll use a prompt prefix
-		if len(finalCmd) == 1 && finalCmd[0] == "claude" {
-			// Append instruction to read context
-			finalCmd = append(finalCmd, fmt.Sprintf("Read the task context from %s and complete the task described there.", contextFile))
+		// Inject context into claude command
+		// Claude CLI uses -p for prompt, --system-prompt for system instructions
+		contextInstruction := fmt.Sprintf("IMPORTANT: First read the task context file at %s which contains the Jira issue details and linked Confluence documentation. Base your work on this context.", contextFile)
+
+		if len(finalCmd) >= 1 && finalCmd[0] == "claude" {
+			// Check if user provided -p flag
+			hasPrompt := false
+			promptIdx := -1
+			for i, arg := range finalCmd {
+				if arg == "-p" && i+1 < len(finalCmd) {
+					hasPrompt = true
+					promptIdx = i + 1
+					break
+				}
+			}
+
+			if hasPrompt {
+				// Prepend context instruction to user's prompt
+				finalCmd[promptIdx] = contextInstruction + "\n\n" + finalCmd[promptIdx]
+			} else {
+				// No user prompt, add our own
+				finalCmd = append(finalCmd, "-p", fmt.Sprintf("%s Then complete the task described in the context.", contextInstruction))
+			}
 		}
 	}
 
