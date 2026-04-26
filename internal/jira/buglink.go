@@ -36,11 +36,15 @@ type IssueLink struct {
 	OutwardKey string
 }
 
-// causedByLinkTypes is matched case-insensitively. Other Jira instances may
+// causedByLinkTypes is matched case-insensitively. Includes the canonical
+// link-type Name ("Caused" — what real Jira sends) plus the inward/outward
+// descriptions for fixtures that use those forms. Other Jira instances may
 // add custom names — make this configurable in REFACTOR (Step 8).
 var causedByLinkTypes = map[string]bool{
+	"caused":       true,
 	"caused by":    true,
 	"is caused by": true,
+	"causes":       true,
 }
 
 // runIDPattern matches `caused_by:` followed by ≥12 hex chars. Intentionally

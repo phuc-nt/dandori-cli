@@ -68,6 +68,23 @@ func TestParseLinkCandidates_OutwardOnly(t *testing.T) {
 	}
 }
 
+// TestParseLinkCandidates_RealJiraShape locks in the canonical link-type
+// Name that real Jira sends ("Caused"), distinct from the inward/outward
+// description forms. Regression: live verify on fooknt failed because the
+// matcher only accepted the inward description.
+func TestParseLinkCandidates_RealJiraShape(t *testing.T) {
+	bug := &BugIssue{
+		Key: "BUG-3",
+		Links: []IssueLink{
+			{Type: "Caused", OutwardKey: "TASK-1"},
+		},
+	}
+	got := ParseLinkCandidates(bug)
+	if !reflect.DeepEqual(got, []string{"TASK-1"}) {
+		t.Errorf("got %v, want [TASK-1]", got)
+	}
+}
+
 func TestParseLinkCandidates_OnlyUnrelated(t *testing.T) {
 	bug := &BugIssue{
 		Links: []IssueLink{
