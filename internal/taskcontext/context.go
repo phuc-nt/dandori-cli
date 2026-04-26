@@ -2,12 +2,16 @@ package taskcontext
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
 	"github.com/phuc-nt/dandori-cli/internal/confluence"
+	"github.com/phuc-nt/dandori-cli/internal/event"
 	"github.com/phuc-nt/dandori-cli/internal/jira"
+	"github.com/phuc-nt/dandori-cli/internal/model"
 )
 
 // TaskContext holds all context fetched from Jira and Confluence for a task
@@ -36,6 +40,8 @@ type LinkedDoc struct {
 type Fetcher struct {
 	jiraClient *jira.Client
 	confClient *confluence.Client
+	recorder   *event.Recorder
+	runID      string
 }
 
 // NewFetcher creates a new context fetcher
@@ -43,6 +49,69 @@ func NewFetcher(jiraClient *jira.Client, confClient *confluence.Client) *Fetcher
 	return &Fetcher{
 		jiraClient: jiraClient,
 		confClient: confClient,
+	}
+}
+
+// WithRecorder attaches an event recorder so that each Confluence page fetch
+// emits a confluence.read (or confluence.read.error) event tagged with runID.
+// Returns the same Fetcher to allow chaining at construction.
+func (f *Fetcher) WithRecorder(recorder *event.Recorder, runID string) *Fetcher {
+	f.recorder = recorder
+	f.runID = runID
+	return f
+}
+
+// classifyConfluenceError maps confluence client errors to a coarse class
+// suitable for analytics (no PII, no full message).
+func classifyConfluenceError(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, confluence.ErrPageNotFound):
+		return "not_found"
+	case errors.Is(err, confluence.ErrEmptyBaseURL):
+		return "config"
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "401"), strings.Contains(msg, "403"), strings.Contains(msg, "auth"):
+		return "auth"
+	case strings.Contains(msg, "timeout"), strings.Contains(msg, "deadline"):
+		return "timeout"
+	case strings.Contains(msg, "no such host"), strings.Contains(msg, "connection"), strings.Contains(msg, "dial"):
+		return "network"
+	}
+	return "other"
+}
+
+// emitConfluenceRead writes a successful read event. Failures only log; tracking
+// must never block the run.
+func (f *Fetcher) emitConfluenceRead(pageID, title, spaceKey string, version, charCount int) {
+	if f.recorder == nil || f.runID == "" {
+		return
+	}
+	payload := map[string]any{
+		"page_id":    pageID,
+		"version":    version,
+		"title":      title,
+		"space_key":  spaceKey,
+		"char_count": charCount,
+	}
+	if err := f.recorder.RecordEvent(f.runID, model.LayerSemantic, "confluence.read", payload); err != nil {
+		slog.Warn("record confluence.read failed", "page_id", pageID, "error", err)
+	}
+}
+
+func (f *Fetcher) emitConfluenceReadError(pageID string, err error) {
+	if f.recorder == nil || f.runID == "" {
+		return
+	}
+	payload := map[string]any{
+		"page_id":     pageID,
+		"error_class": classifyConfluenceError(err),
+	}
+	if recErr := f.recorder.RecordEvent(f.runID, model.LayerSemantic, "confluence.read.error", payload); recErr != nil {
+		slog.Warn("record confluence.read.error failed", "page_id", pageID, "error", recErr)
 	}
 }
 
@@ -99,6 +168,7 @@ func (f *Fetcher) Fetch(ctx context.Context, issueKey string) (*TaskContext, err
 		for _, cl := range uniqueLinks {
 			page, err := f.confClient.GetPage(ctx, cl.PageID)
 			if err != nil {
+				f.emitConfluenceReadError(cl.PageID, err)
 				continue // Skip pages we can't access
 			}
 
@@ -109,6 +179,12 @@ func (f *Fetcher) Fetch(ctx context.Context, issueKey string) (*TaskContext, err
 				URL:     cl.URL,
 				Content: content,
 			})
+
+			spaceKey := ""
+			if page.Space != nil {
+				spaceKey = page.Space.Key
+			}
+			f.emitConfluenceRead(cl.PageID, page.Title, spaceKey, page.Version.Number, len(content))
 		}
 	}
 
