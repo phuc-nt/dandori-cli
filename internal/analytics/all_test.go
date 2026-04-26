@@ -122,4 +122,81 @@ func TestAnalyticsAll_WindowLabel(t *testing.T) {
 	}
 }
 
+// seedQualityData inserts runs + events needed for Quality KPI block tests.
+func seedQualityData(t *testing.T, d *db.LocalDB) {
+	t.Helper()
+	ts := "2026-04-26T10:00:00Z"
+	for _, stmt := range []string{
+		`INSERT INTO runs (id, jira_issue_key, agent_name, agent_type, user, workstation_id, started_at, cost_usd, status)
+		 VALUES ('q1', 'QT-1', 'alpha', 'claude_code', 'tester', 'ws', '` + ts + `', 0.50, 'done')`,
+		`INSERT INTO runs (id, jira_issue_key, agent_name, agent_type, user, workstation_id, started_at, cost_usd, status)
+		 VALUES ('q2', 'QT-2', 'beta', 'claude_code', 'tester', 'ws', '` + ts + `', 0.20, 'done')`,
+		`INSERT INTO events (run_id, layer, event_type, data, ts)
+		 VALUES ('q1', 3, 'task.iteration.start', '{"issue_key":"QT-1"}', '` + ts + `')`,
+		`INSERT INTO events (run_id, layer, event_type, data, ts)
+		 VALUES ('q2', 3, 'bug.filed', '{"bug_key":"BUG-1"}', '` + ts + `')`,
+	} {
+		if _, err := d.Exec(stmt); err != nil {
+			t.Fatalf("seedQualityData: %v", err)
+		}
+	}
+}
+
+func TestBuildSnapshot_IncludesQualityKPI(t *testing.T) {
+	dir := t.TempDir()
+	d, err := db.Open(filepath.Join(dir, "kpi.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { _ = d.Close() })
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	seedQualityData(t, d)
+
+	snap, err := BuildSnapshot(d, Window{Since: 30 * 24 * time.Hour}, DefaultThresholds())
+	if err != nil {
+		t.Fatalf("BuildSnapshot: %v", err)
+	}
+	if snap.QualityKPI.Regression == nil && snap.QualityKPI.Bugs == nil {
+		t.Error("QualityKPI block should be populated when data exists")
+	}
+	if len(snap.QualityKPI.Regression) == 0 {
+		t.Error("expected at least one RegressionRow")
+	}
+	if len(snap.QualityKPI.Bugs) == 0 {
+		t.Error("expected at least one BugRateRow")
+	}
+	if len(snap.QualityKPI.Cost) == 0 {
+		t.Error("expected at least one TaskCostRow")
+	}
+}
+
+func TestFormatTable_QualityKPIBlock(t *testing.T) {
+	dir := t.TempDir()
+	d, err := db.Open(filepath.Join(dir, "kpifmt.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { _ = d.Close() })
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	seedQualityData(t, d)
+
+	snap, err := BuildSnapshot(d, Window{Since: 30 * 24 * time.Hour}, DefaultThresholds())
+	if err != nil {
+		t.Fatalf("BuildSnapshot: %v", err)
+	}
+	out := FormatTable(snap)
+	if !strings.Contains(out, "QUALITY KPI") {
+		t.Errorf("FormatTable output missing QUALITY KPI heading; got:\n%s", out)
+	}
+	for _, want := range []string{"Regression rate", "Bug rate", "Top cost"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("FormatTable missing %q section", want)
+		}
+	}
+}
+
 var _ = os.Stdout // keep imports stable if file is edited down

@@ -9,6 +9,14 @@ import (
 	"github.com/phuc-nt/dandori-cli/internal/db"
 )
 
+// QualityKPIBlock holds the three quality KPI slices for the snapshot.
+// Only agent dimension is used in the snapshot (keeps output scannable).
+type QualityKPIBlock struct {
+	Regression []db.RegressionRow `json:"regression"`
+	Bugs       []db.BugRateRow    `json:"bugs"`
+	Cost       []db.TaskCostRow   `json:"cost"`
+}
+
 // Snapshot is the 4-block output of `analytics all`.
 type Snapshot struct {
 	WindowLabel    string              `json:"window"`
@@ -17,6 +25,7 @@ type Snapshot struct {
 	Leaderboard    []db.MixRow         `json:"leaderboard"`
 	QualityByAgent []db.QualityStats   `json:"quality_by_agent"`
 	Alerts         []Alert             `json:"alerts"`
+	QualityKPI     QualityKPIBlock     `json:"quality_kpi"`
 }
 
 // Window controls the time range. Zero Since → 30 days.
@@ -70,6 +79,19 @@ func BuildSnapshot(local *db.LocalDB, w Window, th Thresholds) (*Snapshot, error
 		})
 	}
 
+	// Quality KPI block — agent dimension only, top 10 to keep snapshot scannable.
+	// Errors are non-fatal: missing events simply yield empty slices.
+	var kpiBlock QualityKPIBlock
+	if rr, err := local.RegressionRate("agent", w.days()); err == nil {
+		kpiBlock.Regression = rr
+	}
+	if br, err := local.BugRate("agent", w.days()); err == nil {
+		kpiBlock.Bugs = br
+	}
+	if tc, err := local.QualityAdjustedCost("agent", w.days(), 10); err == nil {
+		kpiBlock.Cost = tc
+	}
+
 	return &Snapshot{
 		WindowLabel:    w.label(),
 		GeneratedAt:    time.Now().UTC(),
@@ -77,6 +99,7 @@ func BuildSnapshot(local *db.LocalDB, w Window, th Thresholds) (*Snapshot, error
 		Leaderboard:    board,
 		QualityByAgent: quality,
 		Alerts:         DetectAlerts(stats, th),
+		QualityKPI:     kpiBlock,
 	}, nil
 }
 
@@ -139,6 +162,52 @@ func FormatTable(s *Snapshot) string {
 	} else {
 		for _, a := range s.Alerts {
 			fmt.Fprintf(&b, "  ⚠ %s\n", a.Message)
+		}
+	}
+	fmt.Fprintln(&b)
+
+	fmt.Fprintln(&b, "[5] QUALITY KPI (by agent)")
+	kpi := s.QualityKPI
+	if len(kpi.Regression) == 0 && len(kpi.Bugs) == 0 && len(kpi.Cost) == 0 {
+		fmt.Fprintln(&b, "  (no quality KPI data yet)")
+	} else {
+		if len(kpi.Regression) > 0 {
+			fmt.Fprintln(&b, "  Regression rate:")
+			fmt.Fprintf(&b, "    %-18s %6s %10s %12s\n", "AGENT", "TASKS", "REGRESSED", "REGRESSION%")
+			for _, r := range kpi.Regression {
+				key := r.GroupKey
+				if key == "" {
+					key = "(none)"
+				}
+				fmt.Fprintf(&b, "    %-18s %6d %10d %11.1f%%\n", key, r.TotalTasks, r.RegressedTasks, r.RegressionPct)
+			}
+		}
+		if len(kpi.Bugs) > 0 {
+			fmt.Fprintln(&b, "  Bug rate:")
+			fmt.Fprintf(&b, "    %-18s %6s %6s %10s\n", "AGENT", "RUNS", "BUGS", "BUGS/RUN")
+			for _, r := range kpi.Bugs {
+				key := r.GroupKey
+				if key == "" {
+					key = "(none)"
+				}
+				fmt.Fprintf(&b, "    %-18s %6d %6d %10.2f\n", key, r.Runs, r.Bugs, r.BugsPerRun)
+			}
+		}
+		if len(kpi.Cost) > 0 {
+			fmt.Fprintln(&b, "  Top cost tasks:")
+			fmt.Fprintf(&b, "    %-14s %-18s %8s %5s %10s %5s %6s\n", "TASK", "AGENT", "COST", "RUNS", "ITERATIONS", "BUGS", "CLEAN")
+			for _, r := range kpi.Cost {
+				key := r.GroupKey
+				if key == "" {
+					key = "(none)"
+				}
+				clean := "no"
+				if r.IsClean {
+					clean = "yes"
+				}
+				fmt.Fprintf(&b, "    %-14s %-18s %8.4f %5d %10d %5d %6s\n",
+					r.IssueKey, key, r.TotalCostUSD, r.RunCount, r.IterationCount, r.BugCount, clean)
+			}
 		}
 	}
 
