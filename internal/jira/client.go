@@ -244,6 +244,33 @@ func (c *Client) SearchIssues(jql string, maxResults int) ([]Issue, error) {
 	return issues, nil
 }
 
+// SearchBugs is the bug-link variant of SearchIssues: it requests the
+// issuelinks field so DetectBugLinks can inspect Jira link types
+// ("is caused by" etc). Splitting from SearchIssues keeps the hot
+// sprint poll path lightweight.
+func (c *Client) SearchBugs(jql string, maxResults int) ([]Issue, error) {
+	if maxResults == 0 {
+		maxResults = 50
+	}
+
+	body := map[string]any{
+		"jql":        jql,
+		"maxResults": maxResults,
+		"fields":     []string{"summary", "description", "issuetype", "status", "labels", "assignee", "created", "updated", "issuelinks"},
+	}
+
+	var resp issuesResponse
+	if err := c.post("/rest/api/3/search/jql", body, &resp); err != nil {
+		return nil, err
+	}
+
+	issues := make([]Issue, 0, len(resp.Issues))
+	for _, ir := range resp.Issues {
+		issues = append(issues, *parseIssue(&ir))
+	}
+	return issues, nil
+}
+
 func (c *Client) delete(path string) error {
 	resp, err := c.do(http.MethodDelete, path, nil)
 	if err != nil {

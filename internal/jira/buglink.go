@@ -15,6 +15,18 @@ type BugIssue struct {
 	Links       []IssueLink
 }
 
+// FromIssue adapts a poller-fetched Issue into a BugIssue. Used by the
+// bugLinkCycle to feed DetectBugLinks.
+func (b *BugIssue) FromIssue(i *Issue) {
+	if i == nil {
+		return
+	}
+	b.Key = i.Key
+	b.Summary = i.Summary
+	b.Description = i.Description
+	b.Links = i.Links
+}
+
 // IssueLink represents one row from a Jira issue's "issuelinks" array. Only
 // one of InwardKey / OutwardKey is set per Jira; we accept either since
 // the relevant directional half differs by link type definition.

@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -10,16 +11,22 @@ import (
 	"github.com/phuc-nt/dandori-cli/internal/model"
 )
 
+// bugLinkScanWindow is the JQL "created >= -Nd" window. Conservative
+// 30d default — bugs filed weeks after a run still get linked. Since
+// detection dedupes on bug_key, re-scanning is idempotent.
+const bugLinkScanWindow = "30d"
+
 type Poller struct {
-	client          *Client
-	boardID         int
-	interval        time.Duration
-	lastIssueSet    map[string]bool
-	pendingSuggests map[string]pendingSuggest
-	onNewTask       func(Issue)
-	onAssigned      func(Issue)
-	onSuggestAgent  func(Issue) (agentName string, score int, reason string)
-	reminderAfter   time.Duration
+	client            *Client
+	boardID           int
+	interval          time.Duration
+	bugLinkInterval   time.Duration
+	lastIssueSet      map[string]bool
+	pendingSuggests   map[string]pendingSuggest
+	onNewTask         func(Issue)
+	onAssigned        func(Issue)
+	onSuggestAgent    func(Issue) (agentName string, score int, reason string)
+	reminderAfter     time.Duration
 
 	localDB  *db.LocalDB
 	recorder *event.Recorder
@@ -40,11 +47,15 @@ type PollerConfig struct {
 	OnSuggestAgent func(Issue) (agentName string, score int, reason string)
 	ReminderAfter  time.Duration
 
-	// LocalDB + Recorder enable iteration detection. When either is nil,
-	// the poller skips iteration tracking — keeps the existing assignment
-	// flow unchanged for callers that don't need this feature yet.
+	// LocalDB + Recorder enable iteration detection + bug-link cycle.
+	// When either is nil, the poller skips both tracking features.
 	LocalDB  *db.LocalDB
 	Recorder *event.Recorder
+
+	// BugLinkInterval controls how often the bug-link cycle runs.
+	// Default 1h — much rarer than the sprint poll because bug
+	// detection is a heavier search and idempotent across cycles.
+	BugLinkInterval time.Duration
 }
 
 func NewPoller(cfg PollerConfig) *Poller {
@@ -58,10 +69,16 @@ func NewPoller(cfg PollerConfig) *Poller {
 		reminderAfter = 2 * time.Hour
 	}
 
+	bugLinkInterval := cfg.BugLinkInterval
+	if bugLinkInterval == 0 {
+		bugLinkInterval = time.Hour
+	}
+
 	return &Poller{
 		client:          cfg.Client,
 		boardID:         cfg.BoardID,
 		interval:        interval,
+		bugLinkInterval: bugLinkInterval,
 		lastIssueSet:    make(map[string]bool),
 		pendingSuggests: make(map[string]pendingSuggest),
 		onNewTask:       cfg.OnNewTask,
@@ -74,14 +91,23 @@ func NewPoller(cfg PollerConfig) *Poller {
 }
 
 func (p *Poller) Run(ctx context.Context) error {
-	slog.Info("jira poller started", "board_id", p.boardID, "interval", p.interval)
+	slog.Info("jira poller started",
+		"board_id", p.boardID,
+		"interval", p.interval,
+		"bug_link_interval", p.bugLinkInterval,
+	)
 
 	if err := p.Poll(ctx); err != nil {
 		slog.Error("initial poll failed", "error", err)
 	}
+	if err := p.bugLinkCycle(ctx); err != nil {
+		slog.Error("initial bug link cycle failed", "error", err)
+	}
 
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
+	bugTicker := time.NewTicker(p.bugLinkInterval)
+	defer bugTicker.Stop()
 
 	for {
 		select {
@@ -91,6 +117,10 @@ func (p *Poller) Run(ctx context.Context) error {
 		case <-ticker.C:
 			if err := p.Poll(ctx); err != nil {
 				slog.Error("poll failed", "error", err)
+			}
+		case <-bugTicker.C:
+			if err := p.bugLinkCycle(ctx); err != nil {
+				slog.Error("bug link cycle failed", "error", err)
 			}
 		}
 	}
@@ -215,6 +245,63 @@ func (p *Poller) detectIterations(issues []Issue) {
 		}
 		slog.Info("iteration detected", "key", issue.Key, "round", evt.Round, "prev_run", evt.PrevRunID)
 	}
+}
+
+// BugLinkCycleOnce runs the bug-link cycle exactly once. Public so the
+// `dandori jira-poll --once` command can trigger a single pass without
+// starting the long-running ticker loop.
+func (p *Poller) BugLinkCycleOnce(ctx context.Context) error {
+	return p.bugLinkCycle(ctx)
+}
+
+// bugLinkCycle searches Jira for recently-created Bug issues, runs
+// DetectBugLinks on each, and emits bug.filed events for the matches.
+// Designed for a separate ticker (~1h) — heavier than the sprint poll.
+//
+// Failures must NEVER break the cycle: each per-bug failure logs and
+// continues so a single bad payload doesn't block the rest.
+func (p *Poller) bugLinkCycle(ctx context.Context) error {
+	if p.localDB == nil || p.recorder == nil {
+		return nil
+	}
+	jql := fmt.Sprintf("issuetype=Bug AND created >= -%s ORDER BY created DESC", bugLinkScanWindow)
+	bugs, err := p.client.SearchBugs(jql, 50)
+	if err != nil {
+		return fmt.Errorf("bug search: %w", err)
+	}
+	resolver := bugLinkDBResolver{db: p.localDB}
+	for _, issue := range bugs {
+		bug := &BugIssue{}
+		bug.FromIssue(&issue)
+		events, err := DetectBugLinks(bug, resolver)
+		if err != nil {
+			slog.Warn("bug link: detect failed", "key", bug.Key, "error", err)
+			continue
+		}
+		for _, e := range events {
+			if err := p.recorder.RecordEvent(e.RunID, model.LayerSemantic, "bug.filed", e.Payload); err != nil {
+				slog.Warn("bug link: record event failed", "key", bug.Key, "run", e.RunID, "error", err)
+				continue
+			}
+			slog.Info("bug linked", "bug_key", bug.Key, "run", e.RunID, "link_type", e.Payload["link_type"])
+		}
+	}
+	return nil
+}
+
+// bugLinkDBResolver adapts LocalDB to BugLinkResolver. Lives in poller.go
+// (not buglink.go) so the jira package's pure detection layer stays
+// resolver-interface only.
+type bugLinkDBResolver struct{ db *db.LocalDB }
+
+func (r bugLinkDBResolver) LatestRunForIssue(issueKey string) (string, error) {
+	return r.db.LatestRunIDForIssue(issueKey)
+}
+func (r bugLinkDBResolver) FindRunByPrefix(prefix string) (string, error) {
+	return r.db.FindRunByPrefix(prefix)
+}
+func (r bugLinkDBResolver) BugEventExists(bugKey string) (bool, error) {
+	return r.db.BugEventExists(bugKey)
 }
 
 func toIterationEvents(rows []db.IterationEventRow) []IterationEvent {

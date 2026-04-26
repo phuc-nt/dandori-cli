@@ -38,6 +38,22 @@ Examples:
 	RunE: runAnalyticsContext,
 }
 
+var analyticsBugsCmd = &cobra.Command{
+	Use:   "bugs",
+	Short: "Bugs filed per agent / task (Layer-3 bug.filed events)",
+	Long: `Aggregate bug.filed events emitted by the bug-link cycle.
+
+Each bug.filed event carries a bug_key + caused_by_run_id. Counts are
+DISTINCT per bug_key so the same bug linked via two methods (Jira link
++ description tag) registers once.
+
+Examples:
+  dandori analytics bugs                 # by agent
+  dandori analytics bugs --by task       # by Jira task key
+  dandori analytics bugs --since 30 --format json`,
+	RunE: runAnalyticsBugs,
+}
+
 var analyticsIterationsCmd = &cobra.Command{
 	Use:   "iterations",
 	Short: "Average feedback rounds per agent / engineer / sprint",
@@ -55,6 +71,7 @@ func init() {
 	analyticsCmd.AddCommand(analyticsToolsCmd)
 	analyticsCmd.AddCommand(analyticsContextCmd)
 	analyticsCmd.AddCommand(analyticsIterationsCmd)
+	analyticsCmd.AddCommand(analyticsBugsCmd)
 
 	analyticsToolsCmd.Flags().IntVar(&analyticsEventsSince, "since", 0, "Window in days (0 = all time)")
 	analyticsToolsCmd.Flags().IntVar(&analyticsEventsTop, "top", 20, "Limit to top K tools")
@@ -66,6 +83,10 @@ func init() {
 
 	analyticsIterationsCmd.Flags().StringVar(&analyticsEventsBy, "by", "agent", "Group by: agent, engineer, sprint")
 	analyticsIterationsCmd.Flags().StringVar(&analyticsFormat, "format", "table", "Output format: table, json")
+
+	analyticsBugsCmd.Flags().StringVar(&analyticsEventsBy, "by", "agent", "Group by: agent, task")
+	analyticsBugsCmd.Flags().IntVar(&analyticsEventsSince, "since", 0, "Window in days (0 = all time)")
+	analyticsBugsCmd.Flags().StringVar(&analyticsFormat, "format", "table", "Output format: table, json")
 }
 
 func runAnalyticsTools(cmd *cobra.Command, args []string) error {
@@ -128,6 +149,42 @@ func runAnalyticsContext(cmd *cobra.Command, args []string) error {
 			title = "(untitled)"
 		}
 		fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", r.PageID, title, r.UseCount, r.LastUsedAt.Format("2006-01-02 15:04"))
+	}
+	return w.Flush()
+}
+
+func runAnalyticsBugs(cmd *cobra.Command, args []string) error {
+	store, err := getLocalDB()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	rows, err := store.BugStats(analyticsEventsBy, analyticsEventsSince)
+	if err != nil {
+		return fmt.Errorf("bug stats: %w", err)
+	}
+	if len(rows) == 0 {
+		fmt.Println("No bug.filed events yet. Bug-link cycle requires Jira Bug tickets with `caused by` links or `caused_by:<runid>` description tags.")
+		return nil
+	}
+	if analyticsFormat == "json" {
+		return json.NewEncoder(os.Stdout).Encode(rows)
+	}
+
+	header := "AGENT"
+	if analyticsEventsBy == "task" {
+		header = "TASK"
+	}
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(w, "%s\tBUGS\tLAST FILED\n", header)
+	fmt.Fprintf(w, "%s\t----\t----------\n", "-----")
+	for _, r := range rows {
+		key := r.GroupKey
+		if key == "" {
+			key = "(none)"
+		}
+		fmt.Fprintf(w, "%s\t%d\t%s\n", key, r.BugCount, r.LastFiled.Format("2006-01-02 15:04"))
 	}
 	return w.Flush()
 }

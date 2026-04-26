@@ -74,6 +74,11 @@ type Issue struct {
 	UpdatedAt         time.Time
 
 	ConfluenceLinks []ConfluenceLink
+
+	// Links is populated only by SearchBugs (it requests the issuelinks
+	// field). GetSprintIssues / GetIssue leave it empty to avoid extra
+	// payload weight on the hot path.
+	Links []IssueLink
 }
 
 type ConfluenceLink struct {
@@ -146,7 +151,23 @@ type issueResponse struct {
 		AgentName    string   `json:"customfield_10100"`
 		Created      JiraTime `json:"created"`
 		Updated      JiraTime `json:"updated"`
+		IssueLinks   []issueLinkResponse `json:"issuelinks"`
 	} `json:"fields"`
+}
+
+// issueLinkResponse mirrors one entry of Jira's "issuelinks" array. Each
+// row carries a type plus exactly one of inwardIssue/outwardIssue
+// depending on which side of the link the parent issue sits.
+type issueLinkResponse struct {
+	Type struct {
+		Name string `json:"name"`
+	} `json:"type"`
+	InwardIssue *struct {
+		Key string `json:"key"`
+	} `json:"inwardIssue,omitempty"`
+	OutwardIssue *struct {
+		Key string `json:"key"`
+	} `json:"outwardIssue,omitempty"`
 }
 
 func parseIssue(resp *issueResponse) *Issue {
@@ -167,7 +188,26 @@ func parseIssue(resp *issueResponse) *Issue {
 		EpicKey:     resp.Fields.Epic.Key,
 		CreatedAt:   resp.Fields.Created.Time,
 		UpdatedAt:   resp.Fields.Updated.Time,
+		Links:       parseIssueLinks(resp.Fields.IssueLinks),
 	}
+}
+
+func parseIssueLinks(rows []issueLinkResponse) []IssueLink {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]IssueLink, 0, len(rows))
+	for _, r := range rows {
+		link := IssueLink{Type: r.Type.Name}
+		if r.InwardIssue != nil {
+			link.InwardKey = r.InwardIssue.Key
+		}
+		if r.OutwardIssue != nil {
+			link.OutwardKey = r.OutwardIssue.Key
+		}
+		out = append(out, link)
+	}
+	return out
 }
 
 func parseDescription(v any) string {
