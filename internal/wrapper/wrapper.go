@@ -288,12 +288,20 @@ func insertRun(localDB *db.LocalDB, run *model.Run) error {
 	// ON CONFLICT updates the row so callers can pre-create a pending run
 	// (e.g. for taskcontext.Fetch event tagging) and the wrapper still owns
 	// the canonical fields once execution starts.
+	//
+	// engineer_name uses COALESCE so that a pre-created value (set from the
+	// Jira assignee in cmd/task_run.go) is not overwritten by NULL when the
+	// wrapper fires. If the wrapper does have a value it wins normally.
+	var engineerNameVal interface{}
+	if run.EngineerName != "" {
+		engineerNameVal = run.EngineerName
+	}
 	_, err := localDB.Exec(`
 		INSERT INTO runs (
 			id, jira_issue_key, jira_sprint_id, agent_name, agent_type,
 			user, workstation_id, cwd, git_remote, git_head_before,
-			command, started_at, status
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			command, started_at, status, engineer_name
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			jira_issue_key = excluded.jira_issue_key,
 			jira_sprint_id = excluded.jira_sprint_id,
@@ -306,11 +314,12 @@ func insertRun(localDB *db.LocalDB, run *model.Run) error {
 			git_head_before= excluded.git_head_before,
 			command        = excluded.command,
 			started_at     = excluded.started_at,
-			status         = excluded.status
+			status         = excluded.status,
+			engineer_name  = COALESCE(excluded.engineer_name, engineer_name)
 	`,
 		run.ID, run.JiraIssueKey, run.JiraSprintID, run.AgentName, run.AgentType,
 		run.User, run.WorkstationID, run.CWD, run.GitRemote, run.GitHeadBefore,
-		run.Command, run.StartedAt.Format(time.RFC3339), run.Status,
+		run.Command, run.StartedAt.Format(time.RFC3339), run.Status, engineerNameVal,
 	)
 	return err
 }

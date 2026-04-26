@@ -122,8 +122,9 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Pre-create runID + pending run row so context-fetch events can reference it.
+	// engineerName is populated after fetch below; pre-create with empty string (NULL).
 	runID := util.GenerateRunID()
-	if err := insertPendingRun(localDB, runID, issueKey); err != nil {
+	if err := insertPendingRun(localDB, runID, issueKey, ""); err != nil {
 		// Non-fatal: tracking degrades to wrapper-managed insert.
 		fmt.Printf("Warning: pre-create run row failed: %v\n", err)
 	}
@@ -139,6 +140,13 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		taskCtx, err := fetcher.Fetch(ctx, issueKey)
 		if err != nil {
 			return fmt.Errorf("fetch context: %w", err)
+		}
+
+		// Backfill engineer_name now that we have the Jira issue assignee.
+		if taskCtx.Assignee != "" {
+			if updErr := updateRunEngineerName(localDB, runID, taskCtx.Assignee); updErr != nil {
+				fmt.Printf("Warning: set engineer_name failed: %v\n", updErr)
+			}
 		}
 
 		taskDescription = taskCtx.Description // Save for AC extraction later
@@ -441,10 +449,18 @@ func buildCompletionComment(agentName string, result *wrapper.Result, changes Gi
 	return sb.String()
 }
 
+// updateRunEngineerName sets engineer_name on an existing run row.
+// Called after context fetch resolves the Jira assignee.
+func updateRunEngineerName(localDB *db.LocalDB, runID, engineerName string) error {
+	_, err := localDB.Exec(`UPDATE runs SET engineer_name = ? WHERE id = ?`, engineerName, runID)
+	return err
+}
+
 // insertPendingRun reserves a runs row early so events emitted during
 // taskcontext.Fetch (Layer-3 phase 02) carry a valid run_id. The wrapper
 // upserts the row with full metadata once execution actually starts.
-func insertPendingRun(localDB *db.LocalDB, runID, jiraKey string) error {
+// engineerName is the Jira assignee DisplayName (may be empty for unassigned issues).
+func insertPendingRun(localDB *db.LocalDB, runID, jiraKey, engineerName string) error {
 	cwd, _ := os.Getwd()
 	currentUser, _ := user.Current()
 	hostname, _ := os.Hostname()
@@ -452,11 +468,16 @@ func insertPendingRun(localDB *db.LocalDB, runID, jiraKey string) error {
 	if currentUser != nil {
 		username = currentUser.Username
 	}
+	// engineer_name may be empty — store NULL for unassigned so analytics shows "(unassigned)"
+	var engineerNameVal interface{}
+	if engineerName != "" {
+		engineerNameVal = engineerName
+	}
 	_, err := localDB.Exec(`
 		INSERT OR IGNORE INTO runs (
 			id, jira_issue_key, agent_type, user, workstation_id,
-			cwd, started_at, status
-		) VALUES (?, ?, 'claude_code', ?, ?, ?, ?, 'pending')
-	`, runID, jiraKey, username, fmt.Sprintf("ws-%s", hostname), cwd, time.Now().Format(time.RFC3339))
+			cwd, started_at, status, engineer_name
+		) VALUES (?, ?, 'claude_code', ?, ?, ?, ?, 'pending', ?)
+	`, runID, jiraKey, username, fmt.Sprintf("ws-%s", hostname), cwd, time.Now().Format(time.RFC3339), engineerNameVal)
 	return err
 }

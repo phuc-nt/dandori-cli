@@ -23,6 +23,7 @@ type TaskContext struct {
 	Priority    string
 	Status      string
 	Labels      []string
+	Assignee    string // Jira issue assignee DisplayName; empty if unassigned
 
 	// Confluence docs linked in the issue
 	LinkedDocs []LinkedDoc
@@ -131,6 +132,7 @@ func (f *Fetcher) Fetch(ctx context.Context, issueKey string) (*TaskContext, err
 		Priority:    issue.Priority,
 		Status:      issue.Status,
 		Labels:      issue.Labels,
+		Assignee:    issue.Assignee,
 	}
 
 	// 2. Extract Confluence links from description

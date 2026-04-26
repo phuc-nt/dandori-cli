@@ -39,6 +39,7 @@ type Run struct {
 	CacheWriteTokens int
 	Model           sql.NullString
 	CostUSD         float64
+	EngineerName    string // Jira issue assignee DisplayName; empty if unassigned
 	Synced          bool
 	CreatedAt       time.Time
 }
