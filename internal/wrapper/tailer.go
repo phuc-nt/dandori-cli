@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/phuc-nt/dandori-cli/internal/event"
+	"github.com/phuc-nt/dandori-cli/internal/model"
 )
 
 // DefaultPostExitTimeout is how long the tailer keeps polling after the
@@ -21,6 +24,14 @@ func TailSessionLog(ctx context.Context, cwd string, snapshot *SessionSnapshot) 
 	return TailSessionLogWithTimeout(ctx, cwd, snapshot, DefaultPostExitTimeout)
 }
 
+// TailSessionLogWithRecorder is the phase-01 entry point: same behaviour as
+// TailSessionLogWithTimeout, plus emits Layer-3 semantic events (tool.use /
+// tool.result / skill.invoke) into the events table for runID. recorder may
+// be nil — in that case, behaviour is identical to the timeout-only variant.
+func TailSessionLogWithRecorder(ctx context.Context, cwd string, snapshot *SessionSnapshot, postExitTimeout time.Duration, recorder *event.Recorder, runID string) TokenUsage {
+	return tailSessionLog(ctx, cwd, snapshot, postExitTimeout, recorder, runID)
+}
+
 // TailSessionLogWithTimeout watches the Claude session JSONL in two phases:
 //   Phase A (ctx alive): standard ticker loop — captures tokens as they're written.
 //   Phase B (ctx done):  post-exit wait up to postExitTimeout. Session JSONL often
@@ -30,6 +41,12 @@ func TailSessionLog(ctx context.Context, cwd string, snapshot *SessionSnapshot) 
 //
 // Pass postExitTimeout=0 to skip Phase B entirely (--no-wait behaviour).
 func TailSessionLogWithTimeout(ctx context.Context, cwd string, snapshot *SessionSnapshot, postExitTimeout time.Duration) TokenUsage {
+	return tailSessionLog(ctx, cwd, snapshot, postExitTimeout, nil, "")
+}
+
+// tailSessionLog is the unified implementation. recorder/runID are optional;
+// when both are set, every parsed line also emits Layer-3 events.
+func tailSessionLog(ctx context.Context, cwd string, snapshot *SessionSnapshot, postExitTimeout time.Duration, recorder *event.Recorder, runID string) TokenUsage {
 	usage := TokenUsage{}
 
 	if snapshot == nil || snapshot.Dir == "" {
@@ -49,11 +66,13 @@ func TailSessionLogWithTimeout(ctx context.Context, cwd string, snapshot *Sessio
 			if postExitTimeout <= 0 {
 				// --no-wait: one last read if we already found the file.
 				if logPath != "" {
-					usage = readTokensFromOffset(logPath, lastOffset, usage)
+					newUsage, newOffset := parseLogFromOffsetWithRecorder(logPath, lastOffset, recorder, runID)
+					usage = mergeUsage(usage, newUsage)
+					lastOffset = newOffset
 				}
 				return usage
 			}
-			return tailPostExit(cwd, snapshot, logPath, lastOffset, usage, postExitTimeout)
+			return tailPostExit(cwd, snapshot, logPath, lastOffset, usage, postExitTimeout, recorder, runID)
 		case <-ticker.C:
 			if logPath == "" {
 				logPath = GetSessionLogPath(cwd, snapshot)
@@ -61,7 +80,7 @@ func TailSessionLogWithTimeout(ctx context.Context, cwd string, snapshot *Sessio
 					continue
 				}
 			}
-			newUsage, newOffset := parseLogFromOffset(logPath, lastOffset)
+			newUsage, newOffset := parseLogFromOffsetWithRecorder(logPath, lastOffset, recorder, runID)
 			usage = mergeUsage(usage, newUsage)
 			lastOffset = newOffset
 		}
@@ -72,7 +91,7 @@ func TailSessionLogWithTimeout(ctx context.Context, cwd string, snapshot *Sessio
 // returns when either:
 //   - no new bytes for idleGrace (session flushed and stable), OR
 //   - postExitTimeout expires.
-func tailPostExit(cwd string, snapshot *SessionSnapshot, logPath string, lastOffset int64, usage TokenUsage, postExitTimeout time.Duration) TokenUsage {
+func tailPostExit(cwd string, snapshot *SessionSnapshot, logPath string, lastOffset int64, usage TokenUsage, postExitTimeout time.Duration, recorder *event.Recorder, runID string) TokenUsage {
 	const (
 		pollInterval = 250 * time.Millisecond
 		idleGrace    = 750 * time.Millisecond
@@ -96,7 +115,7 @@ func tailPostExit(cwd string, snapshot *SessionSnapshot, logPath string, lastOff
 		}
 
 		if logPath != "" {
-			newUsage, newOffset := parseLogFromOffset(logPath, lastOffset)
+			newUsage, newOffset := parseLogFromOffsetWithRecorder(logPath, lastOffset, recorder, runID)
 			if newOffset > lastOffset {
 				usage = mergeUsage(usage, newUsage)
 				lastOffset = newOffset
@@ -121,12 +140,15 @@ func tailPostExit(cwd string, snapshot *SessionSnapshot, logPath string, lastOff
 	}
 }
 
-func readTokensFromOffset(path string, offset int64, current TokenUsage) TokenUsage {
-	newUsage, _ := parseLogFromOffset(path, offset)
-	return mergeUsage(current, newUsage)
+func parseLogFromOffset(path string, offset int64) (TokenUsage, int64) {
+	return parseLogFromOffsetWithRecorder(path, offset, nil, "")
 }
 
-func parseLogFromOffset(path string, offset int64) (TokenUsage, int64) {
+// parseLogFromOffsetWithRecorder reads new bytes from the JSONL session log,
+// extracts token usage (Layer 2) and emits Layer-3 events when recorder is
+// non-nil. Recorder failures are logged and swallowed — tracking must never
+// break a live run.
+func parseLogFromOffsetWithRecorder(path string, offset int64, recorder *event.Recorder, runID string) (TokenUsage, int64) {
 	usage := TokenUsage{}
 
 	f, err := os.Open(path)
@@ -150,6 +172,14 @@ func parseLogFromOffset(path string, offset int64) (TokenUsage, int64) {
 
 		lineUsage := parseLineForTokens(line)
 		usage = mergeUsage(usage, lineUsage)
+
+		if recorder != nil && runID != "" {
+			for _, ev := range parseLineForEvents(line) {
+				if recErr := recorder.RecordEvent(runID, model.LayerSemantic, ev.Type, ev.Payload); recErr != nil {
+					slog.Warn("record session event failed", "type", ev.Type, "error", recErr)
+				}
+			}
+		}
 	}
 
 	newOffset, _ := f.Seek(0, io.SeekCurrent)

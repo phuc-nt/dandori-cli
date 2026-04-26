@@ -1,0 +1,11 @@
+{"type":"assistant","message":{"id":"msg_01","model":"claude-opus-4-7","content":[{"type":"text","text":"I'll read the file."},{"type":"tool_use","id":"toolu_R1","name":"Read","input":{"file_path":"/tmp/example.md"}}],"usage":{"input_tokens":100,"output_tokens":20,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_R1","is_error":false,"content":"file contents here, about 200 chars long..."}]}}
+{"type":"assistant","message":{"id":"msg_02","model":"claude-opus-4-7","content":[{"type":"tool_use","id":"toolu_B1","name":"Bash","input":{"command":"ls -la","description":"List dir"}}],"usage":{"input_tokens":150,"output_tokens":15,"cache_creation_input_tokens":0,"cache_read_input_tokens":50}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_B1","is_error":true,"content":"command not found"}]}}
+{"type":"assistant","message":{"id":"msg_03","model":"claude-opus-4-7","content":[{"type":"tool_use","id":"toolu_E1","name":"Edit","input":{"file_path":"/tmp/x.go","old_string":"a","new_string":"b"}}],"usage":{"input_tokens":200,"output_tokens":30}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_E1","content":"edit applied"}]}}
+{"type":"assistant","message":{"id":"msg_04","model":"claude-opus-4-7","content":[{"type":"tool_use","id":"toolu_S1","name":"Skill","input":{"skill":"ck-plan","args":"deploy"}}],"usage":{"input_tokens":80,"output_tokens":10}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_S1","content":"skill loaded"}]}}
+{"type":"file-history-snapshot","data":"ignored"}
+not-valid-json-line
+{"type":"user","message":{"content":[{"type":"text","text":"plain user reply, no tool"}]}}

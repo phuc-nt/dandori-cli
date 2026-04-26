@@ -5,9 +5,10 @@ import "time"
 type EventLayer int
 
 const (
-	LayerWrapper EventLayer = 1
-	LayerTailer  EventLayer = 2
-	LayerSkill   EventLayer = 3
+	LayerWrapper  EventLayer = 1
+	LayerTailer   EventLayer = 2
+	LayerSkill    EventLayer = 3
+	LayerSemantic EventLayer = 4
 )
 
 type Event struct {
