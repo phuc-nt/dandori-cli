@@ -183,6 +183,13 @@ dandori analytics iterations --by sprint     # group by sprint
 dandori analytics bugs                       # bugs caused per agent (from Jira Bug tickets)
 dandori analytics bugs --by task             # bugs per Jira task
 dandori analytics bugs --since 30 --format json
+
+# Composite quality KPIs (regression rate, bug rate, quality-adjusted cost)
+dandori analytics kpi                                    # default: regression by agent
+dandori analytics kpi --kpi regression --by engineer     # regression rate per engineer
+dandori analytics kpi --kpi bugs --by sprint             # bugs / runs per sprint
+dandori analytics kpi --kpi cost --by agent --top 10     # quality-adjusted cost per task
+# Also surfaced as a [5] QUALITY KPI block in: dandori analytics all
 # All accept --format json for piping
 
 # Jira poller daemon (sprint cycle + bug-link cycle)
@@ -200,6 +207,7 @@ The dashboard has:
 - Agent leaderboard
 - Per-task cost breakdown (Jira links clickable)
 - Recent runs timeline
+- Quality KPI section: regression rate, bug rate, quality-adjusted cost — each with `--by agent | engineer | sprint` dropdown
 
 ---
 
@@ -293,6 +301,7 @@ beta   8     +1.0    +5.0     820    8        60%       50%
 | `dandori analytics {tools\|context\|iterations\|bugs}` | Layer-3 instrumentation analytics |
 | `dandori analytics iterations --by {agent\|engineer\|sprint}` | Group iteration rounds |
 | `dandori analytics bugs --by {agent\|task}` | Group bug.filed events |
+| `dandori analytics kpi --kpi {regression\|bugs\|cost} --by {agent\|engineer\|sprint}` | Composite quality KPIs |
 | `dandori jira-poll [--once\|--bug-interval N\|--skip-bugs]` | Sprint + bug-link poller daemon |
 | `dandori dashboard` | Web UI |
 | `dandori demo --reset --seed --use\|--restore` | Demo DB sandbox (blog scenario) |
