@@ -198,33 +198,7 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	jiraClient.AddComment(issueKey, startComment)
 
 	// Build agent command with context
-	finalCmd := agentCmd
-	if contextFile != "" {
-		// Inject context into claude command
-		// Claude CLI uses -p for prompt, --system-prompt for system instructions
-		contextInstruction := fmt.Sprintf("IMPORTANT: First read the task context file at %s which contains the Jira issue details and linked Confluence documentation. Base your work on this context.", contextFile)
-
-		if len(finalCmd) >= 1 && finalCmd[0] == "claude" {
-			// Check if user provided -p flag
-			hasPrompt := false
-			promptIdx := -1
-			for i, arg := range finalCmd {
-				if arg == "-p" && i+1 < len(finalCmd) {
-					hasPrompt = true
-					promptIdx = i + 1
-					break
-				}
-			}
-
-			if hasPrompt {
-				// Prepend context instruction to user's prompt
-				finalCmd[promptIdx] = contextInstruction + "\n\n" + finalCmd[promptIdx]
-			} else {
-				// No user prompt, add our own
-				finalCmd = append(finalCmd, "-p", fmt.Sprintf("%s Then complete the task described in the context.", contextInstruction))
-			}
-		}
-	}
+	finalCmd := injectClaudeContext(agentCmd, contextFile)
 
 	fmt.Printf("Running: %v\n\n", finalCmd)
 
@@ -480,4 +454,49 @@ func insertPendingRun(localDB *db.LocalDB, runID, jiraKey, engineerName string) 
 		) VALUES (?, ?, 'claude_code', ?, ?, ?, ?, 'pending', ?)
 	`, runID, jiraKey, username, fmt.Sprintf("ws-%s", hostname), cwd, time.Now().Format(time.RFC3339), engineerNameVal)
 	return err
+}
+
+// injectClaudeContext prepends/appends the dandori context-file instructions
+// onto a `claude` agent command. Returns the original command unchanged when
+// contextFile is empty or the command isn't claude. Pure function — no I/O —
+// so it's directly testable.
+//
+// Bug #1 fix — claude refuses to read the temp context file unless its
+// directory is on the allowlist. Auto-inject `--add-dir <tempDir>` when the
+// user hasn't already passed --add-dir or --dangerously-skip-permissions.
+func injectClaudeContext(agentCmd []string, contextFile string) []string {
+	if contextFile == "" || len(agentCmd) == 0 || agentCmd[0] != "claude" {
+		return agentCmd
+	}
+
+	contextInstruction := fmt.Sprintf("IMPORTANT: First read the task context file at %s which contains the Jira issue details and linked Confluence documentation. Base your work on this context.", contextFile)
+
+	out := append([]string{}, agentCmd...)
+	hasPrompt := false
+	promptIdx := -1
+	hasAddDir := false
+	hasSkipPerms := false
+	for i, arg := range out {
+		if arg == "-p" && i+1 < len(out) {
+			hasPrompt = true
+			promptIdx = i + 1
+		}
+		if arg == "--add-dir" {
+			hasAddDir = true
+		}
+		if arg == "--dangerously-skip-permissions" {
+			hasSkipPerms = true
+		}
+	}
+
+	if hasPrompt {
+		out[promptIdx] = contextInstruction + "\n\n" + out[promptIdx]
+	} else {
+		out = append(out, "-p", fmt.Sprintf("%s Then complete the task described in the context.", contextInstruction))
+	}
+
+	if !hasAddDir && !hasSkipPerms {
+		out = append(out, "--add-dir", filepath.Dir(contextFile))
+	}
+	return out
 }
