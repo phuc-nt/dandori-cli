@@ -80,7 +80,7 @@ func runConfWrite(cmd *cobra.Command, args []string) error {
 			confWriteRunID = resolved
 		}
 		err = localDB.QueryRow(`
-			SELECT id, COALESCE(jira_issue_key, ''), agent_name, status, COALESCE(model, ''),
+			SELECT id, COALESCE(jira_issue_key, ''), COALESCE(agent_name, ''), status, COALESCE(model, ''),
 			       COALESCE(duration_sec, 0), COALESCE(cost_usd, 0), COALESCE(input_tokens, 0), COALESCE(output_tokens, 0),
 			       COALESCE(git_head_before, ''), COALESCE(git_head_after, ''), started_at, COALESCE(ended_at, '')
 			FROM runs WHERE id = ?`, confWriteRunID).Scan(
@@ -90,7 +90,7 @@ func runConfWrite(cmd *cobra.Command, args []string) error {
 		)
 	} else {
 		err = localDB.QueryRow(`
-			SELECT id, COALESCE(jira_issue_key, ''), agent_name, status, COALESCE(model, ''),
+			SELECT id, COALESCE(jira_issue_key, ''), COALESCE(agent_name, ''), status, COALESCE(model, ''),
 			       COALESCE(duration_sec, 0), COALESCE(cost_usd, 0), COALESCE(input_tokens, 0), COALESCE(output_tokens, 0),
 			       COALESCE(git_head_before, ''), COALESCE(git_head_after, ''), started_at, COALESCE(ended_at, '')
 			FROM runs WHERE jira_issue_key = ?
