@@ -135,8 +135,7 @@ func (r RunReport) Validate() error {
 	if r.RunID == "" {
 		return errors.New("run ID is required")
 	}
-	if r.IssueKey == "" {
-		return errors.New("issue key is required")
-	}
+	// IssueKey is optional: runs may be ad-hoc agent invocations not tied
+	// to a Jira ticket; the report still posts to Confluence.
 	return nil
 }

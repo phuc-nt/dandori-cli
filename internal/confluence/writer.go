@@ -58,7 +58,11 @@ func GenerateReportTitle(run RunReport) string {
 	if stamp.IsZero() {
 		stamp = time.Now()
 	}
-	return fmt.Sprintf("%s — Run %s — %s", run.IssueKey, run.RunID[:min(8, len(run.RunID))], stamp.Format("2006-01-02 15:04:05"))
+	shortRun := run.RunID[:min(8, len(run.RunID))]
+	if run.IssueKey == "" {
+		return fmt.Sprintf("Run %s — %s", shortRun, stamp.Format("2006-01-02 15:04:05"))
+	}
+	return fmt.Sprintf("%s — Run %s — %s", run.IssueKey, shortRun, stamp.Format("2006-01-02 15:04:05"))
 }
 
 const reportTemplate = `<h1>Agent Run Report: {{.IssueKey}}</h1>

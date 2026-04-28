@@ -139,6 +139,22 @@ func TestWriterPageTitle(t *testing.T) {
 	}
 }
 
+func TestWriterPageTitle_NoIssueKey(t *testing.T) {
+	run := RunReport{
+		RunID:     "abc12345xyz",
+		StartedAt: time.Date(2026, 4, 18, 10, 30, 0, 0, time.UTC),
+	}
+
+	title := GenerateReportTitle(run)
+
+	if strings.HasPrefix(title, " — ") {
+		t.Errorf("title should not have leading dash when issue key is empty: %q", title)
+	}
+	if !strings.Contains(title, "abc12345") {
+		t.Errorf("title should contain run ID: %q", title)
+	}
+}
+
 func TestRunReportValidation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -156,9 +172,9 @@ func TestRunReportValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "missing issue key",
+			name:    "missing issue key is allowed (ad-hoc run)",
 			run:     RunReport{RunID: "123"},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 
