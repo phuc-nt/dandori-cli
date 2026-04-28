@@ -56,6 +56,7 @@ var (
 	taskRunDryRun    bool
 	taskRunNoContext bool
 	taskRunNoSync    bool
+	taskRunNoVerify  bool
 )
 
 func init() {
@@ -63,6 +64,7 @@ func init() {
 	taskRunCmd.Flags().BoolVar(&taskRunDryRun, "dry-run", false, "Preview context without running agent")
 	taskRunCmd.Flags().BoolVar(&taskRunNoContext, "no-context", false, "Skip context injection")
 	taskRunCmd.Flags().BoolVar(&taskRunNoSync, "no-sync", false, "Skip post-run Jira/Confluence sync")
+	taskRunCmd.Flags().BoolVar(&taskRunNoVerify, "no-verify", false, "Bypass pre-sync verify gate (emergency override)")
 }
 
 func runTaskRun(cmd *cobra.Command, args []string) error {
@@ -250,21 +252,29 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		// In Progress when gate fails). The agent may produce exit code 0
 		// while fabricating files unrelated to the spec; the gate catches
 		// that before we transition to Done.
-		gateCfg := verify.GateConfig{
-			SemanticCheck: cfg.Verify.SemanticCheck,
-			QualityGate:   cfg.Verify.QualityGate,
-			SkipLabel:     cfg.Verify.SkipLabel,
+		var gateRes verify.PreSyncResult
+		if taskRunNoVerify {
+			// Emergency override: PO requested bypass via --no-verify.
+			// Surface as skipped so the Jira comment records why.
+			gateRes = verify.PreSyncResult{
+				Pass:    true,
+				Skipped: true,
+				Reason:  "gate bypassed via --no-verify flag",
+			}
+		} else {
+			gateCfg := verify.GateConfig{
+				SemanticCheck: cfg.Verify.SemanticCheck,
+				QualityGate:   cfg.Verify.QualityGate,
+				SkipLabel:     cfg.Verify.SkipLabel,
+			}
+			gateRes = verify.PreSync(gateCfg, verify.PreSyncInput{
+				TaskDescription: taskDescription,
+				JiraLabels:      taskLabels,
+				ChangedFiles:    gitChanges.FilesChanged,
+				WorkspaceDir:    detectTaskWorkspaceDir(issueKey),
+				Quality:         qualitySignal(result.QualityAfter),
+			})
 		}
-		gateRes := verify.PreSync(gateCfg, verify.PreSyncInput{
-			TaskDescription: taskDescription,
-			JiraLabels:      taskLabels,
-			ChangedFiles:    gitChanges.FilesChanged,
-			WorkspaceDir:    detectTaskWorkspaceDir(issueKey),
-			// Quality signal: skip lint/test gate for now — semantic check
-			// alone covers the CLITEST2-2 fake-completion shape. Phase 2
-			// of the Bug #3 spike can wire quality.Collector here later.
-			Quality: nil,
-		})
 
 		// Build comprehensive completion comment
 		doneComment := buildCompletionComment(agentName, result, gitChanges, issueKey, taskDescription)
@@ -518,6 +528,22 @@ func detectTaskWorkspaceDir(issueKey string) string {
 		}
 	}
 	return ""
+}
+
+// qualitySignalAdapter bridges *quality.Snapshot to verify.QualitySignal so
+// the gate can read lint/test failure counts without verify/ depending on
+// quality/. Returns nil when no snapshot was captured (e.g. quality disabled).
+type qualitySignalAdapter struct{ snap *quality.Snapshot }
+
+func (q qualitySignalAdapter) CountFailures() (int, int) {
+	return q.snap.LintErrors, q.snap.TestsFailed
+}
+
+func qualitySignal(snap *quality.Snapshot) verify.QualitySignal {
+	if snap == nil {
+		return nil
+	}
+	return qualitySignalAdapter{snap: snap}
 }
 
 // appendGateVerdict adds a Jira-formatted section describing the verify gate

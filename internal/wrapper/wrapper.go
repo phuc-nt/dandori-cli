@@ -44,6 +44,10 @@ type Result struct {
 	SessionID   string
 	TokenUsage  TokenUsage
 	CostUSD     float64
+	// QualityAfter is the post-run lint+test snapshot when QualityConfig is
+	// enabled. nil otherwise. Exposed so callers (e.g. cmd/task_run.go) can
+	// feed the verify gate without re-running the snapshot.
+	QualityAfter *quality.Snapshot
 }
 
 type TokenUsage struct {
@@ -195,9 +199,10 @@ func Run(ctx context.Context, localDB *db.LocalDB, opts Options) (*Result, error
 	emitIterationEndIfApplicable(localDB, runID)
 
 	// Quality snapshot after and store metrics
+	var qualityAfter *quality.Snapshot
 	if qualityCollector != nil && qualityBefore != nil {
 		slog.Debug("capturing quality snapshot after run")
-		qualityAfter := qualityCollector.Snapshot(cwd) // Full snapshot (lint + tests)
+		qualityAfter = qualityCollector.Snapshot(cwd) // Full snapshot (lint + tests)
 		slog.Debug("quality after", "lint_errors", qualityAfter.LintErrors, "tests_passed", qualityAfter.TestsPassed)
 
 		metrics := quality.ComputeMetrics(runID, qualityBefore, qualityAfter)
@@ -225,12 +230,13 @@ func Run(ctx context.Context, localDB *db.LocalDB, opts Options) (*Result, error
 	slog.Debug("run completed", "run_id", runID, "exit_code", exitCode, "duration", duration)
 
 	return &Result{
-		RunID:      runID,
-		ExitCode:   exitCode,
-		Duration:   duration,
-		SessionID:  sessionID,
-		TokenUsage: tokenUsage,
-		CostUSD:    costUSD,
+		RunID:        runID,
+		ExitCode:     exitCode,
+		Duration:     duration,
+		SessionID:    sessionID,
+		TokenUsage:   tokenUsage,
+		CostUSD:      costUSD,
+		QualityAfter: qualityAfter,
 	}, nil
 }
 
