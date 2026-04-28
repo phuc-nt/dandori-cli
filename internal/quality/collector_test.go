@@ -1,6 +1,7 @@
 package quality
 
 import (
+	"os"
 	"testing"
 	"time"
 )
@@ -96,6 +97,9 @@ func TestCollector_NewCollector(t *testing.T) {
 func TestCollector_Snapshot_RealProject(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
+	}
+	if os.Getenv("DANDORI_QUALITY_RUNNING") != "" {
+		t.Skip("skipping recursive quality snapshot (called from within quality collector)")
 	}
 
 	cfg := DefaultConfig()
