@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-04-28
+
+Pre-sync verify gate, Layer-3 tracking, dogfooding bug-fix sweep.
+
+### Added
+- **Pre-sync verify gate** (`internal/verify/`) — blocks fake-completion before Jira transitions to Done:
+  - Path-match semantic check: extracts file/path tokens from the task spec, flags when the diff misses them
+  - Quality gate: fails the gate when the post-run lint/test snapshot reports failures
+  - Workspace-scoped matching for the `demo-workspace/{date}-{TASK-ID}/` dogfooding convention
+  - Doc-only diffs (`.md`/`.txt`/`.rst`) skip the quality gate; semantic check still runs
+  - Inconclusive specs (no extractable paths) flag for review instead of silently passing
+  - Warn-mode by default: gate failure leaves the ticket In Progress with a Jira comment, never blocks the exit code
+  - Skip via Jira label (`verify.skip_label`, default `skip-verify`) for PO override
+  - `dandori task run --no-verify` flag for emergency PO override (audit trail preserved)
+  - Config keys: `verify.semantic_check`, `verify.quality_gate`, `verify.skip_label`
+- **Layer-3 tracking** (tools, context, iterations, bug links):
+  - `wrapper`: emit Layer-3 tool/skill events from the session JSONL
+  - `taskcontext`: record `confluence.read` events per page fetched
+  - `jira`: detect task iteration via statusCategory regression
+  - `jira`: bug-link detection (parsers + `DetectBugLinks` for `caused_by:` description tags and inward/outward link types)
+  - `jira-poll` daemon: wire bug-link cycle into poller + analytics
+  - Analytics queries for tools, context, iterations on Layer-3 events
+- **Composite quality KPIs** (`dandori analytics`):
+  - Regression rate, bug rate, quality-adjusted cost — CLI + `analytics-all`
+  - Dashboard quality KPI section with 3 dimensions per metric
+- **Multi-board Jira polling**: `jira.board_ids` list (legacy `board_id` still honored)
+- **Logging**: `LogLevel` config field with `DANDORI_LOG_LEVEL` env override
+- **Demo**: `HandleHealthz` endpoint with httptest coverage
+
+### Fixed
+- **task-run** (Bug #1): auto `--add-dir` for the context tempDir when wrapping `claude`, so the agent can read the injected context file under `acceptEdits` allowlist
+- **db** (Bug #2): tolerate `NULL` `agent_name` in scan paths (older runs)
+- **jira** (Bug #5): separate ADF paragraphs with newline so completion comments render correctly
+- **wrapper**: populate `runs.engineer_name` from Jira assignee
+- **jira**: match canonical link-type Name "Caused" alongside inward/outward forms
+- **confluence**: include time-of-day in report title to avoid duplicate-title rejections
+- **wrapper**: resolve symlinks for session directory detection
+- **quality** (Bug #4): isolate snapshot subprocess (process-group + `WaitDelay`) to prevent post-exit hang when `go test` grandchildren keep stdout pipe open
+
+### Technical
+- `internal/verify/semantic_check.go` — path-match extraction + workspace-scoped matching
+- `internal/verify/gate.go` — combined gate orchestrator (semantic + quality + skip-label)
+- `internal/wrapper/wrapper.go` — `Result.QualityAfter` exposes post-run snapshot to callers
+- `internal/quality/collector.go` — `spawnCollectorCmd` helper with `Setpgid` + group-targeted SIGKILL `Cancel` + `WaitDelay`; `DANDORI_QUALITY_RUNNING` env recursion guard
+- `internal/jira/buglink.go` — bug-link parsers + detector
+- `cmd/version.go` — `formatVersion` extracted; `ParseSemver` helper added
+
 ## [0.3.0] — 2026-04-19
 
 Agent Quality Comparison: Measure and compare code quality across agents.

@@ -18,9 +18,9 @@ builds:
         goarch: arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
+      - -X github.com/phuc-nt/dandori-cli/cmd.Version={{.Version}}
+      - -X github.com/phuc-nt/dandori-cli/cmd.Commit={{.Commit}}
+      - -X github.com/phuc-nt/dandori-cli/cmd.BuildDate={{.Date}}
 
   - id: dandori-server
     main: ./cmd/server
@@ -31,7 +31,6 @@ builds:
     goarch: [amd64, arm64]
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
 
 archives:
   - id: dandori
