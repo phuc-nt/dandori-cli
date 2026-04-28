@@ -34,8 +34,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 	defer localDB.Close()
 
+	// COALESCE(agent_name, '') — Bug #2: rows from older schema versions or
+	// failed task-run inserts may have NULL agent_name, which breaks
+	// rows.Scan into a string. Empty string is fine; the print path renders
+	// '-' for blanks already.
 	rows, err := localDB.Query(`
-		SELECT id, agent_name, status, jira_issue_key, started_at, duration_sec, cost_usd
+		SELECT id, COALESCE(agent_name, ''), status, jira_issue_key, started_at, duration_sec, cost_usd
 		FROM runs
 		ORDER BY started_at DESC
 		LIMIT ?

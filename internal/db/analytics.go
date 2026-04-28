@@ -41,7 +41,7 @@ type LocalRunSummary struct {
 func (l *LocalDB) GetAgentStats() ([]LocalAgentStat, error) {
 	query := `
 		SELECT
-			agent_name,
+			COALESCE(agent_name, '') as agent_name,
 			COUNT(*) as run_count,
 			ROUND(CAST(SUM(CASE WHEN exit_code = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) * 100, 1) as success_rate,
 			COALESCE(SUM(cost_usd), 0) as total_cost,
@@ -49,7 +49,7 @@ func (l *LocalDB) GetAgentStats() ([]LocalAgentStat, error) {
 			COALESCE(AVG(duration_sec), 0) as avg_duration,
 			COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens
 		FROM runs
-		GROUP BY agent_name
+		GROUP BY COALESCE(agent_name, '')
 		ORDER BY total_cost DESC
 	`
 
@@ -140,7 +140,7 @@ func (l *LocalDB) GetRecentRuns(limit int) ([]LocalRunSummary, error) {
 		SELECT
 			id,
 			COALESCE(jira_issue_key, '') as jira_issue_key,
-			agent_name,
+			COALESCE(agent_name, '') as agent_name,
 			status,
 			COALESCE(duration_sec, 0) as duration,
 			COALESCE(cost_usd, 0) as cost,
@@ -227,7 +227,7 @@ type SyncableRun struct {
 // GetRunsToSync returns completed runs that haven't been synced to Jira
 func (l *LocalDB) GetRunsToSync(taskFilter string) ([]SyncableRun, error) {
 	query := `
-		SELECT id, COALESCE(jira_issue_key, ''), agent_name, status,
+		SELECT id, COALESCE(jira_issue_key, ''), COALESCE(agent_name, ''), status,
 			COALESCE(duration_sec, 0), COALESCE(cost_usd, 0),
 			COALESCE(input_tokens + output_tokens, 0)
 		FROM runs

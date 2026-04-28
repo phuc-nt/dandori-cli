@@ -317,3 +317,31 @@ func TestGetSprintSummaryEmpty(t *testing.T) {
 		t.Errorf("empty sprint should have 0 runs, got %d", summary.RunCount)
 	}
 }
+
+// Regression for Bug #2: rows with NULL agent_name (e.g. failed task-run
+// inserts before agent assignment) used to break Scan into a string. Both
+// GetAgentStats and GetRecentRuns must tolerate NULLs by COALESCEing.
+func TestNullAgentName_DoesNotBreakScan(t *testing.T) {
+	d := setupTestDB(t)
+	defer d.Close()
+
+	_, err := d.db.Exec(`
+		INSERT INTO runs (id, agent_name, agent_type, user, workstation_id,
+			started_at, exit_code, status, cost_usd, jira_issue_key)
+		VALUES ('null-agent-run', NULL, 'claude_code', 'test', 'ws1',
+			datetime('now'), 0, 'done', 1.0, 'TASK-1')
+	`)
+	if err != nil {
+		t.Fatalf("insert NULL agent_name row: %v", err)
+	}
+
+	if _, err := d.GetAgentStats(); err != nil {
+		t.Errorf("GetAgentStats with NULL agent_name: %v", err)
+	}
+	if _, err := d.GetRecentRuns(10); err != nil {
+		t.Errorf("GetRecentRuns with NULL agent_name: %v", err)
+	}
+	if _, err := d.GetRunsToSync(""); err != nil {
+		t.Errorf("GetRunsToSync with NULL agent_name: %v", err)
+	}
+}
