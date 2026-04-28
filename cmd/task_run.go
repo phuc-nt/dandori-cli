@@ -91,10 +91,20 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 
 	var confClient *confluence.Client
 	if cfg.Confluence.BaseURL != "" {
+		// Prefer dedicated confluence creds; fall back to Jira creds for
+		// Cloud-style setups where one API token covers both.
+		confUser := cfg.Confluence.User
+		if confUser == "" {
+			confUser = cfg.Jira.User
+		}
+		confToken := cfg.Confluence.Token
+		if confToken == "" {
+			confToken = cfg.Jira.Token
+		}
 		confClient = confluence.NewClient(confluence.ClientConfig{
 			BaseURL: cfg.Confluence.BaseURL,
-			User:    cfg.Jira.User,
-			Token:   cfg.Jira.Token,
+			User:    confUser,
+			Token:   confToken,
 			IsCloud: cfg.Confluence.Cloud,
 		})
 	}
