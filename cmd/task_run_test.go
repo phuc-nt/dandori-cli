@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/phuc-nt/dandori-cli/internal/verify"
 )
 
 const ctxFile = "/var/folders/tmp/dandori-context-FOO-1.md"
@@ -103,4 +107,70 @@ func argValue(args []string, flag string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func TestAppendGateVerdict_Pass(t *testing.T) {
+	out := appendGateVerdict("comment", verify.PreSyncResult{Pass: true})
+	if !strings.Contains(out, "(/) Passed") {
+		t.Errorf("expected pass marker, got %q", out)
+	}
+}
+
+func TestAppendGateVerdict_Skipped(t *testing.T) {
+	out := appendGateVerdict("comment", verify.PreSyncResult{Pass: true, Skipped: true, Reason: "label override"})
+	if !strings.Contains(out, "Skipped") || !strings.Contains(out, "label override") {
+		t.Errorf("expected skipped + reason, got %q", out)
+	}
+}
+
+func TestAppendGateVerdict_Fail_ListsMissing(t *testing.T) {
+	res := verify.PreSyncResult{
+		Pass:   false,
+		Reason: "semantic check failed",
+		Semantic: verify.Result{
+			Missing: []string{"login.ts", "auth.go"},
+		},
+	}
+	out := appendGateVerdict("comment", res)
+	if !strings.Contains(out, "(!) Flagged") {
+		t.Errorf("expected flagged marker, got %q", out)
+	}
+	for _, want := range []string{"login.ts", "auth.go", "In Progress"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in: %s", want, out)
+		}
+	}
+}
+
+func TestDetectTaskWorkspaceDir(t *testing.T) {
+	tmp := t.TempDir()
+	mustMkdir(t, filepath.Join(tmp, "demo-workspace", "260427-CLITEST2-2"))
+	mustMkdir(t, filepath.Join(tmp, "demo-workspace", "260427-OTHER-1"))
+
+	prev, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+
+	got := detectTaskWorkspaceDir("CLITEST2-2")
+	want := filepath.Join("demo-workspace", "260427-CLITEST2-2")
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	if got := detectTaskWorkspaceDir("DOES-NOT-EXIST"); got != "" {
+		t.Errorf("expected empty for missing key, got %q", got)
+	}
+
+	if got := detectTaskWorkspaceDir(""); got != "" {
+		t.Errorf("expected empty for empty key, got %q", got)
+	}
+}
+
+func mustMkdir(t *testing.T, p string) {
+	t.Helper()
+	if err := os.MkdirAll(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
 }

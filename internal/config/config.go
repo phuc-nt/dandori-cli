@@ -36,6 +36,15 @@ type Config struct {
 	Sync       SyncConfig       `yaml:"sync"`
 	Quality    QualityConfig    `yaml:"quality"`
 	Wrapper    WrapperConfig    `yaml:"wrapper"`
+	Verify     VerifyConfig     `yaml:"verify"`
+}
+
+// VerifyConfig — Bug #3 pre-sync gate (semantic check + quality gate).
+// See plans/260428-0812-bug-3-fake-completion-spike/plan.md.
+type VerifyConfig struct {
+	SemanticCheck bool   `yaml:"semantic_check"` // Q3: path-match spec vs diff
+	QualityGate   bool   `yaml:"quality_gate"`   // Q4: lint/test on changed files
+	SkipLabel     string `yaml:"skip_label"`     // Q2: Jira label to bypass gates
 }
 
 type WrapperConfig struct {
@@ -131,6 +140,11 @@ func DefaultConfig() *Config {
 		},
 		Wrapper: WrapperConfig{
 			PostExitTimeout: "10s",
+		},
+		Verify: VerifyConfig{
+			SemanticCheck: true,
+			QualityGate:   true,
+			SkipLabel:     "skip-verify",
 		},
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/phuc-nt/dandori-cli/internal/quality"
 	"github.com/phuc-nt/dandori-cli/internal/taskcontext"
 	"github.com/phuc-nt/dandori-cli/internal/util"
+	"github.com/phuc-nt/dandori-cli/internal/verify"
 	"github.com/phuc-nt/dandori-cli/internal/wrapper"
 	"github.com/spf13/cobra"
 )
@@ -133,6 +134,7 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	// Fetch task context
 	var contextFile string
 	var taskDescription string
+	var taskLabels []string
 	if !taskRunNoContext {
 		fmt.Printf("Fetching context for %s...\n", issueKey)
 
@@ -150,6 +152,7 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		}
 
 		taskDescription = taskCtx.Description // Save for AC extraction later
+		taskLabels = taskCtx.Labels            // Save for verify gate (skip-verify label)
 
 		fmt.Printf("  Issue: %s\n", taskCtx.Summary)
 		fmt.Printf("  Type: %s | Priority: %s | Status: %s\n", taskCtx.IssueType, taskCtx.Priority, taskCtx.Status)
@@ -239,20 +242,52 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	if !taskRunNoSync && result.ExitCode == 0 {
 		fmt.Println("\nSyncing to Jira...")
 
-		// Transition to Done
-		if err := jiraClient.TransitionToDone(issueKey, jira.DefaultStatusMapping); err != nil {
-			fmt.Printf("Warning: could not transition to Done: %v\n", err)
-		}
-
-		// Get git changes for the report (compare before vs after)
+		// Get git changes (compare HEAD before vs after the run)
 		gitHeadAfter := getGitHead()
 		gitChanges := getGitChangesBetween(gitHeadBefore, gitHeadAfter)
+
+		// Bug #3 — pre-sync gate (warn-mode per Q1: post comment but stay
+		// In Progress when gate fails). The agent may produce exit code 0
+		// while fabricating files unrelated to the spec; the gate catches
+		// that before we transition to Done.
+		gateCfg := verify.GateConfig{
+			SemanticCheck: cfg.Verify.SemanticCheck,
+			QualityGate:   cfg.Verify.QualityGate,
+			SkipLabel:     cfg.Verify.SkipLabel,
+		}
+		gateRes := verify.PreSync(gateCfg, verify.PreSyncInput{
+			TaskDescription: taskDescription,
+			JiraLabels:      taskLabels,
+			ChangedFiles:    gitChanges.FilesChanged,
+			WorkspaceDir:    detectTaskWorkspaceDir(issueKey),
+			// Quality signal: skip lint/test gate for now — semantic check
+			// alone covers the CLITEST2-2 fake-completion shape. Phase 2
+			// of the Bug #3 spike can wire quality.Collector here later.
+			Quality: nil,
+		})
 
 		// Build comprehensive completion comment
 		doneComment := buildCompletionComment(agentName, result, gitChanges, issueKey, taskDescription)
 
+		// Append gate verdict to the comment so reviewers see it.
+		doneComment = appendGateVerdict(doneComment, gateRes)
+
 		jiraClient.AddComment(issueKey, doneComment)
 		fmt.Println("  ✓ Jira updated")
+
+		if gateRes.Pass {
+			if err := jiraClient.TransitionToDone(issueKey, jira.DefaultStatusMapping); err != nil {
+				fmt.Printf("Warning: could not transition to Done: %v\n", err)
+			}
+			if gateRes.Skipped {
+				fmt.Printf("  ✓ Transitioned to Done (gate skipped: %s)\n", gateRes.Reason)
+			} else {
+				fmt.Println("  ✓ Transitioned to Done (gate passed)")
+			}
+		} else {
+			fmt.Printf("  ⚠ Gate flagged: %s\n", gateRes.Reason)
+			fmt.Println("  ⚠ Leaving Jira ticket In Progress for human review.")
+		}
 
 		// Write Confluence report if configured
 		if cfg.Confluence.AutoPost && confClient != nil {
@@ -454,6 +489,61 @@ func insertPendingRun(localDB *db.LocalDB, runID, jiraKey, engineerName string) 
 		) VALUES (?, ?, 'claude_code', ?, ?, ?, ?, 'pending', ?)
 	`, runID, jiraKey, username, fmt.Sprintf("ws-%s", hostname), cwd, time.Now().Format(time.RFC3339), engineerNameVal)
 	return err
+}
+
+// detectTaskWorkspaceDir returns the per-task workspace path used by the
+// dogfooding convention: demo-workspace/{date}-{TASK-ID}/. The directory may
+// not exist yet when called; callers use the path purely for prefix matching
+// in the semantic check, so non-existence is fine.
+//
+// Returns "" when the convention doesn't apply (e.g. real production tasks
+// outside dogfooding) so verify.PreSync falls back to bare path-matching.
+func detectTaskWorkspaceDir(issueKey string) string {
+	if issueKey == "" {
+		return ""
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	root := filepath.Join(cwd, "demo-workspace")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return ""
+	}
+	suffix := "-" + issueKey
+	for _, e := range entries {
+		if e.IsDir() && strings.HasSuffix(e.Name(), suffix) {
+			return filepath.Join("demo-workspace", e.Name())
+		}
+	}
+	return ""
+}
+
+// appendGateVerdict adds a Jira-formatted section describing the verify gate
+// outcome. Pass: small confirmation. Fail: clear call-to-action listing what
+// the spec referenced that the diff did not touch.
+func appendGateVerdict(comment string, res verify.PreSyncResult) string {
+	var sb strings.Builder
+	sb.WriteString(comment)
+	sb.WriteString("\n\nh3. Verify Gate\n")
+	if res.Skipped {
+		sb.WriteString(fmt.Sprintf("(/) Skipped — %s\n", res.Reason))
+		return sb.String()
+	}
+	if res.Pass {
+		sb.WriteString("(/) Passed — diff aligns with task spec.\n")
+		return sb.String()
+	}
+	sb.WriteString(fmt.Sprintf("(!) Flagged — %s\n", res.Reason))
+	if len(res.Semantic.Missing) > 0 {
+		sb.WriteString("\nSpec referenced but diff did not touch:\n")
+		for _, m := range res.Semantic.Missing {
+			sb.WriteString(fmt.Sprintf("* {{%s}}\n", m))
+		}
+	}
+	sb.WriteString("\n_Ticket left In Progress — please review the diff and decide whether to transition manually._\n")
+	return sb.String()
 }
 
 // injectClaudeContext prepends/appends the dandori context-file instructions
