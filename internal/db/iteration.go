@@ -66,6 +66,62 @@ func (l *LocalDB) LatestRunForIssue(issueKey string) (*LatestRun, error) {
 	return &r, nil
 }
 
+// TotalRunIDs returns IDs of all runs whose started_at falls in [since, until).
+// Filters by department when team is non-empty. ALL statuses included
+// (done|error|cancelled|running) — cancelled stays in the denominator on
+// purpose so teams can't game Rework Rate by cancelling iteration runs.
+func (l *LocalDB) TotalRunIDs(since, until time.Time, team string) ([]string, error) {
+	q := `SELECT id FROM runs WHERE started_at >= ? AND started_at < ?`
+	args := []any{since.UTC().Format(time.RFC3339), until.UTC().Format(time.RFC3339)}
+	if team != "" {
+		q += ` AND COALESCE(department, '') = ?`
+		args = append(args, team)
+	}
+	rows, err := l.db.Query(q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query total runs: %w", err)
+	}
+	defer rows.Close()
+	return collectStrings(rows)
+}
+
+// ReworkRunIDs returns distinct run IDs that have at least one
+// task.iteration.start event with round >= 2 AND whose run started in the
+// window. The run-level start filter avoids counting iteration events from
+// older runs whose ticket was reopened during the window.
+func (l *LocalDB) ReworkRunIDs(since, until time.Time, team string) ([]string, error) {
+	q := `
+		SELECT DISTINCT r.id
+		FROM runs r
+		JOIN events e ON e.run_id = r.id
+		WHERE e.event_type = 'task.iteration.start'
+		  AND CAST(json_extract(e.data, '$.round') AS INTEGER) >= 2
+		  AND r.started_at >= ? AND r.started_at < ?`
+	args := []any{since.UTC().Format(time.RFC3339), until.UTC().Format(time.RFC3339)}
+	if team != "" {
+		q += ` AND COALESCE(r.department, '') = ?`
+		args = append(args, team)
+	}
+	rows, err := l.db.Query(q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query rework runs: %w", err)
+	}
+	defer rows.Close()
+	return collectStrings(rows)
+}
+
+func collectStrings(rows *sql.Rows) ([]string, error) {
+	var out []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 // IterationEventsForIssue returns all task.iteration.start rows for the issue,
 // parsed from events.data JSON. Events are linked via runs.jira_issue_key
 // (events table itself doesn't carry issue_key — it's denormalised through
