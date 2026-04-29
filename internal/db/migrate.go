@@ -36,6 +36,12 @@ func (l *LocalDB) Migrate() error {
 		if _, err := l.Exec(MigrationV2ToV3); err != nil {
 			return fmt.Errorf("migrate v2 to v3: %w", err)
 		}
+		currentVersion = 3
+	}
+	if currentVersion == 3 {
+		if _, err := l.Exec(MigrationV3ToV4); err != nil {
+			return fmt.Errorf("migrate v3 to v4: %w", err)
+		}
 	}
 
 	return nil
