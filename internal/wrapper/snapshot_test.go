@@ -152,3 +152,41 @@ func TestSnapshotNilHandling(t *testing.T) {
 		t.Error("should handle nil snapshot")
 	}
 }
+
+// TestExpectedClaudeProjectDir_EncodingMatchesClaude locks the cwd→project-dir
+// encoding to what Claude Code itself produces. Claude replaces `/`, `_`, and
+// `.` all with `-` when constructing ~/.claude/projects/<name>; if our wrapper
+// does anything different, it will tail the wrong file (or no file at all)
+// and report cost_usd=0 for the run. Verified empirically against Claude Code
+// CLI (see plans/reports/ / discussion 2026-04-29).
+func TestExpectedClaudeProjectDir_EncodingMatchesClaude(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("home: %v", err)
+	}
+	prefix := filepath.Join(home, ".claude", "projects") + string(filepath.Separator)
+
+	cases := []struct {
+		name string
+		cwd  string
+		// suffix is what we expect AFTER ~/.claude/projects/.
+		suffix string
+	}{
+		{"plain slashes", "/tmp/foo/bar", "-tmp-foo-bar"},
+		{"underscore in dir name", "/tmp/foo_bar", "-tmp-foo-bar"},
+		{"underscore at segment start", "/tmp/_dandori-cli", "-tmp--dandori-cli"},
+		{"dot in dir name", "/tmp/foo.bar", "-tmp-foo-bar"},
+		{"dotfile segment", "/tmp/.foo", "-tmp--foo"},
+		{"mixed underscores and dots", "/a_b/c.d/e", "-a-b-c-d-e"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := expectedClaudeProjectDir(c.cwd)
+			want := prefix + c.suffix
+			if got != want {
+				t.Errorf("expectedClaudeProjectDir(%q)\n  got  %q\n  want %q", c.cwd, got, want)
+			}
+		})
+	}
+}

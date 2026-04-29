@@ -12,6 +12,11 @@ type SessionSnapshot struct {
 	Dir   string
 }
 
+// projectDirReplacer is the cwd→Claude-project-dir-name encoder. Mirrors
+// Claude Code CLI's own rule (verified empirically 2026-04-29): every `/`,
+// `_`, and `.` becomes `-`.
+var projectDirReplacer = strings.NewReplacer("/", "-", "_", "-", ".", "-")
+
 func SnapshotSessionDir(cwd string) *SessionSnapshot {
 	claudeDir := expectedClaudeProjectDir(cwd)
 	if claudeDir == "" {
@@ -110,7 +115,12 @@ func expectedClaudeProjectDir(cwd string) string {
 		realCwd = cwd
 	}
 
-	dirName := strings.ReplaceAll(realCwd, "/", "-")
+	// Claude Code encodes the cwd into ~/.claude/projects/<name> by replacing
+	// `/`, `_`, and `.` all with `-`. Earlier we only replaced `/` — when the
+	// user's cwd contained `_` or `.` (e.g. `_dandori-cli`, `foo.bar`), the
+	// wrapper polled a path that never existed, the tailer got nothing, and
+	// the run was persisted with cost_usd=0. Mirror Claude's rule exactly.
+	dirName := projectDirReplacer.Replace(realCwd)
 	return filepath.Join(home, ".claude", "projects", dirName)
 }
 
