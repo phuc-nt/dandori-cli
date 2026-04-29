@@ -70,8 +70,21 @@ func buildFaros(r ExportReport) map[string]any {
 			"threshold_version": r.Rework.ThresholdVersion,
 		},
 	}
+	insuff := r.InsufficientData
+	if r.Config.IncludeAttribution && r.Attribution != nil && r.Attribution.InsufficientData {
+		already := false
+		for _, s := range insuff {
+			if s == "task_attribution" {
+				already = true
+				break
+			}
+		}
+		if !already {
+			insuff = append(insuff, "task_attribution")
+		}
+	}
 	dataQuality := map[string]any{
-		"insufficient_data":            stringListOrEmpty(r.InsufficientData),
+		"insufficient_data":            stringListOrEmpty(insuff),
 		"tickets_without_in_progress":  r.LeadTime.TicketsWithoutInProgres,
 		"warnings":                     stringListOrEmpty(r.Warnings),
 		"human_jira_update_assumption": "metrics rely on humans transitioning Jira status promptly",
@@ -88,14 +101,41 @@ func buildFaros(r ExportReport) map[string]any {
 	if r.Config.Team != "" {
 		out["team"] = r.Config.Team
 	}
+	if r.Config.IncludeAttribution {
+		out["task_attribution"] = attributionBlock(r.Attribution)
+	}
 	return out
+}
+
+// attributionBlock projects the AttributionResult into the wire shape, or
+// nil when data is insufficient (consumer-safe — dashboards render N/A).
+func attributionBlock(a *AttributionResult) any {
+	if a == nil || a.InsufficientData {
+		return nil
+	}
+	return map[string]any{
+		"tasks_total":                    a.TasksTotal,
+		"tasks_with_session":             a.TasksWithSession,
+		"agent_autonomy_rate":            a.AgentAutonomyRate,
+		"agent_code_retention_p50":       a.RetentionP50,
+		"agent_code_retention_p90":       a.RetentionP90,
+		"intervention_rate_p50":          a.InterventionRateP50,
+		"iterations_p50":                 a.IterationsP50,
+		"iterations_p90":                 a.IterationsP90,
+		"cost_per_retained_line_usd_p50": a.CostPerRetainedLineP50,
+		"session_outcomes":               a.SessionOutcomes,
+	}
 }
 
 func buildOobeya(r ExportReport) map[string]any {
 	faros := buildFaros(r)
 	metrics := faros["metrics"].(map[string]any)
+	productivity := map[string]any{"deployment_frequency": metrics["deployment_frequency"]}
+	if r.Config.IncludeAttribution {
+		productivity["task_attribution"] = attributionBlock(r.Attribution)
+	}
 	layers := map[string]any{
-		"productivity": map[string]any{"deployment_frequency": metrics["deployment_frequency"]},
+		"productivity": productivity,
 		"delivery":     map[string]any{"lead_time_for_changes": metrics["lead_time_for_changes"]},
 		"quality": map[string]any{
 			"change_failure_rate": metrics["change_failure_rate"],
@@ -125,7 +165,7 @@ func buildRaw(r ExportReport) map[string]any {
 		"incident_labels":          r.Config.IncidentCf.Labels,
 		"jql_extra":                r.Config.JQLExtra,
 	}
-	return map[string]any{
+	out := map[string]any{
 		"generated_at":      r.GeneratedAt.UTC().Format(time.RFC3339),
 		"window":            r.Config.Window,
 		"team":              r.Config.Team,
@@ -138,6 +178,10 @@ func buildRaw(r ExportReport) map[string]any {
 		"insufficient_data": stringListOrEmpty(r.InsufficientData),
 		"warnings":          stringListOrEmpty(r.Warnings),
 	}
+	if r.Config.IncludeAttribution {
+		out["task_attribution"] = attributionBlock(r.Attribution)
+	}
+	return out
 }
 
 // nullableFloat returns nil when insufficient → JSON marshals as null.

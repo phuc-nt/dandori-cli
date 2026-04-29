@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/phuc-nt/dandori-cli/internal/db"
 	"github.com/phuc-nt/dandori-cli/internal/jira"
 )
 
@@ -11,20 +12,22 @@ import (
 // CLI flags + dandori config.yaml; passed unchanged to the orchestrator so
 // reproducibility lives in one place (raw format echoes this back).
 type ExportConfig struct {
-	Window     MetricWindow
-	Team       string
-	JQLExtra   string
-	StatusCfg  JiraStatusConfig
-	IncidentCf IncidentMatchConfig
-	MaxResults int
+	Window             MetricWindow
+	Team               string
+	JQLExtra           string
+	StatusCfg          JiraStatusConfig
+	IncidentCf         IncidentMatchConfig
+	MaxResults         int
+	IncludeAttribution bool // opt-in G7 task_attribution block (default OFF for v0.5.0 backcompat)
 }
 
 // ExportSources is the set of data dependencies the orchestrator needs.
 // Splitting Jira (DORA + CFR + MTTR) from ReworkSrc (LocalDB-backed)
 // lets tests and the CLI wire fakes/real clients independently.
 type ExportSources struct {
-	Jira   jiraCFRSource // includes deploy + incident
-	Rework reworkSource  // LocalDB
+	Jira        jiraCFRSource // includes deploy + incident
+	Rework      reworkSource  // LocalDB
+	Attribution *db.LocalDB   // LocalDB; only read when cfg.IncludeAttribution
 }
 
 // ExportReport is the in-memory aggregate of all 5 metrics for one run.
@@ -38,7 +41,8 @@ type ExportReport struct {
 	CFR              CFRResult
 	MTTR             MTTRResult
 	Rework           ReworkResult
-	InsufficientData []string // metric IDs that lacked data (faros + oobeya consume)
+	Attribution      *AttributionResult // populated only when cfg.IncludeAttribution
+	InsufficientData []string           // metric IDs that lacked data (faros + oobeya consume)
 	Warnings         []string
 }
 
@@ -127,6 +131,17 @@ func Run(src ExportSources, cfg ExportConfig) (ExportReport, error) {
 		rep.InsufficientData = append(rep.InsufficientData, "rework_rate")
 		rep.Rework.InsufficientData = true
 		rep.Rework.Window = cfg.Window
+	}
+
+	if cfg.IncludeAttribution && src.Attribution != nil {
+		attr, err := AggregateAttribution(src.Attribution, cfg.Window)
+		if err != nil {
+			return rep, fmt.Errorf("attribution: %w", err)
+		}
+		rep.Attribution = &attr
+		if attr.InsufficientData {
+			rep.InsufficientData = append(rep.InsufficientData, "task_attribution")
+		}
 	}
 
 	return rep, nil

@@ -69,3 +69,26 @@ This is by design (single source of truth = Jira), but consumers of the export s
 ## Threshold (Rework Rate)
 
 The 10% threshold uses strict `>` (10 of 100 = NOT exceeding). `threshold_version: v1-2026Q2` lets dashboards detect threshold updates without re-keying.
+
+## `--include-attribution` (G7, opt-in)
+
+Adds a `task_attribution` block to all 3 formats. Aggregates over `task_attribution` rows whose `jira_done_at` lands in the export window.
+
+```bash
+dandori metric export --format faros --since 28d --include-attribution
+```
+
+Default OFF — without the flag the output is byte-for-byte identical to v0.5.0 dashboards.
+
+| Field | Meaning |
+|---|---|
+| `tasks_total` | rows in window |
+| `tasks_with_session` | tasks with at least one tracked agent session |
+| `agent_autonomy_rate` | share of tasks with `intervention_rate < 0.2` |
+| `agent_code_retention_p50` / `p90` | percentile of `lines_attributed_agent / (lines_attributed_agent + lines_attributed_human)` per task |
+| `intervention_rate_p50` | percentile of per-task `human_intervention / (intervention + approval)` |
+| `iterations_p50` / `p90` | per-task `task.iteration.start` count |
+| `cost_per_retained_line_usd_p50` | `total_agent_cost_usd / lines_attributed_agent` (excludes tasks with 0 retained agent lines) |
+| `session_outcomes` | merged histogram of `session_end_reason` (`agent_finished`, `user_interrupted`, `error`) |
+
+Insufficient data semantics match v0.5.0: zero rows in window → block is `null` and `task_attribution` is added to `data_quality.insufficient_data`. In `oobeya`, the block is nested under `layers.productivity.task_attribution`.

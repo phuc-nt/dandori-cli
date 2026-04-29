@@ -33,12 +33,13 @@ var metricExportCmd = &cobra.Command{
 }
 
 var (
-	metricFormat     string
-	metricSince      string
-	metricUntil      string
-	metricTeam       string
-	metricOutput     string
-	metricMaxResults int
+	metricFormat             string
+	metricSince              string
+	metricUntil              string
+	metricTeam               string
+	metricOutput             string
+	metricMaxResults         int
+	metricIncludeAttribution bool
 )
 
 func init() {
@@ -51,6 +52,7 @@ func init() {
 	metricExportCmd.Flags().StringVar(&metricTeam, "team", "", "Filter by team/department (empty = all)")
 	metricExportCmd.Flags().StringVar(&metricOutput, "output", "stdout", "Output: 'stdout' or path to write")
 	metricExportCmd.Flags().IntVar(&metricMaxResults, "max-results", 200, "Max Jira issues per query")
+	metricExportCmd.Flags().BoolVar(&metricIncludeAttribution, "include-attribution", false, "Include per-task agent vs human attribution block")
 }
 
 func runMetricExport(cmd *cobra.Command, args []string) error {
@@ -84,9 +86,12 @@ func runMetricExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("migrate: %w", err)
 	}
 
+	cfg.IncludeAttribution = metricIncludeAttribution
+
 	src := metric.ExportSources{
-		Jira:   metric.NewJiraSource(jc),
-		Rework: store,
+		Jira:        metric.NewJiraSource(jc),
+		Rework:      store,
+		Attribution: store,
 	}
 
 	rep, err := metric.Run(src, cfg)
