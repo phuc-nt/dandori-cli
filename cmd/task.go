@@ -3,6 +3,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/phuc-nt/dandori-cli/internal/attribution"
+	"github.com/phuc-nt/dandori-cli/internal/config"
+	"github.com/phuc-nt/dandori-cli/internal/db"
 	"github.com/phuc-nt/dandori-cli/internal/jira"
 	"github.com/spf13/cobra"
 )
@@ -104,6 +107,21 @@ func runTaskDone(cmd *cobra.Command, args []string) error {
 	client, err := getJiraClient()
 	if err != nil {
 		return err
+	}
+
+	// Attribution snapshot before the transition. Non-fatal: a missing or
+	// non-git workspace must not block a manual Jira move.
+	if dbPath, err := config.DBPath(); err == nil {
+		if localDB, openErr := db.Open(dbPath); openErr == nil {
+			if migErr := localDB.Migrate(); migErr == nil {
+				if finalHead := getFullGitHead(); finalHead != "" {
+					if err := attribution.ComputeAndPersist(localDB, issueKey, ".", finalHead); err != nil {
+						fmt.Printf("Warning: attribution compute failed: %v\n", err)
+					}
+				}
+			}
+			localDB.Close()
+		}
 	}
 
 	// Transition to Done

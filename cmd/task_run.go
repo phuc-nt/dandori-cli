@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/phuc-nt/dandori-cli/internal/attribution"
 	"github.com/phuc-nt/dandori-cli/internal/config"
 	"github.com/phuc-nt/dandori-cli/internal/confluence"
 	"github.com/phuc-nt/dandori-cli/internal/db"
@@ -296,6 +297,16 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		fmt.Println("  ✓ Jira updated")
 
 		if gateRes.Pass {
+			// Attribution must be computed BEFORE the Jira transition so
+			// the row reflects the tree state the human is signing off on.
+			// Failure here is non-fatal — attribution is observability.
+			finalHead := getFullGitHead()
+			if finalHead != "" {
+				if err := attribution.ComputeAndPersist(localDB, issueKey, ".", finalHead); err != nil {
+					fmt.Printf("Warning: attribution compute failed: %v\n", err)
+				}
+			}
+
 			if err := jiraClient.TransitionToDone(issueKey, jira.DefaultStatusMapping); err != nil {
 				fmt.Printf("Warning: could not transition to Done: %v\n", err)
 			}
@@ -332,6 +343,15 @@ type GitChanges struct {
 // getGitHead gets current git HEAD
 func getGitHead() string {
 	if out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		return strings.TrimSpace(string(out))
+	}
+	return ""
+}
+
+// getFullGitHead returns the full 40-char SHA. Attribution needs this because
+// git blame emits full SHAs and we membership-test against rev-list output.
+func getFullGitHead() string {
+	if out, err := exec.Command("git", "rev-parse", "HEAD").Output(); err == nil {
 		return strings.TrimSpace(string(out))
 	}
 	return ""
