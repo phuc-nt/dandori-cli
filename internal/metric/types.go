@@ -38,3 +38,21 @@ func DefaultWindow(now time.Time) MetricWindow {
 type TeamFilter struct {
 	Team string
 }
+
+// JiraStatusConfig defines which Jira status names count as deploy events
+// (transition INTO any ReleaseStatusNames) and which mark "in progress"
+// for lead-time start (transition INTO any InProgressStatusNames). Names
+// are matched case-insensitively. Per-team overrides come from config.yaml;
+// DefaultJiraStatusConfig provides sensible defaults that work for most
+// Jira instances using the default workflow.
+type JiraStatusConfig struct {
+	ReleaseStatusNames    []string
+	InProgressStatusNames []string
+}
+
+func DefaultJiraStatusConfig() JiraStatusConfig {
+	return JiraStatusConfig{
+		ReleaseStatusNames:    []string{"Released", "Deployed", "Live", "Done"},
+		InProgressStatusNames: []string{"In Progress"},
+	}
+}
