@@ -37,6 +37,17 @@ type Config struct {
 	Quality    QualityConfig    `yaml:"quality"`
 	Wrapper    WrapperConfig    `yaml:"wrapper"`
 	Verify     VerifyConfig     `yaml:"verify"`
+	Metric     MetricConfig     `yaml:"metric"`
+}
+
+// MetricConfig drives `dandori metric export`. All fields optional; defaults
+// from internal/metric.DefaultJiraStatusConfig are used when empty.
+type MetricConfig struct {
+	ReleaseStatusNames    []string `yaml:"release_status_names"`
+	InProgressStatusNames []string `yaml:"in_progress_status_names"`
+	IncidentIssueTypes    []string `yaml:"incident_issue_types"`
+	IncidentLabels        []string `yaml:"incident_labels"`
+	JQLExtra              string   `yaml:"jql_extra"` // applied to deploy + incident search, e.g. `AND project = PAY`
 }
 
 // VerifyConfig — Bug #3 pre-sync gate (semantic check + quality gate).
