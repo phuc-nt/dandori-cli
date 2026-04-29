@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-04-29
+
+DORA + Rework Rate exporter (G6).
+
+### Added
+- **`dandori metric export`** — 5 engineering metrics (deployment frequency, lead time for changes, change failure rate, time to restore service, rework rate) over a configurable window:
+  - Source of truth = Jira (status transitions for deploys, issuetype/labels for incidents) + local SQLite (Layer-3 `task.iteration.start` events for rework)
+  - 3 wire formats: `faros` (DORA schema), `oobeya` (6-layer mapping), `raw` (full report with `jira_config` echo)
+  - Insufficient-data semantics: emits `"value": null` (not `0`) so dashboards show "N/A" instead of charting misleading zeros
+  - Window flags accept `Nd` / `YYYY-MM-DD` / RFC3339 / `now`; team filter scopes rework leg
+  - Configurable via `metric:` block in `~/.dandori/config.yaml` — release statuses, in-progress statuses, incident issue types, incident labels, JQL extension
+  - Incident config has no default; CFR + MTTR are skipped cleanly when not opted in
+  - Lead time uses NIST linear-interpolation percentiles (p50/p75/p90); MTTR reports p50/p90 + ongoing-incident count
+  - Rework Rate uses 10% threshold with strict `>` (10/100 = NOT exceeding); threshold version stamped (`v1-2026Q2`)
+  - Reports `tickets_without_in_progress` count in `data_quality` so process gaps surface
+- See [`docs/metric-export.md`](docs/metric-export.md) for command reference + config schema.
+
 ## [0.4.0] — 2026-04-28
 
 Pre-sync verify gate, Layer-3 tracking, dogfooding bug-fix sweep.
