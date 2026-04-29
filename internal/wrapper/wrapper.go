@@ -196,6 +196,24 @@ func Run(ctx context.Context, localDB *db.LocalDB, opts Options) (*Result, error
 		slog.Error("update run", "error", err)
 	}
 
+	// G7: re-read the JSONL transcript once session is complete and persist
+	// the message counters that drive intervention_rate. Failures non-fatal —
+	// attribution is observability, must not break the run.
+	if logPath := GetSessionLogPath(cwd, sessionSnapshot); logPath != "" {
+		if data, err := os.ReadFile(logPath); err == nil {
+			counts := aggregateMessageCounts(data)
+			if err := persistMessageCounts(localDB, runID, counts); err != nil {
+				slog.Warn("persist message counts failed", "run_id", runID, "error", err)
+			} else {
+				slog.Debug("message counts persisted",
+					"run_id", runID, "human", counts.HumanTotal, "agent", counts.AgentTotal,
+					"interventions", counts.Interventions, "approvals", counts.Approvals)
+			}
+		} else {
+			slog.Debug("transcript read failed for message counts", "path", logPath, "error", err)
+		}
+	}
+
 	emitIterationEndIfApplicable(localDB, runID)
 
 	// Quality snapshot after and store metrics

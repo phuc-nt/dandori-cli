@@ -1,0 +1,12 @@
+{"type":"user","message":{"content":[{"type":"text","text":"Implement user authentication with JWT tokens please."}]}}
+{"type":"assistant","message":{"id":"msg_a1","model":"claude-opus-4-7","content":[{"type":"text","text":"I'll start by reading the existing auth code."}],"usage":{"input_tokens":100,"output_tokens":15}}}
+{"type":"assistant","message":{"id":"msg_a2","model":"claude-opus-4-7","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"file_path":"/auth.go"}}],"usage":{"input_tokens":120,"output_tokens":20}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":false,"content":"package auth\n..."}]}}
+{"type":"user","message":{"content":[{"type":"text","text":"looks good"}]}}
+{"type":"assistant","message":{"id":"msg_a3","model":"claude-opus-4-7","content":[{"type":"tool_use","id":"toolu_2","name":"Edit","input":{"file_path":"/auth.go"}}],"usage":{"input_tokens":140,"output_tokens":25}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_2","is_error":false,"content":"applied"}]}}
+{"type":"user","message":{"content":[{"type":"text","text":"no, please use HMAC-SHA256 instead of plain comparison for the token verification"}]}}
+{"type":"assistant","message":{"id":"msg_a4","model":"claude-opus-4-7","content":[{"type":"text","text":"Switching to HMAC-SHA256."}],"usage":{"input_tokens":160,"output_tokens":15}}}
+{"type":"assistant","message":{"id":"msg_a5","model":"claude-opus-4-7","content":[{"type":"tool_use","id":"toolu_3","name":"Edit","input":{"file_path":"/auth.go"}}],"usage":{"input_tokens":180,"output_tokens":30}}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_3","is_error":false,"content":"applied"}]}}
+{"type":"user","message":{"content":[{"type":"text","text":"and also add rate limiting on the /login endpoint for anti-bruteforce"}]}}

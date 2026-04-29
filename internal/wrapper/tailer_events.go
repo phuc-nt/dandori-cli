@@ -34,6 +34,7 @@ type contentPart struct {
 	ToolUseID  string          `json:"tool_use_id,omitempty"` // tool_result link
 	IsError    *bool           `json:"is_error,omitempty"`    // tool_result error flag
 	RawContent json.RawMessage `json:"content,omitempty"`     // tool_result content (size only)
+	Text       string          `json:"text,omitempty"`        // text part body (G7 message classifier)
 }
 
 // parseLineForEvents extracts zero-or-more SessionEvents from a single JSONL
