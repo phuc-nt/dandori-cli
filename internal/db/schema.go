@@ -1,6 +1,6 @@
 package db
 
-const SchemaVersion = 4
+const SchemaVersion = 5
 
 const SchemaSQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS runs (
     cost_usd REAL DEFAULT 0,
     engineer_name TEXT,
     department TEXT,
+    session_end_reason TEXT,
+    human_message_count INTEGER DEFAULT 0,
+    agent_message_count INTEGER DEFAULT 0,
+    human_intervention_count INTEGER DEFAULT 0,
+    human_approval_count INTEGER DEFAULT 0,
     synced INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -106,6 +111,26 @@ CREATE TABLE IF NOT EXISTS metric_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_snap_team_window ON metric_snapshots(team, window_end);
 CREATE INDEX IF NOT EXISTS idx_events_type_run ON events(event_type, run_id);
+
+CREATE TABLE IF NOT EXISTS task_attribution (
+    jira_issue_key TEXT PRIMARY KEY,
+    session_count INTEGER NOT NULL,
+    total_lines_final INTEGER NOT NULL,
+    lines_attributed_agent INTEGER NOT NULL,
+    lines_attributed_human INTEGER NOT NULL,
+    total_agent_tokens INTEGER DEFAULT 0,
+    total_agent_cost_usd REAL DEFAULT 0,
+    total_iterations INTEGER DEFAULT 0,
+    total_human_messages INTEGER DEFAULT 0,
+    total_intervention_count INTEGER DEFAULT 0,
+    intervention_rate REAL DEFAULT 0,
+    session_outcomes TEXT,
+    git_head_at_jira_done TEXT,
+    jira_done_at TEXT NOT NULL,
+    computed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_attribution_done_at ON task_attribution(jira_done_at);
 `
 
 // Migration from v1 to v2: add quality_metrics table

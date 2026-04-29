@@ -330,6 +330,22 @@ func insertRun(localDB *db.LocalDB, run *model.Run) error {
 	return err
 }
 
+// sessionEndReason maps the wrapped command's exit code to the canonical
+// session-end label persisted on runs.session_end_reason. 130 is SIGINT
+// (the user pressed Ctrl+C mid-session) — that signal carries product
+// meaning: a human aborted the agent, which is what intervention metrics
+// key off. Anything else non-zero collapses to "error".
+func sessionEndReason(exitCode int) string {
+	switch exitCode {
+	case 0:
+		return "agent_finished"
+	case 130:
+		return "user_interrupted"
+	default:
+		return "error"
+	}
+}
+
 func updateRunComplete(localDB *db.LocalDB, runID string, endedAt time.Time, duration time.Duration, exitCode int, status model.RunStatus, gitHeadAfter, sessionID string, tokens TokenUsage, costUSD float64) error {
 	_, err := localDB.Exec(`
 		UPDATE runs SET
@@ -344,7 +360,8 @@ func updateRunComplete(localDB *db.LocalDB, runID string, endedAt time.Time, dur
 			cache_read_tokens = ?,
 			cache_write_tokens = ?,
 			model = ?,
-			cost_usd = ?
+			cost_usd = ?,
+			session_end_reason = ?
 		WHERE id = ?
 	`,
 		endedAt.Format(time.RFC3339),
@@ -359,6 +376,7 @@ func updateRunComplete(localDB *db.LocalDB, runID string, endedAt time.Time, dur
 		tokens.CacheWrite,
 		tokens.Model,
 		costUSD,
+		sessionEndReason(exitCode),
 		runID,
 	)
 	return err
