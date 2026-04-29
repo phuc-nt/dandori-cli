@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-04-29
+
+Agent contribution attribution (G7).
+
+### Added
+- **`dandori metric export --include-attribution`** — per-task accounting of agent vs human code contribution, plus aggregate intervention/iteration/cost percentiles:
+  - **Line-level attribution** via `git blame` at the final HEAD when Jira moved to Done. Each line's introducing commit is membership-tested against the union of session-reachable commits (`rev-list HeadBefore..HeadAfter`); pre-session baseline lines are excluded from totals
+  - **Intervention classifier** (v1 heuristic): human text ≥30 chars after agent tool use = intervention, <30 = approval. Documented as a proxy in [`docs/agent-attribution.md`](docs/agent-attribution.md)
+  - **Computed BEFORE Jira transition** — `dandori task run` (auto-flow) and `dandori task done` (manual) both write the `task_attribution` row before calling `TransitionToDone`. Failure is non-fatal so observability never blocks the Jira move
+  - 6 fields surfaced in the export block: `agent_autonomy_rate` (share of tasks with `intervention_rate < 0.2`), `agent_code_retention_p50/p90`, `intervention_rate_p50`, `iterations_p50/p90`, `cost_per_retained_line_usd_p50`, `session_outcomes` (merged histogram of `agent_finished` / `user_interrupted` / `error`)
+  - Insufficient-data semantics match v0.5.0: zero rows in window → block is `null` and `task_attribution` is added to `data_quality.insufficient_data`
+  - Backwards-compat: without the flag, output is byte-for-byte identical to v0.5.0 dashboards
+- **SQLite migration v4 → v5**: `task_attribution` table + 5 new `runs` columns (`session_end_reason`, `human_message_count`, `agent_message_count`, `human_intervention_count`, `human_approval_count`)
+- See [`docs/agent-attribution.md`](docs/agent-attribution.md) for definitions, output schema, three named limitations (format reflow, cross-repo, heuristic threshold), and 6 example questions.
+
 ## [0.5.0] — 2026-04-29
 
 DORA + Rework Rate exporter (G6).
