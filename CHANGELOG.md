@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **attribution window scan** (CLITEST2-14): `AggregateAttribution` lexically string-compared `jira_done_at` against UTC-Z window bounds, silently dropping rows whose stored timestamp carried a non-UTC offset (e.g. `+07:00`). Per-row data was correct, only window membership was wrong. Fix: `compute.go` now normalizes `jira_done_at` to UTC `Z` before INSERT; v5→v6 migration backfills existing rows. Surfaced via 5/5 dogfood case study.
+- **wrapper no-commit warning**: when an agent edits the working tree but never runs `git commit`, `task run` now logs a warning + prints a CLI hint. Attribution still reports zero agent lines for that run, but the user knows why instead of silently mis-attributing. New `Result.NoCommitDetected` field.
+
 ## [0.6.0] — 2026-04-30
 
 Agent contribution attribution (G7).

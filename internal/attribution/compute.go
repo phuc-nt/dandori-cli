@@ -4,9 +4,28 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/phuc-nt/dandori-cli/internal/db"
 )
+
+// normalizeJiraDoneAt converts a stored timestamp (any RFC3339 / RFC3339Nano,
+// possibly with offset like +07:00) into a UTC-Z string. AggregateAttribution
+// binds window bounds as Z, and SQLite compares timestamps as plain strings —
+// so non-UTC stored values silently fall outside the window. Returns the
+// original string unchanged if it cannot be parsed (preserves data over
+// strictness).
+func normalizeJiraDoneAt(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return t.UTC().Format(time.RFC3339)
+		}
+	}
+	return raw
+}
 
 // MessageCounts mirrors wrapper.MessageCounts to avoid an import cycle.
 // Only the fields we aggregate into task_attribution are kept.
@@ -173,7 +192,7 @@ func upsertAttribution(d *db.LocalDB, jiraKey string, ret RetentionResult, agg a
 	if err != nil {
 		return fmt.Errorf("marshal outcomes: %w", err)
 	}
-	doneAt := agg.JiraDoneAt
+	doneAt := normalizeJiraDoneAt(agg.JiraDoneAt)
 	if doneAt == "" {
 		// Should not happen — runs always have started_at — but guard anyway.
 		doneAt = "1970-01-01T00:00:00Z"
