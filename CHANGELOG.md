@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`go-build*` temp-dir leak** (high severity): `dandori run` with `quality.enabled=true` (the previous default) spawned `go test` whose 30s SIGKILL timeout prevented the Go toolchain from cleaning up its scratch dirs. One user accumulated ~43k dirs / ~199 GB in `$TMPDIR`. Three-part fix:
+  1. **Default `quality.enabled` flipped to `false`** (`internal/quality/collector.go`, `internal/config/config.go`). `dandori init` now prompts to opt in; existing configs are unchanged.
+  2. **SIGTERM + 2s grace before SIGKILL** (`internal/quality/spawn_unix.go`): `cmd.Cancel` now sends SIGTERM to the process group so `go test` can run its deferred cleanup; `WaitDelay` gains a `gracePeriod` buffer before Go escalates to SIGKILL. Verified by `TestSpawnCollectorCmd_SIGTERM_AllowsCleanup`.
+  3. **New `dandori clean` command** (`cmd/clean.go`): scans `$TMPDIR` for `go-build*` dirs older than 60 minutes (in-flight protection), reports reclaimable size, and deletes only with `--force`. Does **not** touch `GOCACHE` (long-lived cache).
 - **attribution window scan** (CLITEST2-14): `AggregateAttribution` lexically string-compared `jira_done_at` against UTC-Z window bounds, silently dropping rows whose stored timestamp carried a non-UTC offset (e.g. `+07:00`). Per-row data was correct, only window membership was wrong. Fix: `compute.go` now normalizes `jira_done_at` to UTC `Z` before INSERT; v5→v6 migration backfills existing rows. Surfaced via 5/5 dogfood case study.
 - **wrapper no-commit warning**: when an agent edits the working tree but never runs `git commit`, `task run` now logs a warning + prints a CLI hint. Attribution still reports zero agent lines for that run, but the user knows why instead of silently mis-attributing. New `Result.NoCommitDetected` field.
 
