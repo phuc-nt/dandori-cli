@@ -16,10 +16,13 @@ type Config struct {
 	Timeout     string `yaml:"timeout"`
 }
 
-// DefaultConfig returns default quality config
+// DefaultConfig returns default quality config.
+// Enabled defaults to false to avoid spawning `go test` from every `dandori run`,
+// which leaks ~30 go-build* dirs in $TMPDIR per run when the test suite times out
+// (SIGKILL prevents go's cleanup). Opt in via `dandori init` or config.
 func DefaultConfig() Config {
 	return Config{
-		Enabled:     true,
+		Enabled:     false,
 		LintCommand: "golangci-lint run --json --out-format json 2>/dev/null || true",
 		TestCommand: "go test -json -count=1 ./... 2>&1 || true",
 		Timeout:     "30s",

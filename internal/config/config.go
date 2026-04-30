@@ -144,7 +144,7 @@ func DefaultConfig() *Config {
 			BatchSize:   100,
 		},
 		Quality: QualityConfig{
-			Enabled:     true,
+			Enabled:     false,
 			LintCommand: "golangci-lint run --json --out-format json 2>/dev/null || true",
 			TestCommand: "go test -json -count=1 ./... 2>&1 || true",
 			Timeout:     "30s",

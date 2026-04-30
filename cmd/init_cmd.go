@@ -77,6 +77,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 			cfg.Project.Key = strings.TrimSpace(projectKey)
 		}
 
+		fmt.Print("Enable quality tracking (runs `go test`/lint after each run, may consume disk space) [y/N]: ")
+		if ans, _ := reader.ReadString('\n'); strings.HasPrefix(strings.ToLower(strings.TrimSpace(ans)), "y") {
+			cfg.Quality.Enabled = true
+		}
+
 		if err := config.Save(cfg, configPath); err != nil {
 			return fmt.Errorf("save config: %w", err)
 		}
