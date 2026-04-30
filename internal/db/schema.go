@@ -139,8 +139,8 @@ INSERT OR REPLACE INTO schema_version (version) VALUES (2);
 `
 
 // Migration v2→v3:
-//   * add engineer_name + department columns
-//   * relax runs.agent_name from NOT NULL → NULL (blog leaderboard needs
+//   - add engineer_name + department columns
+//   - relax runs.agent_name from NOT NULL → NULL (blog leaderboard needs
 //     human-only rows where agent_name IS NULL)
 //
 // SQLite cannot ALTER COLUMN, so we rebuild the table. All other columns

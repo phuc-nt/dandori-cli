@@ -33,9 +33,9 @@ type Poller struct {
 }
 
 type pendingSuggest struct {
-	suggestedAt   time.Time
-	agentName     string
-	reminderSent  bool
+	suggestedAt  time.Time
+	agentName    string
+	reminderSent bool
 }
 
 type PollerConfig struct {

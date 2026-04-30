@@ -58,17 +58,17 @@ func seedTestData(t *testing.T, db *serverdb.DB) {
 	// Insert test runs
 	runs := []struct {
 		id, issueKey, sprint, agent string
-		duration                     float64
-		cost                         float64
-		exitCode                     int
-		tokens                       int
+		duration                    float64
+		cost                        float64
+		exitCode                    int
+		tokens                      int
 	}{
 		{"run-001", "CLITEST-1", "4", "beta", 900, 2.85, 0, 15000},
 		{"run-002", "CLITEST-1", "4", "beta", 900, 2.15, 0, 12000},
 		{"run-003", "CLITEST-2", "4", "alpha", 1200, 3.45, 0, 18000},
 		{"run-004", "CLITEST-2", "4", "alpha", 1200, 2.65, 0, 14000},
 		{"run-005", "CLITEST-3", "4", "alpha", 1800, 4.25, 0, 22000},
-		{"run-006", "CLITEST-4", "4", "gamma", 900, 1.85, 1, 10000},  // failed
+		{"run-006", "CLITEST-4", "4", "gamma", 900, 1.85, 1, 10000}, // failed
 		{"run-007", "CLITEST-4", "4", "alpha", 1200, 3.05, 0, 16000},
 	}
 

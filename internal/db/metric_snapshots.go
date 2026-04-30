@@ -94,10 +94,10 @@ type rowScanner interface {
 
 func scanSnapshot(r rowScanner) (*MetricSnapshot, error) {
 	var (
-		s                  MetricSnapshot
-		windowStart        string
-		windowEnd          string
-		createdAt          string
+		s           MetricSnapshot
+		windowStart string
+		windowEnd   string
+		createdAt   string
 	)
 	if err := r.Scan(&s.ID, &s.Team, &s.Format, &windowStart, &windowEnd, &s.Payload, &createdAt); err != nil {
 		return nil, err

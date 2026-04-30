@@ -147,11 +147,11 @@ type issueResponse struct {
 		Epic struct {
 			Key string `json:"key"`
 		} `json:"epic"`
-		StoryPoints  any      `json:"customfield_10020"` // Can be float64, array, or null
-		AgentName    string   `json:"customfield_10100"`
-		Created      JiraTime `json:"created"`
-		Updated      JiraTime `json:"updated"`
-		IssueLinks   []issueLinkResponse `json:"issuelinks"`
+		StoryPoints any                 `json:"customfield_10020"` // Can be float64, array, or null
+		AgentName   string              `json:"customfield_10100"`
+		Created     JiraTime            `json:"created"`
+		Updated     JiraTime            `json:"updated"`
+		IssueLinks  []issueLinkResponse `json:"issuelinks"`
 	} `json:"fields"`
 }
 
@@ -172,23 +172,23 @@ type issueLinkResponse struct {
 
 func parseIssue(resp *issueResponse) *Issue {
 	return &Issue{
-		Key:         resp.Key,
-		Summary:     resp.Fields.Summary,
-		Description: parseDescription(resp.Fields.Description),
-		IssueType:   resp.Fields.IssueType.Name,
-		Priority:    resp.Fields.Priority.Name,
+		Key:               resp.Key,
+		Summary:           resp.Fields.Summary,
+		Description:       parseDescription(resp.Fields.Description),
+		IssueType:         resp.Fields.IssueType.Name,
+		Priority:          resp.Fields.Priority.Name,
 		Status:            resp.Fields.Status.Name,
 		StatusCategoryKey: resp.Fields.Status.StatusCategory.Key,
-		SprintID:    resp.Fields.Sprint.ID,
-		SprintName:  resp.Fields.Sprint.Name,
-		Assignee:    resp.Fields.Assignee.DisplayName,
-		Labels:      resp.Fields.Labels,
-		StoryPoints: parseStoryPoints(resp.Fields.StoryPoints),
-		AgentName:   resp.Fields.AgentName,
-		EpicKey:     resp.Fields.Epic.Key,
-		CreatedAt:   resp.Fields.Created.Time,
-		UpdatedAt:   resp.Fields.Updated.Time,
-		Links:       parseIssueLinks(resp.Fields.IssueLinks),
+		SprintID:          resp.Fields.Sprint.ID,
+		SprintName:        resp.Fields.Sprint.Name,
+		Assignee:          resp.Fields.Assignee.DisplayName,
+		Labels:            resp.Fields.Labels,
+		StoryPoints:       parseStoryPoints(resp.Fields.StoryPoints),
+		AgentName:         resp.Fields.AgentName,
+		EpicKey:           resp.Fields.Epic.Key,
+		CreatedAt:         resp.Fields.Created.Time,
+		UpdatedAt:         resp.Fields.Updated.Time,
+		Links:             parseIssueLinks(resp.Fields.IssueLinks),
 	}
 }
 

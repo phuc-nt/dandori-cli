@@ -33,11 +33,12 @@ func TailSessionLogWithRecorder(ctx context.Context, cwd string, snapshot *Sessi
 }
 
 // TailSessionLogWithTimeout watches the Claude session JSONL in two phases:
-//   Phase A (ctx alive): standard ticker loop — captures tokens as they're written.
-//   Phase B (ctx done):  post-exit wait up to postExitTimeout. Session JSONL often
-//                        appears 1-4s AFTER the child process exits, so we keep
-//                        polling GetSessionLogPath at 500ms intervals. Once the
-//                        file appears, we drain it until no new bytes for 500ms.
+//
+//	Phase A (ctx alive): standard ticker loop — captures tokens as they're written.
+//	Phase B (ctx done):  post-exit wait up to postExitTimeout. Session JSONL often
+//	                     appears 1-4s AFTER the child process exits, so we keep
+//	                     polling GetSessionLogPath at 500ms intervals. Once the
+//	                     file appears, we drain it until no new bytes for 500ms.
 //
 // Pass postExitTimeout=0 to skip Phase B entirely (--no-wait behaviour).
 func TailSessionLogWithTimeout(ctx context.Context, cwd string, snapshot *SessionSnapshot, postExitTimeout time.Duration) TokenUsage {

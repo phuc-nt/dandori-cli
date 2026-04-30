@@ -8,9 +8,9 @@ import (
 // BugStatRow groups bug.filed events by a chosen dimension (agent or
 // jira_issue_key). Returned by BugStats for the analytics command.
 type BugStatRow struct {
-	GroupKey   string    `json:"group_key"`
-	BugCount   int       `json:"bug_count"`
-	LastFiled  time.Time `json:"last_filed_at"`
+	GroupKey  string    `json:"group_key"`
+	BugCount  int       `json:"bug_count"`
+	LastFiled time.Time `json:"last_filed_at"`
 }
 
 // BugStats counts distinct bug_key values from bug.filed events,

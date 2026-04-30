@@ -88,8 +88,8 @@ type BugLinkResolver interface {
 
 // BugLinkEvent is one bug.filed event payload waiting to be recorded.
 type BugLinkEvent struct {
-	RunID    string
-	Payload  map[string]any
+	RunID   string
+	Payload map[string]any
 }
 
 // DetectBugLinks consumes one bug ticket, walks both link types (structured

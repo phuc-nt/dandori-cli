@@ -12,9 +12,9 @@ type GolangciLintOutput struct {
 
 // GolangciIssue represents a single lint issue
 type GolangciIssue struct {
-	FromLinter  string `json:"FromLinter"`
-	Text        string `json:"Text"`
-	Severity    string `json:"Severity"`
+	FromLinter  string   `json:"FromLinter"`
+	Text        string   `json:"Text"`
+	Severity    string   `json:"Severity"`
 	SourceLines []string `json:"SourceLines"`
 	Pos         struct {
 		Filename string `json:"Filename"`

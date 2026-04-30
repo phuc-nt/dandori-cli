@@ -38,12 +38,12 @@ type Options struct {
 }
 
 type Result struct {
-	RunID       string
-	ExitCode    int
-	Duration    time.Duration
-	SessionID   string
-	TokenUsage  TokenUsage
-	CostUSD     float64
+	RunID      string
+	ExitCode   int
+	Duration   time.Duration
+	SessionID  string
+	TokenUsage TokenUsage
+	CostUSD    float64
 	// QualityAfter is the post-run lint+test snapshot when QualityConfig is
 	// enabled. nil otherwise. Exposed so callers (e.g. cmd/task_run.go) can
 	// feed the verify gate without re-running the snapshot.

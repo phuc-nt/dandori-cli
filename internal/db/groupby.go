@@ -5,12 +5,12 @@ import "fmt"
 // MixRow represents one row of the human+agent mix leaderboard
 // (engineer × agent). Bob human-only has Agent == "".
 type MixRow struct {
-	Engineer     string  `json:"engineer"`
-	Agent        string  `json:"agent"`
-	RunCount     int     `json:"run_count"`
-	TotalCost    float64 `json:"total_cost"`
-	AvgCost      float64 `json:"avg_cost"`
-	AvgDuration  float64 `json:"avg_duration_sec"`
+	Engineer    string  `json:"engineer"`
+	Agent       string  `json:"agent"`
+	RunCount    int     `json:"run_count"`
+	TotalCost   float64 `json:"total_cost"`
+	AvgCost     float64 `json:"avg_cost"`
+	AvgDuration float64 `json:"avg_duration_sec"`
 }
 
 // GetCostByEngineer groups runs by engineer_name (human owner).

@@ -11,9 +11,9 @@ import "time"
 // toward 8% then 5% per Faros benchmark guidance. Documented in
 // docs/goals-and-metrics/decision-260429-dora-plus-rework-baseline.md.
 const (
-	ReworkThresholdV1   = 0.10
-	ReworkThresholdTag  = "v1-2026Q2"
-	DefaultWindowDays   = 28
+	ReworkThresholdV1  = 0.10
+	ReworkThresholdTag = "v1-2026Q2"
+	DefaultWindowDays  = 28
 )
 
 // MetricWindow is a closed-open time interval [Start, End) used by all

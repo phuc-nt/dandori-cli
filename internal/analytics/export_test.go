@@ -141,7 +141,7 @@ func TestExportJSONCostGroups(t *testing.T) {
 
 func TestExportCSVSpecialChars(t *testing.T) {
 	stats := []AgentStat{
-		{AgentName: "alpha,beta", RunCount: 1}, // comma in name
+		{AgentName: "alpha,beta", RunCount: 1},  // comma in name
 		{AgentName: "test\"quote", RunCount: 2}, // quote in name
 	}
 

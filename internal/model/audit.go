@@ -5,10 +5,10 @@ import "time"
 type AuditAction string
 
 const (
-	AuditRunStarted   AuditAction = "run_started"
-	AuditRunCompleted AuditAction = "run_completed"
-	AuditRunFailed    AuditAction = "run_failed"
-	AuditTaskAssigned AuditAction = "task_assigned"
+	AuditRunStarted    AuditAction = "run_started"
+	AuditRunCompleted  AuditAction = "run_completed"
+	AuditRunFailed     AuditAction = "run_failed"
+	AuditTaskAssigned  AuditAction = "task_assigned"
 	AuditConfigChanged AuditAction = "config_changed"
 	AuditSyncCompleted AuditAction = "sync_completed"
 )

@@ -9,9 +9,9 @@ import (
 )
 
 type IngestRequest struct {
-	WorkstationID string         `json:"workstation_id"`
-	Runs          []IngestRun    `json:"runs"`
-	Events        []IngestEvent  `json:"events"`
+	WorkstationID string        `json:"workstation_id"`
+	Runs          []IngestRun   `json:"runs"`
+	Events        []IngestEvent `json:"events"`
 }
 
 type IngestRun struct {

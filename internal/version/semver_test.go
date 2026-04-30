@@ -4,10 +4,10 @@ import "testing"
 
 func TestParseSemver(t *testing.T) {
 	tests := []struct {
-		name                        string
-		input                       string
+		name                            string
+		input                           string
 		wantMajor, wantMinor, wantPatch int
-		wantErr                     bool
+		wantErr                         bool
 	}{
 		{"plain", "1.2.3", 1, 2, 3, false},
 		{"with v prefix", "v0.10.5", 0, 10, 5, false},

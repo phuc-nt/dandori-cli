@@ -70,7 +70,7 @@ func ComputeMetrics(runID string, before, after *Snapshot) *Metrics {
 	}
 
 	// Compute deltas
-	m.LintDelta = m.LintErrorsAfter - m.LintErrorsBefore   // Negative = improvement
+	m.LintDelta = m.LintErrorsAfter - m.LintErrorsBefore    // Negative = improvement
 	m.TestsDelta = m.TestsPassedAfter - m.TestsPassedBefore // Positive = improvement
 
 	return m

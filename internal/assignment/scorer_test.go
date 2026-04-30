@@ -6,11 +6,11 @@ import (
 
 func TestScoreCapabilityOverlap(t *testing.T) {
 	tests := []struct {
-		name         string
-		agentCaps    []string
-		taskLabels   []string
-		taskComps    []string
-		expectedPct  float64 // expected percentage (0-1)
+		name        string
+		agentCaps   []string
+		taskLabels  []string
+		taskComps   []string
+		expectedPct float64 // expected percentage (0-1)
 	}{
 		{
 			name:        "full overlap",

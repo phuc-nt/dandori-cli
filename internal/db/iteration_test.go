@@ -46,10 +46,10 @@ func TestTotalRunIDs_WindowAndDepartment(t *testing.T) {
 	start := end.AddDate(0, 0, -28)
 
 	insertRunWithDept(t, d, "r-old", "payments", "done", start.Add(-24*time.Hour)) // before window
-	insertRunWithDept(t, d, "r-1", "payments", "done", start)                       // boundary inclusive
-	insertRunWithDept(t, d, "r-2", "payments", "cancelled", start.Add(time.Hour))   // cancelled stays
-	insertRunWithDept(t, d, "r-3", "platform", "done", start.Add(2*time.Hour))      // other team
-	insertRunWithDept(t, d, "r-end", "payments", "done", end)                       // exclusive end excluded
+	insertRunWithDept(t, d, "r-1", "payments", "done", start)                      // boundary inclusive
+	insertRunWithDept(t, d, "r-2", "payments", "cancelled", start.Add(time.Hour))  // cancelled stays
+	insertRunWithDept(t, d, "r-3", "platform", "done", start.Add(2*time.Hour))     // other team
+	insertRunWithDept(t, d, "r-end", "payments", "done", end)                      // exclusive end excluded
 
 	all, err := d.TotalRunIDs(start, end, "")
 	if err != nil {

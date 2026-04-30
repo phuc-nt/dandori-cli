@@ -201,8 +201,8 @@ func TestDetectBugLinks_DescriptionTag(t *testing.T) {
 
 func TestDetectBugLinks_AlreadyRecorded_Dedupe(t *testing.T) {
 	bug := &BugIssue{
-		Key:     "BUG-3",
-		Links:   []IssueLink{{Type: "is caused by", InwardKey: "TASK-1"}},
+		Key:   "BUG-3",
+		Links: []IssueLink{{Type: "is caused by", InwardKey: "TASK-1"}},
 	}
 	r := &fakeResolver{
 		bugExists:  map[string]bool{"BUG-3": true},

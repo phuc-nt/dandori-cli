@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/phuc-nt/dandori-cli/internal/confluence"
 	"github.com/phuc-nt/dandori-cli/internal/config"
+	"github.com/phuc-nt/dandori-cli/internal/confluence"
 	"github.com/phuc-nt/dandori-cli/internal/db"
 	"github.com/phuc-nt/dandori-cli/internal/event"
 	"github.com/phuc-nt/dandori-cli/internal/jira"
@@ -164,7 +164,7 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		}
 
 		taskDescription = taskCtx.Description // Save for AC extraction later
-		taskLabels = taskCtx.Labels            // Save for verify gate (skip-verify label)
+		taskLabels = taskCtx.Labels           // Save for verify gate (skip-verify label)
 
 		fmt.Printf("  Issue: %s\n", taskCtx.Summary)
 		fmt.Printf("  Type: %s | Priority: %s | Status: %s\n", taskCtx.IssueType, taskCtx.Priority, taskCtx.Status)

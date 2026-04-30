@@ -31,14 +31,14 @@ type WrapperEvent struct {
 }
 
 type TailerEvent struct {
-	Type         string `json:"type"`
-	RunID        string `json:"run_id"`
-	SessionID    string `json:"session_id,omitempty"`
-	InputTokens  int    `json:"input_tokens,omitempty"`
-	OutputTokens int    `json:"output_tokens,omitempty"`
-	CacheRead    int    `json:"cache_read,omitempty"`
-	CacheWrite   int    `json:"cache_write,omitempty"`
-	Model        string `json:"model,omitempty"`
+	Type         string  `json:"type"`
+	RunID        string  `json:"run_id"`
+	SessionID    string  `json:"session_id,omitempty"`
+	InputTokens  int     `json:"input_tokens,omitempty"`
+	OutputTokens int     `json:"output_tokens,omitempty"`
+	CacheRead    int     `json:"cache_read,omitempty"`
+	CacheWrite   int     `json:"cache_write,omitempty"`
+	Model        string  `json:"model,omitempty"`
 	CostUSD      float64 `json:"cost_usd,omitempty"`
 }
 

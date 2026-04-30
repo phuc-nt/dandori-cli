@@ -15,20 +15,20 @@ type iterationFixture struct {
 
 func mkIssue(key, status, statusCategory string) *Issue {
 	return &Issue{
-		Key:                key,
-		Status:             status,
-		StatusCategoryKey:  statusCategory,
-		UpdatedAt:          time.Date(2026, 4, 25, 10, 0, 0, 0, time.UTC),
+		Key:               key,
+		Status:            status,
+		StatusCategoryKey: statusCategory,
+		UpdatedAt:         time.Date(2026, 4, 25, 10, 0, 0, 0, time.UTC),
 	}
 }
 
 func mkPriorRun(runID, prevStatus, prevCategory string, endedAt time.Time) *PriorRun {
 	return &PriorRun{
-		RunID:                  runID,
-		Status:                 "done",
-		JiraStatusAtCompletion: prevStatus,
+		RunID:                    runID,
+		Status:                   "done",
+		JiraStatusAtCompletion:   prevStatus,
 		JiraCategoryAtCompletion: prevCategory,
-		EndedAt:                endedAt,
+		EndedAt:                  endedAt,
 	}
 }
 

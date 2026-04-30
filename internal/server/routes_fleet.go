@@ -9,11 +9,11 @@ import (
 )
 
 type FleetStats struct {
-	ActiveRuns    int       `json:"active_runs"`
-	TodayRuns     int       `json:"today_runs"`
-	TodayCostUSD  float64   `json:"today_cost_usd"`
-	ActiveAgents  []string  `json:"active_agents"`
-	LastUpdate    time.Time `json:"last_update"`
+	ActiveRuns   int       `json:"active_runs"`
+	TodayRuns    int       `json:"today_runs"`
+	TodayCostUSD float64   `json:"today_cost_usd"`
+	ActiveAgents []string  `json:"active_agents"`
+	LastUpdate   time.Time `json:"last_update"`
 }
 
 func (s *Server) handleFleetLive(w http.ResponseWriter, r *http.Request) {

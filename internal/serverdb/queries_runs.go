@@ -183,4 +183,3 @@ func scanRuns(rows pgx.Rows) ([]Run, error) {
 	}
 	return runs, nil
 }
-

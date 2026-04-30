@@ -9,8 +9,8 @@ import (
 
 func TestExtractJiraKeyFromBranch(t *testing.T) {
 	tests := []struct {
-		url      string
-		wantID   string
+		url       string
+		wantID    string
 		wantSpace string
 	}{
 		{

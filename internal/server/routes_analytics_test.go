@@ -127,9 +127,9 @@ func TestParseAgentList(t *testing.T) {
 
 func TestParsePeriodAndDepth(t *testing.T) {
 	tests := []struct {
-		query    string
-		period   string
-		depth    int
+		query  string
+		period string
+		depth  int
 	}{
 		{"", "week", 8},
 		{"period=day&depth=30", "day", 30},

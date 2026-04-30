@@ -1,7 +1,8 @@
 // Package demo provides deterministic seed data for hackday blog scenario:
-//   Alice+alpha   12 agent runs · 94% AC · dept=Platform
-//   Bob human     9 human-only rows (agent_name IS NULL) · 92% AC · dept=Platform
-//   Carol+beta    7 agent runs · 64% AC (4/7 improved) · dept=Growth
+//
+//	Alice+alpha   12 agent runs · 94% AC · dept=Platform
+//	Bob human     9 human-only rows (agent_name IS NULL) · 92% AC · dept=Platform
+//	Carol+beta    7 agent runs · 64% AC (4/7 improved) · dept=Growth
 //
 // Idempotent via seed_tag 'blog-v1' stored in the command field.
 package demo
@@ -16,20 +17,20 @@ import (
 const seedTag = "blog-v1"
 
 type seedRow struct {
-	id             string
-	agentName      string // empty → inserted as NULL
-	engineerName   string
-	department     string
-	inputTokens    int
-	outputTokens   int
-	cacheReadTok   int
-	cacheWriteTok  int
-	costUSD        float64
-	durationSec    float64
-	qualityScore   float64 // ≥0.8 counts as "improved" in AC %
-	lintDelta      int
-	testsDelta     int
-	commitQuality  float64
+	id            string
+	agentName     string // empty → inserted as NULL
+	engineerName  string
+	department    string
+	inputTokens   int
+	outputTokens  int
+	cacheReadTok  int
+	cacheWriteTok int
+	costUSD       float64
+	durationSec   float64
+	qualityScore  float64 // ≥0.8 counts as "improved" in AC %
+	lintDelta     int
+	testsDelta    int
+	commitQuality float64
 }
 
 // blogScenario returns the 28 rows that reproduce the blog leaderboard table.

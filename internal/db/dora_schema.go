@@ -1,8 +1,8 @@
 package db
 
 // Migration v3→v4 (G6 — DORA + Rework Rate exporter):
-//   * add metric_snapshots table for caching DORA metric exports
-//   * add composite index on events(event_type, run_id) to speed up
+//   - add metric_snapshots table for caching DORA metric exports
+//   - add composite index on events(event_type, run_id) to speed up
 //     Rework Rate queries (filter by event_type='task.iteration.start')
 //
 // ADD-only — no ALTER on existing tables. Rollback = DROP the new objects.

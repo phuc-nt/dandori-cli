@@ -28,7 +28,9 @@ type Result struct {
 
 // pathTokenRe matches file/dir-looking tokens in a spec: contains a slash or a
 // dot followed by 1-5 alphanumeric chars (extension). Examples it catches:
-//   hello.go, src/auth, internal/db/runs.go, README.md, demo-workspace/x.txt
+//
+//	hello.go, src/auth, internal/db/runs.go, README.md, demo-workspace/x.txt
+//
 // Examples it ignores: "the agent", "fix bug", "v1.0" (version, no slash).
 var pathTokenRe = regexp.MustCompile(`[A-Za-z0-9_\-./]*[/.][A-Za-z0-9_\-./]*[A-Za-z0-9]`)
 
@@ -92,13 +94,13 @@ func isVersionLike(s string) bool {
 // in changedFiles are supported.
 //
 // Algorithm (per plan Section 11):
-//   1. Extract path tokens from spec.
-//   2. If none extracted → Inconclusive (Q5: flag for review).
-//   3. For each spec token, check if any changed file path contains it
-//      (basename match OR substring match). Anchor matches under workspaceDir
-//      first; fall back to bare match for compatibility.
-//   4. If at least one spec token matched → Pass.
-//   5. If zero matched → Fail with the missing tokens listed.
+//  1. Extract path tokens from spec.
+//  2. If none extracted → Inconclusive (Q5: flag for review).
+//  3. For each spec token, check if any changed file path contains it
+//     (basename match OR substring match). Anchor matches under workspaceDir
+//     first; fall back to bare match for compatibility.
+//  4. If at least one spec token matched → Pass.
+//  5. If zero matched → Fail with the missing tokens listed.
 func CheckResult(description string, changedFiles []string, workspaceDir string) Result {
 	tokens := ExtractSpecPaths(description)
 	if len(tokens) == 0 {
@@ -141,10 +143,10 @@ func CheckResult(description string, changedFiles []string, workspaceDir string)
 
 // anyFileMatches returns true when any path in changedFiles matches the spec
 // token. Match rules (any one wins):
-//   1. Basename equality: spec "hello.go" vs changed "demo-workspace/x/hello.go" → match.
-//   2. Substring: spec "internal/db" vs changed "internal/db/runs.go" → match.
-//   3. Workspace-anchored substring: spec "hello.go" + workspace "demo-workspace/x"
-//      → check if "demo-workspace/x/hello.go" appears in changedFiles.
+//  1. Basename equality: spec "hello.go" vs changed "demo-workspace/x/hello.go" → match.
+//  2. Substring: spec "internal/db" vs changed "internal/db/runs.go" → match.
+//  3. Workspace-anchored substring: spec "hello.go" + workspace "demo-workspace/x"
+//     → check if "demo-workspace/x/hello.go" appears in changedFiles.
 func anyFileMatches(token string, changedFiles []string, workspaceDir string) bool {
 	tokBase := filepath.Base(token)
 	tokLower := strings.ToLower(token)

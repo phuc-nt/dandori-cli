@@ -35,9 +35,11 @@ func countRuns(t *testing.T, d *db.LocalDB, where string, args ...any) int {
 }
 
 // Blog scenario:
-//   Alice+alpha: 12 runs
-//   Bob human-only: 9 rows (agent_name IS NULL)
-//   Carol+beta: 7 runs
+//
+//	Alice+alpha: 12 runs
+//	Bob human-only: 9 rows (agent_name IS NULL)
+//	Carol+beta: 7 runs
+//
 // Total = 28
 func TestSeed_BlogScenario_InsertsExpectedRuns(t *testing.T) {
 	d := newMigratedDB(t)

@@ -21,21 +21,21 @@ func TestWriterCreateReport(t *testing.T) {
 	})
 
 	run := RunReport{
-		RunID:        "run-abc",
-		IssueKey:     "CLITEST-1",
-		AgentName:    "alpha",
-		Status:       "done",
-		Duration:     120 * time.Second,
-		CostUSD:      1.50,
-		InputTokens:  5000,
-		OutputTokens: 2000,
-		Model:        "claude-sonnet-4-5-20250514",
+		RunID:         "run-abc",
+		IssueKey:      "CLITEST-1",
+		AgentName:     "alpha",
+		Status:        "done",
+		Duration:      120 * time.Second,
+		CostUSD:       1.50,
+		InputTokens:   5000,
+		OutputTokens:  2000,
+		Model:         "claude-sonnet-4-5-20250514",
 		GitHeadBefore: "abc123",
 		GitHeadAfter:  "def456",
-		FilesChanged: []string{"main.go", "config.go"},
-		GitDiff:      "+func hello() {}\n-func old() {}",
-		StartedAt:    time.Now().Add(-2 * time.Minute),
-		EndedAt:      time.Now(),
+		FilesChanged:  []string{"main.go", "config.go"},
+		GitDiff:       "+func hello() {}\n-func old() {}",
+		StartedAt:     time.Now().Add(-2 * time.Minute),
+		EndedAt:       time.Now(),
 	}
 
 	page, err := writer.CreateReport(context.Background(), run)

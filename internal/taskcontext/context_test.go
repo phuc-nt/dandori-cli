@@ -7,9 +7,9 @@ import (
 
 func TestExtractConfluenceLinks(t *testing.T) {
 	tests := []struct {
-		name     string
-		text     string
-		wantIDs  []string
+		name    string
+		text    string
+		wantIDs []string
 	}{
 		{
 			name:    "simple page URL",

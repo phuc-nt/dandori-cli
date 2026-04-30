@@ -71,15 +71,15 @@ func (l *LocalDB) GetQualityMetrics(runID string) (*quality.Metrics, error) {
 
 // QualityStats holds aggregate quality statistics
 type QualityStats struct {
-	AgentName         string
-	RunCount          int
-	AvgLintDelta      float64
-	AvgTestsDelta     float64
-	ImprovedCount     int
-	ImprovedPercent   float64
-	AvgLinesChanged   float64
-	AvgCommitQuality  float64
-	TotalCommits      int
+	AgentName        string
+	RunCount         int
+	AvgLintDelta     float64
+	AvgTestsDelta    float64
+	ImprovedCount    int
+	ImprovedPercent  float64
+	AvgLinesChanged  float64
+	AvgCommitQuality float64
+	TotalCommits     int
 }
 
 // GetQualityStatsByAgent returns quality statistics grouped by agent
