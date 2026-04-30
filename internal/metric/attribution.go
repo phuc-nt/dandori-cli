@@ -37,6 +37,7 @@ func AggregateAttribution(d *db.LocalDB, w MetricWindow) (AttributionResult, err
 	rows, err := d.Query(`SELECT jira_issue_key, session_count,
 		lines_attributed_agent, lines_attributed_human,
 		total_iterations, intervention_rate, total_agent_cost_usd,
+		total_intervention_count, total_human_messages,
 		COALESCE(session_outcomes, '{}')
 		FROM task_attribution
 		WHERE jira_done_at >= ? AND jira_done_at < ?`,
@@ -48,16 +49,16 @@ func AggregateAttribution(d *db.LocalDB, w MetricWindow) (AttributionResult, err
 
 	var (
 		retentions, interventionRates, iterations, costPerRetained []float64
-		autonomousCount                                            int
+		autonomousCount, classifiableCount                         int
 	)
 	for rows.Next() {
 		var (
-			key                                  string
-			sessions, agentLines, humanLines, it int
-			intRate, cost                        float64
-			outcomesJSON                         string
+			key                                                       string
+			sessions, agentLines, humanLines, it, intCount, humanMsgs int
+			intRate, cost                                             float64
+			outcomesJSON                                              string
 		)
-		if err := rows.Scan(&key, &sessions, &agentLines, &humanLines, &it, &intRate, &cost, &outcomesJSON); err != nil {
+		if err := rows.Scan(&key, &sessions, &agentLines, &humanLines, &it, &intRate, &cost, &intCount, &humanMsgs, &outcomesJSON); err != nil {
 			return res, err
 		}
 		res.TasksTotal++
@@ -68,15 +69,21 @@ func AggregateAttribution(d *db.LocalDB, w MetricWindow) (AttributionResult, err
 		if total := agentLines + humanLines; total > 0 {
 			retentions = append(retentions, float64(agentLines)/float64(total))
 		}
-		interventionRates = append(interventionRates, intRate)
+		// Intervention rate is only meaningful when the task had any classified
+		// human messages — otherwise the recorded 0.0 is "no signal," not "no
+		// interventions." Same gate applies to autonomy.
+		hasClassificationSignal := humanMsgs > 0
+		if hasClassificationSignal {
+			interventionRates = append(interventionRates, intRate)
+			classifiableCount++
+			if intRate < 0.2 {
+				autonomousCount++
+			}
+		}
 		iterations = append(iterations, float64(it))
 		// Cost-per-retained-line undefined when agent retained zero lines.
 		if agentLines > 0 {
 			costPerRetained = append(costPerRetained, cost/float64(agentLines))
-		}
-		// Autonomy: tasks with session AND intervention_rate < 0.2.
-		if sessions > 0 && intRate < 0.2 {
-			autonomousCount++
 		}
 		// Merge session_outcomes into the running histogram.
 		var outcomes map[string]int
@@ -94,8 +101,22 @@ func AggregateAttribution(d *db.LocalDB, w MetricWindow) (AttributionResult, err
 		res.InsufficientData = true
 		return res, nil
 	}
-	if res.TasksWithSession > 0 {
-		res.AgentAutonomyRate = float64(autonomousCount) / float64(res.TasksWithSession)
+	// If we have rows but every one of them is zero-signal (no tracked lines
+	// AND no classified messages), the row was persisted but cannot answer
+	// the questions the block exists to answer. Treat as insufficient so
+	// dashboards render N/A instead of suggesting "0% retention, 0% autonomy"
+	// is a meaningful measurement.
+	if len(retentions) == 0 && classifiableCount == 0 {
+		res.InsufficientData = true
+		return res, nil
+	}
+	// Autonomy denominator = tasks with classification signal, not just tasks
+	// with sessions. A task whose transcripts had no human messages (one-shot
+	// or pre-G7 runs) shouldn't inflate the numerator: autonomy means "the
+	// agent finished without human course-correction," which requires that we
+	// could have observed correction in the first place.
+	if classifiableCount > 0 {
+		res.AgentAutonomyRate = float64(autonomousCount) / float64(classifiableCount)
 	}
 	res.RetentionP50 = pctOrZero(retentions, 50)
 	res.RetentionP90 = pctOrZero(retentions, 90)

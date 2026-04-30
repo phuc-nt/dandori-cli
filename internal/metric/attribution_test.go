@@ -107,6 +107,41 @@ func TestAggregateAttribution_InsufficientData(t *testing.T) {
 	}
 }
 
+// TestAggregateAttribution_AllZeroSignal_InsufficientData: rows exist but
+// every one has zero tracked lines AND zero classified messages (the real
+// pre-G7 dogfood pattern). Aggregator must flag insufficient rather than
+// emit "0% retention, 0% autonomy" as if those were measurements.
+func TestAggregateAttribution_AllZeroSignal_InsufficientData(t *testing.T) {
+	d := openMetricAttributionDB(t)
+	w := attributionWindow()
+	mid := w.Start.Add(7 * 24 * time.Hour)
+	// Insert rows with linesAgent=0, linesHuman=0, total_human_messages=0.
+	// Direct INSERT to bypass seedAttribution's hardcoded humanMessages=5.
+	for _, key := range []string{"Z-1", "Z-2", "Z-3"} {
+		if _, err := d.Exec(`INSERT INTO task_attribution (
+			jira_issue_key, session_count, total_lines_final,
+			lines_attributed_agent, lines_attributed_human,
+			total_agent_tokens, total_agent_cost_usd,
+			total_iterations, total_human_messages,
+			total_intervention_count, intervention_rate,
+			session_outcomes, git_head_at_jira_done, jira_done_at, computed_at
+		) VALUES (?, 1, 0, 0, 0, 1000, 0.5, 0, 0, 0, 0, '{}', 'deadbeef', ?, datetime('now'))`,
+			key, mid.UTC().Format(time.RFC3339)); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	res, err := AggregateAttribution(d, w)
+	if err != nil {
+		t.Fatalf("aggregate: %v", err)
+	}
+	if !res.InsufficientData {
+		t.Errorf("InsufficientData = false, want true (all-zero-signal rows)")
+	}
+	if res.AgentAutonomyRate != 0 {
+		t.Errorf("AgentAutonomyRate = %f, want 0 (no classification signal)", res.AgentAutonomyRate)
+	}
+}
+
 // TestFormatFaros_NoFlag_NoAttributionBlock: backward compatibility — without
 // the flag, the faros payload must not contain task_attribution.
 func TestFormatFaros_NoFlag_NoAttributionBlock(t *testing.T) {

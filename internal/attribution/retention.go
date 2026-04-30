@@ -34,6 +34,13 @@ type RetentionResult struct {
 func ComputeRetention(repoPath string, sessions []SessionDiff, finalHead string) (RetentionResult, error) {
 	var res RetentionResult
 
+	if finalHead == "" || !revExists(repoPath, finalHead) {
+		// finalHead is the anchor for blame. Without it we cannot attribute
+		// anything — return empty result rather than error so callers persist
+		// a "no tracked lines" row instead of aborting the Jira flow.
+		return res, nil
+	}
+
 	agentShas := map[string]struct{}{}
 	humanShas := map[string]struct{}{}
 	filesTouched := map[string]struct{}{}
@@ -43,6 +50,15 @@ func ComputeRetention(repoPath string, sessions []SessionDiff, finalHead string)
 			continue
 		}
 		if s.HeadBefore == s.HeadAfter {
+			continue
+		}
+		// Cross-repo / orphaned-sha guard. The wrapper records git_head_* from
+		// the session's CWD repo; if those shas aren't reachable here, the
+		// session committed to a different repo (sibling, dogfood workspace,
+		// pruned branch). Skip the session rather than aborting the whole
+		// task — the row should still reflect any sessions that DID land
+		// commits in this repo.
+		if !revExists(repoPath, s.HeadBefore) || !revExists(repoPath, s.HeadAfter) {
 			continue
 		}
 		shas, err := revList(repoPath, s.HeadBefore, s.HeadAfter)
@@ -194,6 +210,19 @@ func blameLines(repoPath, rev, file string) ([]blameLine, error) {
 		lines = append(lines, blameLine{sha: fields[0]})
 	}
 	return lines, nil
+}
+
+// revExists reports whether rev is a resolvable commit-ish in repoPath. Used
+// to drop sessions whose recorded heads point at a sibling repo, a pruned
+// branch, or another machine's workspace — those would otherwise crash
+// rev-list with "Invalid revision range".
+func revExists(repoPath, rev string) bool {
+	if rev == "" {
+		return false
+	}
+	cmd := exec.Command("git", "cat-file", "-e", rev+"^{commit}")
+	cmd.Dir = repoPath
+	return cmd.Run() == nil
 }
 
 func looksLikeSha(s string) bool {

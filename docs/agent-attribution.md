@@ -42,6 +42,8 @@ Without the flag, output is byte-for-byte identical to v0.5.0.
 1. **Format reflow can mask retained lines.** `gofmt` / `prettier` runs after a session rewrite every line and reattribute them to the formatter's commit. Workarounds: run formatters in the same session as the agent edits, or land formatter passes in the sessions that originated the code.
 2. **Cross-repo work isn't attributed.** A session that only edits a sibling repo (e.g. infra) records `git_head_*` from the wrapper's CWD repo and won't trace blame across repos.
 3. **The 30-character intervention threshold is a heuristic, not ground truth.** A short corrective ("no, use POST not GET") is technically an intervention but counts as approval. A long approval ("looks great, please also write the tests when you have time") counts as intervention. Aggregate trend is informative; per-task interpretation needs a human read of the transcript.
+4. **Cross-repo / orphan-sha sessions are silently skipped.** The wrapper records `git_head_*` from the session's CWD repo. If those shas aren't reachable from the repo `ComputeAndPersist` is invoked against (sibling repo, pruned branch, another machine's workspace), that session contributes nothing to the row — but the row is still written for any sessions that *did* land here. Errors don't crash the Jira flow.
+5. **Zero-signal tasks don't inflate autonomy.** A task with no classified human messages (one-shot `claude -p`, or runs predating G7's classifier) is excluded from both the autonomy numerator and denominator. The aggregate flips to `insufficient_data` if *every* row in the window is zero-signal — preventing a misleading "100% autonomy, 0% retention" report when the real answer is "we don't have data."
 
 ## Six questions this answers
 

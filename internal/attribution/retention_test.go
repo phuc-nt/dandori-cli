@@ -127,6 +127,51 @@ func TestComputeRetention_FileDeletedByHuman(t *testing.T) {
 	}
 }
 
+// TestComputeRetention_OrphanShas: session heads point at commits that
+// don't exist in repoPath (cross-repo, pruned branch, or another machine).
+// The function must skip those sessions silently rather than crash with
+// "Invalid revision range" — the row should still record any sessions that
+// did land commits in this repo.
+func TestComputeRetention_OrphanShas(t *testing.T) {
+	repo := newTestRepo(t)
+	repo.commit("file.go", "package x\nfunc Init() {}\n")
+	finalHead := repo.head()
+
+	// Two sessions: one with shas that don't exist here, one valid.
+	sessions := []SessionDiff{
+		{HeadBefore: "deadbeef00000000000000000000000000000000",
+			HeadAfter: "cafebabe00000000000000000000000000000000"},
+	}
+	res, err := ComputeRetention(repo.path, sessions, finalHead)
+	if err != nil {
+		t.Fatalf("ComputeRetention should skip orphan shas, got: %v", err)
+	}
+	if res.LinesAttributedAgent != 0 || res.LinesAttributedHuman != 0 {
+		t.Errorf("expected zero attribution for orphan-only sessions, got agent=%d human=%d",
+			res.LinesAttributedAgent, res.LinesAttributedHuman)
+	}
+}
+
+// TestComputeRetention_OrphanFinalHead: finalHead itself is unreachable.
+// Should return empty result without error so the Jira flow isn't blocked.
+func TestComputeRetention_OrphanFinalHead(t *testing.T) {
+	repo := newTestRepo(t)
+	repo.commit("file.go", "package x\nfunc A() {}\n")
+	headBefore := repo.head()
+	repo.commit("file.go", "package x\nfunc A() {}\nfunc B() {}\n")
+	headAfter := repo.head()
+
+	res, err := ComputeRetention(repo.path,
+		[]SessionDiff{{HeadBefore: headBefore, HeadAfter: headAfter}},
+		"deadbeef00000000000000000000000000000000")
+	if err != nil {
+		t.Fatalf("orphan finalHead should not error: %v", err)
+	}
+	if res.TotalLinesFinal != 0 {
+		t.Errorf("expected zero total lines for orphan finalHead, got %d", res.TotalLinesFinal)
+	}
+}
+
 // TestComputeRetention_EmptyDiff: HeadBefore == HeadAfter (a session that
 // committed nothing — e.g. read-only run). Must not error and must contribute
 // 0 to agent counts.
