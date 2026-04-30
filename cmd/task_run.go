@@ -251,6 +251,11 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Cost: $%.4f\n", result.CostUSD)
 	fmt.Printf("Exit code: %d\n", result.ExitCode)
 
+	if result.NoCommitDetected {
+		fmt.Println("\n⚠️  Agent edited files but didn't commit. Attribution will count 0 agent lines.")
+		fmt.Println("    Commit the changes before 'dandori task done' to get accurate per-task attribution.")
+	}
+
 	// Auto-sync if enabled
 	if !taskRunNoSync && result.ExitCode == 0 {
 		fmt.Println("\nSyncing to Jira...")

@@ -48,6 +48,11 @@ type Result struct {
 	// enabled. nil otherwise. Exposed so callers (e.g. cmd/task_run.go) can
 	// feed the verify gate without re-running the snapshot.
 	QualityAfter *quality.Snapshot
+	// NoCommitDetected is true when the agent edited the working tree but never
+	// ran `git commit` — head_after equals head_before, and `git status` shows
+	// pending changes. Attribution will count zero agent lines for this run, so
+	// the wrapper surfaces the gap loudly instead of silently mis-attributing.
+	NoCommitDetected bool
 }
 
 type TokenUsage struct {
@@ -180,6 +185,12 @@ func Run(ctx context.Context, localDB *db.LocalDB, opts Options) (*Result, error
 	}
 
 	gitHeadAfter := getGitHead()
+	noCommitDetected := gitHeadBefore != "" && gitHeadBefore == gitHeadAfter && gitWorktreeDirty()
+	if noCommitDetected {
+		slog.Warn("agent finished with uncommitted changes — attribution will report zero agent lines",
+			"run_id", runID, "head", gitHeadAfter,
+			"hint", "have the agent run 'git commit' before exit, or commit manually before 'dandori task done'")
+	}
 	sessionID := DetectSessionID(cwd, sessionSnapshot)
 
 	status := model.StatusDone
@@ -248,13 +259,14 @@ func Run(ctx context.Context, localDB *db.LocalDB, opts Options) (*Result, error
 	slog.Debug("run completed", "run_id", runID, "exit_code", exitCode, "duration", duration)
 
 	return &Result{
-		RunID:        runID,
-		ExitCode:     exitCode,
-		Duration:     duration,
-		SessionID:    sessionID,
-		TokenUsage:   tokenUsage,
-		CostUSD:      costUSD,
-		QualityAfter: qualityAfter,
+		RunID:            runID,
+		ExitCode:         exitCode,
+		Duration:         duration,
+		SessionID:        sessionID,
+		TokenUsage:       tokenUsage,
+		CostUSD:          costUSD,
+		QualityAfter:     qualityAfter,
+		NoCommitDetected: noCommitDetected,
 	}, nil
 }
 
@@ -297,6 +309,18 @@ func getGitHead() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// gitWorktreeDirty reports whether `git status --porcelain` returns any
+// output. Empty stdout means clean. Used to surface the no-commit warning
+// when an agent session edits files but never runs `git commit`.
+func gitWorktreeDirty() bool {
+	cmd := exec.Command("git", "status", "--porcelain")
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return len(strings.TrimSpace(string(out))) > 0
 }
 
 func getGitRemote() string {

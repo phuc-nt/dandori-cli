@@ -57,8 +57,8 @@ func TestMigration_V5_AddsSessionEndAndAttribution(t *testing.T) {
 	if version != SchemaVersion {
 		t.Fatalf("schema_version=%d want %d", version, SchemaVersion)
 	}
-	if SchemaVersion != 5 {
-		t.Fatalf("SchemaVersion const=%d want 5 (G7)", SchemaVersion)
+	if SchemaVersion < 5 {
+		t.Fatalf("SchemaVersion const=%d want >=5 (G7)", SchemaVersion)
 	}
 }
 

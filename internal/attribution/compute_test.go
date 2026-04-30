@@ -223,3 +223,25 @@ func TestComputeAndPersist_ZeroDenominatorInterventionRate(t *testing.T) {
 		t.Errorf("intervention_rate = %f, want 0", rate)
 	}
 }
+
+func TestNormalizeJiraDoneAt(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"empty", "", ""},
+		{"already UTC Z", "2026-04-30T03:33:32Z", "2026-04-30T03:33:32Z"},
+		{"plus offset", "2026-04-30T10:33:32+07:00", "2026-04-30T03:33:32Z"},
+		{"minus offset", "2026-04-30T03:33:32-05:00", "2026-04-30T08:33:32Z"},
+		{"with nanos", "2026-04-30T10:33:32.123456789+07:00", "2026-04-30T03:33:32Z"},
+		{"unparseable returns raw", "not-a-date", "not-a-date"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeJiraDoneAt(tt.in); got != tt.want {
+				t.Errorf("normalizeJiraDoneAt(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
