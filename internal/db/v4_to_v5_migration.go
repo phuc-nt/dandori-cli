@@ -1,13 +1,13 @@
 package db
 
 // Migration v4→v5 (G7 — agent vs human contribution attribution):
-//   * runs gains 5 columns of session-end metadata: a reason enum
+//   - runs gains 5 columns of session-end metadata: a reason enum
 //     (agent_finished | user_interrupted | error) plus four message
 //     counters that drive the intervention-rate proxy.
-//   * task_attribution holds the per-Jira-task summary computed at
+//   - task_attribution holds the per-Jira-task summary computed at
 //     transition-to-Done time (line retention via git blame, aggregated
 //     session stats, intervention rate, outcome histogram).
-//   * idx_attribution_done_at lets `metric export --include-attribution`
+//   - idx_attribution_done_at lets `metric export --include-attribution`
 //     window-scan the table by jira_done_at without a full scan.
 //
 // ADD-only — no rebuild of runs, no data movement. Existing rows keep
