@@ -7,34 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- **`go-build*` temp-dir leak** (high severity): `dandori run` with `quality.enabled=true` (the previous default) spawned `go test` whose 30s SIGKILL timeout prevented the Go toolchain from cleaning up its scratch dirs. One user accumulated ~43k dirs / ~199 GB in `$TMPDIR`. Three-part fix:
-  1. **Default `quality.enabled` flipped to `false`** (`internal/quality/collector.go`, `internal/config/config.go`). `dandori init` now prompts to opt in; existing configs are unchanged.
-  2. **SIGTERM + 2s grace before SIGKILL** (`internal/quality/spawn_unix.go`): `cmd.Cancel` now sends SIGTERM to the process group so `go test` can run its deferred cleanup; `WaitDelay` gains a `gracePeriod` buffer before Go escalates to SIGKILL. Verified by `TestSpawnCollectorCmd_SIGTERM_AllowsCleanup`.
-  3. **New `dandori clean` command** (`cmd/clean.go`): scans `$TMPDIR` for `go-build*` dirs older than 60 minutes (in-flight protection), reports reclaimable size, and deletes only with `--force`. Does **not** touch `GOCACHE` (long-lived cache).
-- **attribution window scan** (CLITEST2-14): `AggregateAttribution` lexically string-compared `jira_done_at` against UTC-Z window bounds, silently dropping rows whose stored timestamp carried a non-UTC offset (e.g. `+07:00`). Per-row data was correct, only window membership was wrong. Fix: `compute.go` now normalizes `jira_done_at` to UTC `Z` before INSERT; v5→v6 migration backfills existing rows. Surfaced via 5/5 dogfood case study.
-- **wrapper no-commit warning**: when an agent edits the working tree but never runs `git commit`, `task run` now logs a warning + prints a CLI hint. Attribution still reports zero agent lines for that run, but the user knows why instead of silently mis-attributing. New `Result.NoCommitDetected` field.
+## [0.5.0] — 2026-04-30
 
-## [0.6.0] — 2026-04-30
+Enterprise measurement layer: DORA + Rework Rate exporter (G6) and agent contribution attribution (G7), plus a critical `go-build*` temp-dir leak hotfix.
 
-Agent contribution attribution (G7).
-
-### Added
-- **`dandori metric export --include-attribution`** — per-task accounting of agent vs human code contribution, plus aggregate intervention/iteration/cost percentiles:
-  - **Line-level attribution** via `git blame` at the final HEAD when Jira moved to Done. Each line's introducing commit is membership-tested against the union of session-reachable commits (`rev-list HeadBefore..HeadAfter`); pre-session baseline lines are excluded from totals
-  - **Intervention classifier** (v1 heuristic): human text ≥30 chars after agent tool use = intervention, <30 = approval. Documented as a proxy in [`docs/agent-attribution.md`](docs/agent-attribution.md)
-  - **Computed BEFORE Jira transition** — `dandori task run` (auto-flow) and `dandori task done` (manual) both write the `task_attribution` row before calling `TransitionToDone`. Failure is non-fatal so observability never blocks the Jira move
-  - 6 fields surfaced in the export block: `agent_autonomy_rate` (share of tasks with `intervention_rate < 0.2`), `agent_code_retention_p50/p90`, `intervention_rate_p50`, `iterations_p50/p90`, `cost_per_retained_line_usd_p50`, `session_outcomes` (merged histogram of `agent_finished` / `user_interrupted` / `error`)
-  - Insufficient-data semantics match v0.5.0: zero rows in window → block is `null` and `task_attribution` is added to `data_quality.insufficient_data`
-  - Backwards-compat: without the flag, output is byte-for-byte identical to v0.5.0 dashboards
-- **SQLite migration v4 → v5**: `task_attribution` table + 5 new `runs` columns (`session_end_reason`, `human_message_count`, `agent_message_count`, `human_intervention_count`, `human_approval_count`)
-- See [`docs/agent-attribution.md`](docs/agent-attribution.md) for definitions, output schema, three named limitations (format reflow, cross-repo, heuristic threshold), and 6 example questions.
-
-## [0.5.0] — 2026-04-29
-
-DORA + Rework Rate exporter (G6).
-
-### Added
+### Added — DORA + Rework Rate exporter (G6)
 - **`dandori metric export`** — 5 engineering metrics (deployment frequency, lead time for changes, change failure rate, time to restore service, rework rate) over a configurable window:
   - Source of truth = Jira (status transitions for deploys, issuetype/labels for incidents) + local SQLite (Layer-3 `task.iteration.start` events for rework)
   - 3 wire formats: `faros` (DORA schema), `oobeya` (6-layer mapping), `raw` (full report with `jira_config` echo)
@@ -46,6 +23,28 @@ DORA + Rework Rate exporter (G6).
   - Rework Rate uses 10% threshold with strict `>` (10/100 = NOT exceeding); threshold version stamped (`v1-2026Q2`)
   - Reports `tickets_without_in_progress` count in `data_quality` so process gaps surface
 - See [`docs/metric-export.md`](docs/metric-export.md) for command reference + config schema.
+
+### Added — Agent contribution attribution (G7)
+- **`dandori metric export --include-attribution`** — per-task accounting of agent vs human code contribution, plus aggregate intervention/iteration/cost percentiles:
+  - **Line-level attribution** via `git blame` at the final HEAD when Jira moved to Done. Each line's introducing commit is membership-tested against the union of session-reachable commits (`rev-list HeadBefore..HeadAfter`); pre-session baseline lines are excluded from totals
+  - **Intervention classifier** (v1 heuristic): human text ≥30 chars after agent tool use = intervention, <30 = approval. Documented as a proxy in [`docs/agent-attribution.md`](docs/agent-attribution.md)
+  - **Computed BEFORE Jira transition** — `dandori task run` (auto-flow) and `dandori task done` (manual) both write the `task_attribution` row before calling `TransitionToDone`. Failure is non-fatal so observability never blocks the Jira move
+  - 6 fields surfaced in the export block: `agent_autonomy_rate` (share of tasks with `intervention_rate < 0.2`), `agent_code_retention_p50/p90`, `intervention_rate_p50`, `iterations_p50/p90`, `cost_per_retained_line_usd_p50`, `session_outcomes` (merged histogram of `agent_finished` / `user_interrupted` / `error`)
+  - Insufficient-data semantics: zero rows in window → block is `null` and `task_attribution` is added to `data_quality.insufficient_data`
+  - Backwards-compat: without the flag, output is byte-for-byte identical to G6 dashboards
+- **SQLite migration v4 → v6**: `task_attribution` table + 5 new `runs` columns (`session_end_reason`, `human_message_count`, `agent_message_count`, `human_intervention_count`, `human_approval_count`); v5 → v6 backfills `jira_done_at` to UTC `Z` for window-scan correctness
+- See [`docs/agent-attribution.md`](docs/agent-attribution.md) for definitions, output schema, three named limitations (format reflow, cross-repo, heuristic threshold), and 6 example questions.
+
+### Fixed
+- **`go-build*` temp-dir leak** (high severity): `dandori run` with `quality.enabled=true` (the previous default) spawned `go test` whose 30s SIGKILL timeout prevented the Go toolchain from cleaning up its scratch dirs. One user accumulated ~43k dirs / ~199 GB in `$TMPDIR`. Three-part fix:
+  1. **Default `quality.enabled` flipped to `false`** (`internal/quality/collector.go`, `internal/config/config.go`). `dandori init` now prompts to opt in; existing configs are unchanged.
+  2. **SIGTERM + 2s grace before SIGKILL** (`internal/quality/spawn_unix.go`): `cmd.Cancel` now sends SIGTERM to the process group so `go test` can run its deferred cleanup; `WaitDelay` gains a `gracePeriod` buffer before Go escalates to SIGKILL. Verified by `TestSpawnCollectorCmd_SIGTERM_AllowsCleanup`.
+  3. **New `dandori clean` command** (`cmd/clean.go`): scans `$TMPDIR` for `go-build*` dirs older than 60 minutes (in-flight protection), reports reclaimable size, and deletes only with `--force`. Does **not** touch `GOCACHE` (long-lived cache).
+- **attribution window scan** (CLITEST2-14): `AggregateAttribution` lexically string-compared `jira_done_at` against UTC-Z window bounds, silently dropping rows whose stored timestamp carried a non-UTC offset (e.g. `+07:00`). Per-row data was correct, only window membership was wrong. Fix: `compute.go` now normalizes `jira_done_at` to UTC `Z` before INSERT; v5→v6 migration backfills existing rows. Surfaced via 5/5 dogfood case study.
+- **wrapper no-commit warning**: when an agent edits the working tree but never runs `git commit`, `task run` now logs a warning + prints a CLI hint. Attribution still reports zero agent lines for that run, but the user knows why instead of silently mis-attributing. New `Result.NoCommitDetected` field.
+
+### Breaking
+- `quality.enabled` default flipped from `true` → `false`. Existing configs are honored; users who had not customized must explicitly opt in via `dandori init` or set `quality.enabled: true` in `~/.dandori/config.yaml`. Rationale: prior default leaked `go-build*` scratch dirs on `go test` timeout (see Fixed). Users still wanting quality tracking should run `dandori init` once or edit config.
 
 ## [0.4.0] — 2026-04-28
 
