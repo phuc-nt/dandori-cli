@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -76,26 +77,75 @@ func (l *LocalDB) GetCostByAgent() ([]LocalCostGroup, error) {
 	return l.getCostBy("agent_name")
 }
 
-// GetCostByTask returns cost breakdown by Jira task
-func (l *LocalDB) GetCostByTask() ([]LocalCostGroup, error) {
-	return l.getCostBy("jira_issue_key")
+// CostFilter restricts cost queries by project key prefix and/or time window.
+// Zero values mean "no restriction": empty ProjectKey matches all projects,
+// zero From/To means no time boundary.
+type CostFilter struct {
+	ProjectKey string    // e.g. "CLITEST" — matches jira_issue_key LIKE "CLITEST-%"
+	From       time.Time // inclusive lower bound on started_at (zero = unbounded)
+	To         time.Time // exclusive upper bound on started_at (zero = unbounded)
 }
 
-// GetCostByDay returns cost breakdown by day
+// GetCostByTask returns cost breakdown by Jira task (no filter).
+func (l *LocalDB) GetCostByTask() ([]LocalCostGroup, error) {
+	return l.GetCostByTaskFiltered(CostFilter{})
+}
+
+// GetCostByTaskFiltered returns cost breakdown by Jira task with optional
+// project prefix and period filters. An empty CostFilter returns all rows.
+func (l *LocalDB) GetCostByTaskFiltered(filter CostFilter) ([]LocalCostGroup, error) {
+	where, args := buildCostWhere(filter, "jira_issue_key")
+	q := fmt.Sprintf(`
+		SELECT
+			COALESCE(jira_issue_key, 'unknown') as grp,
+			COALESCE(SUM(cost_usd), 0) as cost,
+			COUNT(*) as run_count,
+			COALESCE(SUM(input_tokens + output_tokens), 0) as tokens
+		FROM runs
+		%s
+		GROUP BY jira_issue_key
+		ORDER BY cost DESC
+	`, where)
+	return l.queryCostGroupsArgs(q, args...)
+}
+
+// GetCostByDay returns cost breakdown by day (no filter, last 30 days).
 func (l *LocalDB) GetCostByDay() ([]LocalCostGroup, error) {
-	query := `
+	return l.GetCostByDayFiltered(CostFilter{})
+}
+
+// GetCostByDayFiltered returns cost breakdown by day with optional project/period
+// filters. When filter is empty, behaves identically to GetCostByDay (LIMIT 30).
+func (l *LocalDB) GetCostByDayFiltered(filter CostFilter) ([]LocalCostGroup, error) {
+	// Build WHERE clause — started_at IS NOT NULL is always required.
+	clauses := []string{"started_at IS NOT NULL"}
+	var args []any
+	if filter.ProjectKey != "" {
+		clauses = append(clauses, "jira_issue_key LIKE ?")
+		args = append(args, filter.ProjectKey+"-%")
+	}
+	if !filter.From.IsZero() {
+		clauses = append(clauses, "started_at >= ?")
+		args = append(args, filter.From.UTC().Format(time.RFC3339))
+	}
+	if !filter.To.IsZero() {
+		clauses = append(clauses, "started_at < ?")
+		args = append(args, filter.To.UTC().Format(time.RFC3339))
+	}
+	where := "WHERE " + strings.Join(clauses, " AND ")
+	q := fmt.Sprintf(`
 		SELECT
 			date(started_at) as day,
 			COALESCE(SUM(cost_usd), 0) as cost,
 			COUNT(*) as run_count,
 			COALESCE(SUM(input_tokens + output_tokens), 0) as tokens
 		FROM runs
-		WHERE started_at IS NOT NULL
+		%s
 		GROUP BY date(started_at)
 		ORDER BY day DESC
 		LIMIT 30
-	`
-	return l.queryCostGroups(query)
+	`, where)
+	return l.queryCostGroupsArgs(q, args...)
 }
 
 func (l *LocalDB) getCostBy(column string) ([]LocalCostGroup, error) {
@@ -113,7 +163,12 @@ func (l *LocalDB) getCostBy(column string) ([]LocalCostGroup, error) {
 }
 
 func (l *LocalDB) queryCostGroups(query string) ([]LocalCostGroup, error) {
-	rows, err := l.db.Query(query)
+	return l.queryCostGroupsArgs(query)
+}
+
+// queryCostGroupsArgs runs a cost-group SELECT with optional positional args.
+func (l *LocalDB) queryCostGroupsArgs(query string, args ...any) ([]LocalCostGroup, error) {
+	rows, err := l.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query cost: %w", err)
 	}
@@ -127,7 +182,33 @@ func (l *LocalDB) queryCostGroups(query string) ([]LocalCostGroup, error) {
 		}
 		groups = append(groups, g)
 	}
-	return groups, nil
+	return groups, rows.Err()
+}
+
+// buildCostWhere builds a WHERE clause fragment for cost filter queries.
+// projectColumn is the column to check against LIKE (e.g. "jira_issue_key").
+// Pass "" for projectColumn to skip the project filter (used by day queries
+// which build their own base conditions).
+// Returns (" WHERE cond1 AND cond2", args) or ("", nil) when filter is empty.
+func buildCostWhere(filter CostFilter, projectColumn string) (string, []any) {
+	var clauses []string
+	var args []any
+	if projectColumn != "" && filter.ProjectKey != "" {
+		clauses = append(clauses, projectColumn+" LIKE ?")
+		args = append(args, filter.ProjectKey+"-%")
+	}
+	if !filter.From.IsZero() {
+		clauses = append(clauses, "started_at >= ?")
+		args = append(args, filter.From.UTC().Format(time.RFC3339))
+	}
+	if !filter.To.IsZero() {
+		clauses = append(clauses, "started_at < ?")
+		args = append(args, filter.To.UTC().Format(time.RFC3339))
+	}
+	if len(clauses) == 0 {
+		return "", nil
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args
 }
 
 // GetRecentRuns returns recent runs
@@ -318,4 +399,35 @@ func (l *LocalDB) GetSprintSummary(sprintID string) (*SprintSummary, error) {
 	}
 
 	return summary, nil
+}
+
+// GetDistinctProjectKeys returns the set of Jira project key prefixes seen in
+// runs.jira_issue_key (e.g. "CLITEST" extracted from "CLITEST-123"). Used by
+// the dashboard CWD-aware landing to match a git repo against known projects.
+func (l *LocalDB) GetDistinctProjectKeys() ([]string, error) {
+	rows, err := l.Query(`
+		SELECT DISTINCT
+			SUBSTR(jira_issue_key, 1, INSTR(jira_issue_key, '-') - 1) AS project_key
+		FROM runs
+		WHERE jira_issue_key IS NOT NULL
+		  AND jira_issue_key != ''
+		  AND INSTR(jira_issue_key, '-') > 0
+		ORDER BY project_key
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("distinct project keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		if k != "" {
+			keys = append(keys, k)
+		}
+	}
+	return keys, rows.Err()
 }

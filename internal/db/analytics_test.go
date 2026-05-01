@@ -2,6 +2,8 @@ package db
 
 import (
 	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 )
@@ -345,3 +347,180 @@ func TestNullAgentName_DoesNotBreakScan(t *testing.T) {
 		t.Errorf("GetRunsToSync with NULL agent_name: %v", err)
 	}
 }
+
+// TestGetDistinctProjectKeys verifies the dashboard CWD-aware landing
+// helper extracts unique Jira project prefixes from runs.jira_issue_key.
+// TestGetCostByTaskFiltered_ProjectAndPeriod verifies that GetCostByTaskFiltered
+// correctly filters by project key prefix and/or time window.
+func TestGetCostByTaskFiltered_ProjectAndPeriod(t *testing.T) {
+	d := setupTestDB(t)
+	defer d.Close()
+
+	now := time.Now().UTC()
+	dayAgo := now.Add(-24 * time.Hour)
+	weekAgo := now.Add(-7 * 24 * time.Hour)
+	oldTime := now.Add(-60 * 24 * time.Hour) // 60 days ago — outside any 7d window
+
+	rows := []struct {
+		id, key    string
+		startedAt  time.Time
+		costUSD    float64
+	}{
+		{"r1", "CLITEST-1", dayAgo, 1.00},
+		{"r2", "CLITEST-2", weekAgo, 2.00},
+		{"r3", "OTHER-1", dayAgo, 3.00},
+		{"r4", "CLITEST-3", oldTime, 4.00}, // outside 7d window
+	}
+	for _, r := range rows {
+		_, err := d.db.Exec(`
+			INSERT INTO runs (id, jira_issue_key, agent_name, agent_type, user, workstation_id,
+				started_at, status, cost_usd, input_tokens, output_tokens)
+			VALUES (?, ?, 'claude', 'claude', 'test', 'ws1', ?, 'done', ?, 1000, 300)
+		`, r.id, r.key, r.startedAt.Format(time.RFC3339), r.costUSD)
+		if err != nil {
+			t.Fatalf("insert %s: %v", r.id, err)
+		}
+	}
+
+	// Empty filter → all 4 rows (4 distinct issue keys).
+	groups, err := d.GetCostByTaskFiltered(CostFilter{})
+	if err != nil {
+		t.Fatalf("empty filter: %v", err)
+	}
+	if len(groups) != 4 {
+		t.Errorf("empty filter: got %d groups, want 4", len(groups))
+	}
+
+	// Project filter → only CLITEST-* (r1, r2, r4).
+	groups, err = d.GetCostByTaskFiltered(CostFilter{ProjectKey: "CLITEST"})
+	if err != nil {
+		t.Fatalf("project filter: %v", err)
+	}
+	if len(groups) != 3 {
+		t.Errorf("project filter: got %d groups, want 3 (CLITEST-1,2,3)", len(groups))
+	}
+
+	// Period filter: last 14 days → excludes r4 (60 days ago). All 3 recent tasks visible.
+	from := now.Add(-14 * 24 * time.Hour)
+	groups, err = d.GetCostByTaskFiltered(CostFilter{From: from, To: now})
+	if err != nil {
+		t.Fatalf("period filter: %v", err)
+	}
+	if len(groups) != 3 {
+		t.Errorf("period filter: got %d groups, want 3 (r1,r2,r3 within 14d)", len(groups))
+	}
+
+	// Combined: CLITEST + last 14 days → r1, r2 only (r4 excluded by time, r3 excluded by project).
+	groups, err = d.GetCostByTaskFiltered(CostFilter{ProjectKey: "CLITEST", From: from, To: now})
+	if err != nil {
+		t.Fatalf("combined filter: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Errorf("combined filter: got %d groups, want 2 (CLITEST-1, CLITEST-2)", len(groups))
+	}
+}
+
+// TestGetCostByDayFiltered_ProjectAndPeriod verifies that GetCostByDayFiltered
+// correctly filters by project key and/or time window.
+func TestGetCostByDayFiltered_ProjectAndPeriod(t *testing.T) {
+	d := setupTestDB(t)
+	defer d.Close()
+
+	now := time.Now().UTC()
+	dayAgo := now.Add(-24 * time.Hour)
+	oldTime := now.Add(-60 * 24 * time.Hour)
+
+	rows := []struct {
+		id, key   string
+		startedAt time.Time
+	}{
+		{"r1", "CLITEST-1", dayAgo},
+		{"r2", "OTHER-1", dayAgo},
+		{"r3", "CLITEST-2", oldTime}, // outside window
+	}
+	for _, r := range rows {
+		_, err := d.db.Exec(`
+			INSERT INTO runs (id, jira_issue_key, agent_name, agent_type, user, workstation_id,
+				started_at, status, cost_usd, input_tokens, output_tokens)
+			VALUES (?, ?, 'claude', 'claude', 'test', 'ws1', ?, 'done', 1.00, 1000, 300)
+		`, r.id, r.key, r.startedAt.Format(time.RFC3339))
+		if err != nil {
+			t.Fatalf("insert %s: %v", r.id, err)
+		}
+	}
+
+	// Empty filter → all rows (grouped by day; r1 and r2 are same day → 1 day group + old day group).
+	groups, err := d.GetCostByDayFiltered(CostFilter{})
+	if err != nil {
+		t.Fatalf("empty filter: %v", err)
+	}
+	if len(groups) < 2 {
+		t.Errorf("empty filter: got %d day groups, want >= 2", len(groups))
+	}
+
+	// Period filter: last 7 days → excludes r3 (60 days ago), leaves 1 day group.
+	from := now.Add(-7 * 24 * time.Hour)
+	groups, err = d.GetCostByDayFiltered(CostFilter{From: from, To: now})
+	if err != nil {
+		t.Fatalf("period filter: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Errorf("period filter: got %d groups, want 1 (yesterday only)", len(groups))
+	}
+
+	// Project filter: CLITEST only → r1 (recent) and r3 (old) on different days.
+	groups, err = d.GetCostByDayFiltered(CostFilter{ProjectKey: "CLITEST"})
+	if err != nil {
+		t.Fatalf("project filter: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Errorf("project filter: got %d groups, want 2 (r1 day + r3 day)", len(groups))
+	}
+
+	// Combined: CLITEST + last 7 days → only r1.
+	groups, err = d.GetCostByDayFiltered(CostFilter{ProjectKey: "CLITEST", From: from, To: now})
+	if err != nil {
+		t.Fatalf("combined filter: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Errorf("combined filter: got %d groups, want 1 (only r1)", len(groups))
+	}
+}
+
+func TestGetDistinctProjectKeys(t *testing.T) {
+	d := setupTestDB(t)
+	defer d.Close()
+
+	rows := []struct{ id, key string }{
+		{"run1", "CLITEST-1"},
+		{"run2", "CLITEST-2"}, // duplicate prefix — must dedupe
+		{"run3", "OTHER-99"},
+		{"run4", ""},       // empty — must skip
+		{"run5", "BADKEY"}, // no dash — must skip
+	}
+	for _, r := range rows {
+		var keyArg any
+		if r.key == "" {
+			keyArg = nil
+		} else {
+			keyArg = r.key
+		}
+		_, err := d.db.Exec(`
+			INSERT INTO runs (id, jira_issue_key, agent_name, agent_type, user, workstation_id, started_at, status)
+			VALUES (?, ?, 'claude', 'claude', 't', 'w', datetime('now'), 'done')
+		`, r.id, keyArg)
+		if err != nil {
+			t.Fatalf("insert %s: %s", r.id, err)
+		}
+	}
+
+	keys, err := d.GetDistinctProjectKeys()
+	if err != nil {
+		t.Fatalf("GetDistinctProjectKeys: %s", err)
+	}
+	sort.Strings(keys)
+	want := []string{"CLITEST", "OTHER"}
+	if !reflect.DeepEqual(keys, want) {
+		t.Errorf("keys = %v; want %v", keys, want)
+	}
+} 

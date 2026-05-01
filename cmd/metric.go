@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
@@ -104,11 +106,44 @@ func runMetricExport(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if err := cacheMetricSnapshot(store, rep, cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cache snapshot failed: %v\n", err)
+	}
+
 	if metricOutput == "stdout" || metricOutput == "" {
 		_, err = os.Stdout.Write(append(body, '\n'))
 		return err
 	}
 	return os.WriteFile(metricOutput, body, 0o644)
+}
+
+// cacheMetricSnapshot stores the faros-shaped payload so the local dashboard
+// (G9 DORA panel) can serve cached metrics without re-hitting Jira. We always
+// store the faros shape because that's what normalizeDoraPayload in
+// internal/server/g9_routes.go understands; the user's --format flag only
+// affects stdout/file output.
+func cacheMetricSnapshot(store *db.LocalDB, rep metric.ExportReport, cfg metric.ExportConfig) error {
+	body, err := metric.FormatReport(rep, metric.FormatFaros)
+	if err != nil {
+		return fmt.Errorf("format faros: %w", err)
+	}
+	snap := db.MetricSnapshot{
+		ID:          newSnapshotID(),
+		Team:        cfg.Team,
+		Format:      "json",
+		WindowStart: cfg.Window.Start,
+		WindowEnd:   cfg.Window.End,
+		Payload:     string(body),
+	}
+	return store.InsertSnapshot(snap)
+}
+
+func newSnapshotID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("snap-%d", time.Now().UnixNano())
+	}
+	return "snap-" + time.Now().UTC().Format("20060102150405") + "-" + hex.EncodeToString(b[:])
 }
 
 // buildExportConfig merges CLI flags with config.yaml. CLI flags only

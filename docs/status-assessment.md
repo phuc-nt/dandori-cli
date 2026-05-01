@@ -104,7 +104,7 @@
 | Homebrew tap (G4) | ✅ resolved | — | PAT + `phuc-nt/homebrew-dandori` tap bootstrapped 2026-04-30 |
 | Jira/Confluence DC (G5) | P2 | — | Tùng owns branch `feat/jira-confluence-datacenter` |
 | Intent preservation (G8) | ✅ resolved | — | Shipped v0.6.0 — 3 event types, incident-report cmd, Jira G8 sections |
-| Spec-Driven Development (G7-old) | P2 | — | Spec template injected into agent context |
+| ~~Spec-Driven Development (G7-new)~~ | ❌ dropped | — | Dropped 2026-04-30: human PO defines spec, not tool's job |
 
 ## Summary
 
@@ -113,7 +113,7 @@
 - ✅ All 8 phases done + verify gate + DORA + attribution + intent preservation
 - ✅ 5/5 business questions answerable + DORA-grounded leadership questions
 - ✅ v0.6.0 published — full session intent + RCA via `dandori incident-report`
-- ⚠️ Còn 4 gap (G1 multi-agent, G2 context inheritance, G3 skill, G5 DC, G7-new SDD) — backlog trong [`plans/260429-0000-future-roadmap`](../../plans/260429-0000-future-roadmap/plan.md)
+- ⚠️ Còn 3 gap active (G1 multi-agent, G2 context inheritance, G3 skill) + 1 Tùng-owned (G5 DC). G7-new SDD dropped — backlog trong [`plans/260429-0000-future-roadmap`](../../plans/260429-0000-future-roadmap/plan.md)
 
 ## Architecture
 

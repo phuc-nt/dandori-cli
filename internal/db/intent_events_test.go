@@ -1,6 +1,8 @@
 package db
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -190,5 +192,113 @@ func TestGetIntentEvents_WrongRunID(t *testing.T) {
 	}
 	if result.Intent != nil {
 		t.Errorf("should not see events from another run")
+	}
+}
+
+// ---- GetRecentIntentEvents tests ----
+
+// seedRunWithEngineer inserts a run row with a specific engineer name.
+func seedRunWithEngineer(t *testing.T, d *LocalDB, runID, engineer string, ts time.Time) {
+	t.Helper()
+	_, err := d.Exec(`
+		INSERT INTO runs (id, jira_issue_key, agent_name, agent_type, user, workstation_id,
+		                  engineer_name, started_at, status)
+		VALUES (?, 'K-1', 'claude-code', 'claude_code', 'tester', 'ws-1', ?, ?, 'done')
+	`, runID, engineer, ts.UTC().Format(time.RFC3339))
+	if err != nil {
+		t.Fatalf("seedRunWithEngineer %s: %v", runID, err)
+	}
+}
+
+// insertIntentEventAtTime inserts a layer-4 event with an explicit timestamp.
+func insertIntentEventAtTime(t *testing.T, d *LocalDB, runID, eventType string, data map[string]any, ts time.Time) {
+	t.Helper()
+	raw, _ := json.Marshal(data)
+	_, err := d.Exec(`
+		INSERT INTO events (run_id, layer, event_type, data, ts)
+		VALUES (?, 4, ?, ?, ?)
+	`, runID, eventType, string(raw), ts.UTC().Format(time.RFC3339))
+	if err != nil {
+		t.Fatalf("insertIntentEventAtTime %s: %v", runID, err)
+	}
+}
+
+func TestGetRecentIntentEvents_LimitAndOrder(t *testing.T) {
+	d := setupTestDB(t)
+	defer d.Close()
+
+	base := time.Now().Add(-60 * time.Minute)
+	// Insert 30 runs + events
+	for i := 0; i < 30; i++ {
+		runID := fmt.Sprintf("r-limit-%02d", i)
+		ts := base.Add(time.Duration(i) * time.Minute)
+		seedRunWithEngineer(t, d, runID, "alice", ts)
+		insertIntentEventAtTime(t, d, runID, "decision.point", map[string]any{
+			"chosen": fmt.Sprintf("opt-%d", i),
+		}, ts)
+	}
+
+	events, err := d.GetRecentIntentEvents(20, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(events) != 20 {
+		t.Errorf("expected 20 events, got %d", len(events))
+	}
+	// Verify descending order (newest first)
+	for i := 1; i < len(events); i++ {
+		if events[i-1].TS.Before(events[i].TS) {
+			t.Errorf("events not descending: [%d] %v < [%d] %v",
+				i-1, events[i-1].TS, i, events[i].TS)
+		}
+	}
+}
+
+func TestGetRecentIntentEvents_EngineerFilter(t *testing.T) {
+	d := setupTestDB(t)
+	defer d.Close()
+
+	base := time.Now().Add(-10 * time.Minute)
+
+	// alice: 5 events
+	for i := 0; i < 5; i++ {
+		runID := fmt.Sprintf("r-alice-%d", i)
+		ts := base.Add(time.Duration(i) * time.Minute)
+		seedRunWithEngineer(t, d, runID, "alice", ts)
+		insertIntentEventAtTime(t, d, runID, "decision.point", map[string]any{
+			"chosen": "alice-opt",
+		}, ts)
+	}
+	// bob: 3 events
+	for i := 0; i < 3; i++ {
+		runID := fmt.Sprintf("r-bob-%d", i)
+		ts := base.Add(time.Duration(i) * time.Minute)
+		seedRunWithEngineer(t, d, runID, "bob", ts)
+		insertIntentEventAtTime(t, d, runID, "decision.point", map[string]any{
+			"chosen": "bob-opt",
+		}, ts)
+	}
+
+	// Filter empty → all 8
+	all, err := d.GetRecentIntentEvents(50, "")
+	if err != nil {
+		t.Fatalf("all filter: %v", err)
+	}
+	if len(all) != 8 {
+		t.Errorf("empty filter: expected 8 events, got %d", len(all))
+	}
+
+	// Filter "alice" → 5
+	aliceEvents, err := d.GetRecentIntentEvents(50, "alice")
+	if err != nil {
+		t.Fatalf("alice filter: %v", err)
+	}
+	if len(aliceEvents) != 5 {
+		t.Errorf("alice filter: expected 5 events, got %d", len(aliceEvents))
+	}
+	for _, ev := range aliceEvents {
+		if ev.EngineerName != "alice" {
+			t.Errorf("non-alice event returned: engineer=%q", ev.EngineerName)
+		}
 	}
 }

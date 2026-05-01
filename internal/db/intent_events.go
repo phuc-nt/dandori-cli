@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // IntentData holds the G8 intent.extracted event payload for a run.
@@ -31,6 +32,64 @@ type IntentDecision struct {
 type RunIntentEvents struct {
 	Intent    *IntentData
 	Decisions []IntentDecision
+}
+
+// RecentIntentEvent is one row in the intent feed returned by GetRecentIntentEvents.
+// It joins the events table with the runs table to surface engineer attribution.
+type RecentIntentEvent struct {
+	ID           int64           `json:"id"`
+	RunID        string          `json:"run_id"`
+	EventType    string          `json:"event_type"`
+	Data         json.RawMessage `json:"data"`
+	TS           time.Time       `json:"ts"`
+	EngineerName string          `json:"engineer_name,omitempty"`
+	JiraIssueKey string          `json:"jira_issue_key,omitempty"`
+}
+
+// GetRecentIntentEvents returns the most recent layer-4 events, newest first,
+// up to limit rows. Pass engineer="" to return all engineers. Only event_type
+// rows 'intent.extracted' and 'decision.point' are included (same set as the
+// existing GetIntentEvents function).
+func (l *LocalDB) GetRecentIntentEvents(limit int, engineer string) ([]RecentIntentEvent, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	query := `
+		SELECT e.id, e.run_id, e.event_type, e.data, e.ts,
+		       COALESCE(r.engineer_name, '') AS engineer_name,
+		       COALESCE(r.jira_issue_key, '') AS jira_issue_key
+		FROM events e
+		JOIN runs r ON r.id = e.run_id
+		WHERE e.layer = 4
+		  AND e.event_type IN ('intent.extracted', 'decision.point')
+		  AND (? = '' OR COALESCE(r.engineer_name, '') = ?)
+		ORDER BY e.ts DESC, e.id DESC
+		LIMIT ?
+	`
+	rows, err := l.db.Query(query, engineer, engineer, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query recent intent events: %w", err)
+	}
+	defer rows.Close()
+
+	var out []RecentIntentEvent
+	for rows.Next() {
+		var ev RecentIntentEvent
+		var tsStr string
+		var rawData string
+		if err := rows.Scan(&ev.ID, &ev.RunID, &ev.EventType, &rawData, &tsStr, &ev.EngineerName, &ev.JiraIssueKey); err != nil {
+			return nil, fmt.Errorf("scan recent intent event: %w", err)
+		}
+		ev.Data = json.RawMessage(rawData)
+		if t, err := parseTime(tsStr); err == nil {
+			ev.TS = t
+		}
+		out = append(out, ev)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate recent intent events: %w", err)
+	}
+	return out, nil
 }
 
 // GetIntentEvents queries the events table for layer-4 G8 events belonging to
