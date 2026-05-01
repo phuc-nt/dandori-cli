@@ -1144,14 +1144,21 @@ const dashboardHTML = `<!DOCTYPE html>
         }
 
         function applyRoleVisibility(role, id) {
-            // Original panels: hide DORA card for non-org; show engineer filters for engineer.
+            // Org-only DORA card: shown only at org. Project has its own DORA grid;
+            // engineer view doesn't show DORA at all.
             const doraSection = document.getElementById('g9-dora-section');
             doraSection.style.display = role === 'org' ? '' : 'none';
+            // Engineer-name input filter only visible in engineer scope.
             document.getElementById('attr-engineer-filter').style.display  = role === 'engineer' ? '' : 'none';
             document.getElementById('intent-engineer-filter').style.display = role === 'engineer' ? '' : 'none';
-            // G9 attribution+intent hidden for project (project has own panels)
+            // G9 hero grid (attribution + intent): always visible. The intent
+            // feed scopes by project when role=project (backend reads ?project=).
+            // Attribution tile is org/engineer scoped; we hide just the
+            // attribution card for project to avoid showing org numbers there.
             const g9Section = document.getElementById('g9-section');
-            g9Section.style.display = role === 'project' ? 'none' : '';
+            g9Section.style.display = '';
+            const attrTileCard = document.getElementById('attribution-tile')?.closest('.card');
+            if (attrTileCard) attrTileCard.style.display = role === 'project' ? 'none' : '';
             // Project view section
             const projView = document.getElementById('project-view');
             projView.classList.toggle('visible', role === 'project');

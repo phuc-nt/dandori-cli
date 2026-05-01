@@ -192,11 +192,31 @@ const doraStaleHours = 24
 // handleG9DORA serves the DORA scorecard from the latest metric_snapshot.
 // If no snapshot exists or the latest is older than doraStaleHours, returns
 // stale:true with a hint message instructing how to refresh.
+//
+// Scope is selected via query params:
+//   - role=project & id=<KEY> → match metric_snapshots.team = <KEY>
+//   - any other combination   → match team="" (org-level)
+//
+// If a project snapshot is missing the response falls back to org-level
+// rather than 404, so the dashboard always has something to render.
 func handleG9DORA(store *db.LocalDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		snap, err := store.LatestSnapshot("", "json")
+		// Project scope can arrive as ?role=project&id=<KEY> (REST-style) or
+		// ?project=<KEY> (the form buildAPIQuery emits). Honor either.
+		team := ""
+		if r.URL.Query().Get("role") == "project" {
+			team = r.URL.Query().Get("id")
+		} else if p := r.URL.Query().Get("project"); p != "" {
+			team = p
+		}
+
+		snap, err := store.LatestSnapshot(team, "json")
+		if err == nil && snap == nil && team != "" {
+			// Project snapshot missing — fall back to org-level so UI still renders.
+			snap, err = store.LatestSnapshot("", "json")
+		}
 		if err != nil {
 			http.Error(w, `{"error":"db error"}`, http.StatusInternalServerError)
 			return
@@ -292,13 +312,19 @@ func handleG9Attribution(store *db.LocalDB) http.HandlerFunc {
 }
 
 // handleG9Intent serves the intent recent-decisions feed.
-// Supports ?engineer= to scope to one engineer.
+// Supports ?engineer= to scope to one engineer and ?project=<KEY> (or the
+// equivalent ?role=project&id=<KEY>) to scope to one project. Filters compose
+// — both can be set, in which case only events matching both apply.
 func handleG9Intent(store *db.LocalDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		engineer := r.URL.Query().Get("engineer")
+		project := r.URL.Query().Get("project")
+		if project == "" && r.URL.Query().Get("role") == "project" {
+			project = r.URL.Query().Get("id")
+		}
 
-		events, err := store.GetRecentIntentEvents(20, engineer)
+		events, err := store.GetRecentIntentEvents(20, engineer, project)
 		if err != nil {
 			http.Error(w, `{"error":"intent query failed"}`, http.StatusInternalServerError)
 			return

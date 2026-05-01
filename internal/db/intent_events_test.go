@@ -3,6 +3,7 @@ package db
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -238,7 +239,7 @@ func TestGetRecentIntentEvents_LimitAndOrder(t *testing.T) {
 		}, ts)
 	}
 
-	events, err := d.GetRecentIntentEvents(20, "")
+	events, err := d.GetRecentIntentEvents(20, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -280,7 +281,7 @@ func TestGetRecentIntentEvents_EngineerFilter(t *testing.T) {
 	}
 
 	// Filter empty → all 8
-	all, err := d.GetRecentIntentEvents(50, "")
+	all, err := d.GetRecentIntentEvents(50, "", "")
 	if err != nil {
 		t.Fatalf("all filter: %v", err)
 	}
@@ -289,7 +290,7 @@ func TestGetRecentIntentEvents_EngineerFilter(t *testing.T) {
 	}
 
 	// Filter "alice" → 5
-	aliceEvents, err := d.GetRecentIntentEvents(50, "alice")
+	aliceEvents, err := d.GetRecentIntentEvents(50, "alice", "")
 	if err != nil {
 		t.Fatalf("alice filter: %v", err)
 	}
@@ -300,5 +301,83 @@ func TestGetRecentIntentEvents_EngineerFilter(t *testing.T) {
 		if ev.EngineerName != "alice" {
 			t.Errorf("non-alice event returned: engineer=%q", ev.EngineerName)
 		}
+	}
+}
+
+// seedRunWithKey inserts a run with both an engineer and a specific jira_issue_key
+// so project-filter tests can target the prefix match.
+func seedRunWithKey(t *testing.T, d *LocalDB, runID, engineer, jiraKey string, ts time.Time) {
+	t.Helper()
+	_, err := d.Exec(`
+		INSERT INTO runs (id, jira_issue_key, agent_name, agent_type, user, workstation_id,
+		                  engineer_name, started_at, status)
+		VALUES (?, ?, 'claude-code', 'claude_code', 'tester', 'ws-1', ?, ?, 'done')
+	`, runID, jiraKey, engineer, ts.UTC().Format(time.RFC3339))
+	if err != nil {
+		t.Fatalf("seedRunWithKey %s: %v", runID, err)
+	}
+}
+
+// TestGetRecentIntentEvents_ProjectFilter verifies project="" returns all events
+// and project="<KEY>" returns only events whose run.jira_issue_key starts with
+// "<KEY>-".
+func TestGetRecentIntentEvents_ProjectFilter(t *testing.T) {
+	d := setupTestDB(t)
+	defer d.Close()
+
+	base := time.Now().Add(-30 * time.Minute)
+
+	// 4 CLITEST events.
+	for i := 0; i < 4; i++ {
+		runID := fmt.Sprintf("r-cli-%d", i)
+		ts := base.Add(time.Duration(i) * time.Minute)
+		seedRunWithKey(t, d, runID, "alice", fmt.Sprintf("CLITEST-%d", i+1), ts)
+		insertIntentEventAtTime(t, d, runID, "decision.point", map[string]any{"k": i}, ts)
+	}
+	// 2 DEMO events.
+	for i := 0; i < 2; i++ {
+		runID := fmt.Sprintf("r-demo-%d", i)
+		ts := base.Add(time.Duration(10+i) * time.Minute)
+		seedRunWithKey(t, d, runID, "bob", fmt.Sprintf("DEMO-%d", i+1), ts)
+		insertIntentEventAtTime(t, d, runID, "decision.point", map[string]any{"k": i}, ts)
+	}
+
+	all, err := d.GetRecentIntentEvents(50, "", "")
+	if err != nil {
+		t.Fatalf("all: %v", err)
+	}
+	if len(all) != 6 {
+		t.Errorf("all: expected 6, got %d", len(all))
+	}
+
+	cli, err := d.GetRecentIntentEvents(50, "", "CLITEST")
+	if err != nil {
+		t.Fatalf("project=CLITEST: %v", err)
+	}
+	if len(cli) != 4 {
+		t.Errorf("project=CLITEST: expected 4, got %d", len(cli))
+	}
+	for _, ev := range cli {
+		if !strings.HasPrefix(ev.JiraIssueKey, "CLITEST-") {
+			t.Errorf("CLITEST filter leaked: jira_issue_key=%q", ev.JiraIssueKey)
+		}
+	}
+
+	// Engineer + project compose: alice + CLITEST → 4 (alice owns all CLITESTs).
+	composed, err := d.GetRecentIntentEvents(50, "alice", "CLITEST")
+	if err != nil {
+		t.Fatalf("composed: %v", err)
+	}
+	if len(composed) != 4 {
+		t.Errorf("alice+CLITEST: expected 4, got %d", len(composed))
+	}
+
+	// alice + DEMO → 0 (DEMO is bob's).
+	mismatched, err := d.GetRecentIntentEvents(50, "alice", "DEMO")
+	if err != nil {
+		t.Fatalf("mismatched: %v", err)
+	}
+	if len(mismatched) != 0 {
+		t.Errorf("alice+DEMO: expected 0, got %d", len(mismatched))
 	}
 }

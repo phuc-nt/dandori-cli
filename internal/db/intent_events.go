@@ -47,12 +47,18 @@ type RecentIntentEvent struct {
 }
 
 // GetRecentIntentEvents returns the most recent layer-4 events, newest first,
-// up to limit rows. Pass engineer="" to return all engineers. Only event_type
-// rows 'intent.extracted' and 'decision.point' are included (same set as the
-// existing GetIntentEvents function).
-func (l *LocalDB) GetRecentIntentEvents(limit int, engineer string) ([]RecentIntentEvent, error) {
+// up to limit rows. Pass engineer="" to skip engineer filter, project="" to
+// skip project filter. Only event_type rows 'intent.extracted' and
+// 'decision.point' are included (same set as the existing GetIntentEvents
+// function). Project filter matches runs whose jira_issue_key starts with
+// "<project>-" (e.g. project="CLITEST" matches "CLITEST-123").
+func (l *LocalDB) GetRecentIntentEvents(limit int, engineer, project string) ([]RecentIntentEvent, error) {
 	if limit <= 0 {
 		limit = 20
+	}
+	projLike := ""
+	if project != "" {
+		projLike = project + "-%"
 	}
 	query := `
 		SELECT e.id, e.run_id, e.event_type, e.data, e.ts,
@@ -63,10 +69,11 @@ func (l *LocalDB) GetRecentIntentEvents(limit int, engineer string) ([]RecentInt
 		WHERE e.layer = 4
 		  AND e.event_type IN ('intent.extracted', 'decision.point')
 		  AND (? = '' OR COALESCE(r.engineer_name, '') = ?)
+		  AND (? = '' OR COALESCE(r.jira_issue_key, '') LIKE ?)
 		ORDER BY e.ts DESC, e.id DESC
 		LIMIT ?
 	`
-	rows, err := l.db.Query(query, engineer, engineer, limit)
+	rows, err := l.db.Query(query, engineer, engineer, projLike, projLike, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query recent intent events: %w", err)
 	}

@@ -52,19 +52,36 @@ Mobile: 375×812 → `scrollWidth==clientWidth==375`, no horizontal overflow.
 Bookmark restore: `?role=org&period=28d&compare=true` → compare checkbox
 checked, period selector value `28d`.
 
-## Known gaps (deferred, not blocking GA)
+## Gap fixes (post-cutover, same day)
 
-1. **Project view has no scoped intent feed.** `g9-section` is hidden when
-   `role=project` ("project has own panels"), but no project intent panel
-   was added in P4a/P4b. Deferred — add `proj-intent-feed` with `?project=`
-   filter in next iteration.
-2. **`/api/g9/dora` ignores `?role=project&id=`.** Always returns the latest
-   snapshot with empty team filter, so the project DORA scorecard shows org
-   numbers. Need to thread role/id through `LatestSnapshot(team, format)`
-   lookup. Trivial follow-up.
+Both gaps flagged at cutover time were closed before tagging GA.
 
-Both gaps are pre-existing in the experimental path — GA cutover didn't
-introduce them, but they're now visible to all users so worth tracking.
+1. **DORA project scoping** — `handleG9DORA` now reads `?role=project&id=`
+   (and the `?project=` shorthand emitted by `buildAPIQuery`) and threads
+   the value through `LatestSnapshot(team, "json")`. Falls back to org
+   snapshot when a project snapshot is missing so the UI never 404s.
+   New tests in `internal/server/g9_routes_test.go`:
+   - `TestG9DORA_ProjectScope_ReturnsProjectSnapshot`
+   - `TestG9DORA_ProjectQueryParam_AlsoMatches`
+   - `TestG9DORA_ProjectScope_FallsBackToOrgWhenMissing`
+
+2. **Project intent feed** — `GetRecentIntentEvents(limit, engineer, project)`
+   gained a project filter (`jira_issue_key LIKE '<KEY>-%'`). `handleG9Intent`
+   forwards `?project=` (or the REST-style `?role=project&id=`). Frontend
+   `applyRoleVisibility` now keeps `g9-section` visible at project scope and
+   only hides the org-wide attribution-tile card. New tests:
+   - `internal/db/intent_events_test.go` → `TestGetRecentIntentEvents_ProjectFilter`
+   - `internal/server/g9_routes_test.go` → `TestG9Intent_ProjectScope_FiltersByJiraIssuePrefix`
+
+Re-run live matrix confirms project DORA now shows distinct numbers per
+project (CLITEST=1.2, DEMO=0.8, Org=2.4) and project intent feed renders
+with both `?project=` and `?role=project&id=` shapes.
+
+E2E (`go test -tags=e2e -run TestE2E ./internal/integration/...`) green
+in 14.7s. Cross-check vs `dandori analytics`: dashboard `/api/overview`
+total ($68.80, 36 runs, 24500 tokens) matches `analytics all` engineer
+sums (alice $53.80 + bob $15.00); `/api/cost/agent` byte-identical to
+`analytics cost --format json`.
 
 ## Tests
 
@@ -80,4 +97,5 @@ introduce them, but they're now visible to all users so worth tracking.
 
 - P4a: drilldown handlers + frontend wiring + 6 RED→GREEN tests
 - P4b: hero sparklines + mobile CSS @375
-- P4c: GA cutover (this commit)
+- P4c: GA cutover
+- Gap fixes: DORA project scoping + project intent feed (this commit)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -136,6 +137,108 @@ func TestG9DORA_LatestSnapshot_ReturnsValues(t *testing.T) {
 	}
 	if resp["metrics"] == nil {
 		t.Error("expected metrics field")
+	}
+}
+
+// seedProjectSnapshot inserts a metric_snapshots row with team=<projectKey>.
+func seedProjectSnapshot(t *testing.T, store *db.LocalDB, team string, ageHours float64, payload string) {
+	t.Helper()
+	createdAt := time.Now().Add(-time.Duration(ageHours * float64(time.Hour)))
+	start := createdAt.AddDate(0, 0, -28)
+	_, err := store.Exec(`
+		INSERT INTO metric_snapshots (id, team, format, window_start, window_end, payload, created_at)
+		VALUES (?, ?, 'json', ?, ?, ?, ?)
+	`,
+		"snap-"+team+"-"+createdAt.Format("20060102150405"),
+		team,
+		start.UTC().Format(time.RFC3339),
+		createdAt.UTC().Format(time.RFC3339),
+		payload,
+		createdAt.UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		t.Fatalf("seedProjectSnapshot: %v", err)
+	}
+}
+
+// TestG9DORA_ProjectScope_ReturnsProjectSnapshot asserts ?role=project&id=KEY
+// matches the snapshot whose team column equals KEY (not the org snapshot).
+func TestG9DORA_ProjectScope_ReturnsProjectSnapshot(t *testing.T) {
+	store := setupG9DB(t)
+	defer store.Close()
+
+	orgPayload := `{"deploy_frequency":{"value":1.0,"unit":"per day","rating":"high"}}`
+	projPayload := `{"deploy_frequency":{"value":4.2,"unit":"per day","rating":"elite"}}`
+	seedSnapshot(t, store, 2.0, orgPayload)               // team=""
+	seedProjectSnapshot(t, store, "CLITEST", 1.0, projPayload) // team="CLITEST"
+
+	mux := newG9Mux(store)
+	status, body := g9Get(t, mux, "/api/g9/dora?role=project&id=CLITEST")
+	if status != http.StatusOK {
+		t.Fatalf("status=%d want 200; body=%s", status, body)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(body, &resp); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, body)
+	}
+	metrics, _ := resp["metrics"].(map[string]any)
+	df, _ := metrics["deploy_frequency"].(map[string]any)
+	if v, _ := df["value"].(float64); v != 4.2 {
+		t.Errorf("project DORA: deploy_frequency=%v want 4.2 (project snapshot, not org)", df["value"])
+	}
+}
+
+// TestG9DORA_ProjectQueryParam_AlsoMatches asserts the alt query shape
+// (?project=KEY, used by frontend buildAPIQuery) also resolves to the
+// project snapshot.
+func TestG9DORA_ProjectQueryParam_AlsoMatches(t *testing.T) {
+	store := setupG9DB(t)
+	defer store.Close()
+
+	orgPayload := `{"deploy_frequency":{"value":1.0,"unit":"per day","rating":"high"}}`
+	projPayload := `{"deploy_frequency":{"value":4.2,"unit":"per day","rating":"elite"}}`
+	seedSnapshot(t, store, 2.0, orgPayload)
+	seedProjectSnapshot(t, store, "DEMO", 1.0, projPayload)
+
+	mux := newG9Mux(store)
+	status, body := g9Get(t, mux, "/api/g9/dora?project=DEMO")
+	if status != http.StatusOK {
+		t.Fatalf("status=%d want 200; body=%s", status, body)
+	}
+	var resp map[string]any
+	_ = json.Unmarshal(body, &resp)
+	metrics, _ := resp["metrics"].(map[string]any)
+	df, _ := metrics["deploy_frequency"].(map[string]any)
+	if v, _ := df["value"].(float64); v != 4.2 {
+		t.Errorf("project= query: deploy_frequency=%v want 4.2", df["value"])
+	}
+}
+
+// TestG9DORA_ProjectScope_FallsBackToOrgWhenMissing asserts that when no
+// project snapshot exists, the handler still returns the org snapshot
+// rather than reporting stale/empty.
+func TestG9DORA_ProjectScope_FallsBackToOrgWhenMissing(t *testing.T) {
+	store := setupG9DB(t)
+	defer store.Close()
+
+	orgPayload := `{"deploy_frequency":{"value":1.0,"unit":"per day","rating":"high"}}`
+	seedSnapshot(t, store, 1.0, orgPayload)
+
+	mux := newG9Mux(store)
+	status, body := g9Get(t, mux, "/api/g9/dora?role=project&id=NOSUCH")
+	if status != http.StatusOK {
+		t.Fatalf("status=%d want 200; body=%s", status, body)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(body, &resp); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, body)
+	}
+	if stale, _ := resp["stale"].(bool); stale {
+		t.Errorf("expected stale=false (org fallback), got resp=%v", resp)
+	}
+	metrics, _ := resp["metrics"].(map[string]any)
+	if metrics == nil {
+		t.Errorf("expected metrics from org fallback, got nil")
 	}
 }
 
@@ -326,6 +429,63 @@ func TestG9Intent_EngineerScope_FiltersByEngineerName(t *testing.T) {
 		if ev["engineer_name"] != "alice" {
 			t.Errorf("event belongs to wrong engineer: %v", ev["engineer_name"])
 		}
+	}
+}
+
+// TestG9Intent_ProjectScope_FiltersByJiraIssuePrefix asserts that
+// ?project=<KEY> returns only intent events whose run's jira_issue_key
+// starts with "<KEY>-". Also exercises the alt ?role=project&id= form.
+func TestG9Intent_ProjectScope_FiltersByJiraIssuePrefix(t *testing.T) {
+	store := setupG9DB(t)
+	defer store.Close()
+
+	base := time.Now().Add(-30 * time.Minute)
+
+	// CLITEST: 4 events.
+	for i := 0; i < 4; i++ {
+		runID := fmt.Sprintf("rcli-%d", i)
+		ts := base.Add(time.Duration(i) * time.Minute)
+		seedRunG9WithKey(t, store, runID, fmt.Sprintf("CLITEST-%d", i+1), "alice", ts)
+		seedIntentEventG9(t, store, runID, "decision.point", map[string]any{"k": i}, ts)
+	}
+	// DEMO: 2 events.
+	for i := 0; i < 2; i++ {
+		runID := fmt.Sprintf("rdemo-%d", i)
+		ts := base.Add(time.Duration(10+i) * time.Minute)
+		seedRunG9WithKey(t, store, runID, fmt.Sprintf("DEMO-%d", i+1), "bob", ts)
+		seedIntentEventG9(t, store, runID, "decision.point", map[string]any{"k": i}, ts)
+	}
+
+	mux := newG9Mux(store)
+
+	// ?project= form
+	status, body := g9Get(t, mux, "/api/g9/intent?project=CLITEST")
+	if status != http.StatusOK {
+		t.Fatalf("status=%d want 200; body=%s", status, body)
+	}
+	var events []map[string]any
+	if err := json.Unmarshal(body, &events); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, body)
+	}
+	if len(events) != 4 {
+		t.Errorf("project=CLITEST: expected 4 events, got %d", len(events))
+	}
+	for _, ev := range events {
+		key, _ := ev["jira_issue_key"].(string)
+		if !strings.HasPrefix(key, "CLITEST-") {
+			t.Errorf("project filter leaked: jira_issue_key=%q", key)
+		}
+	}
+
+	// ?role=project&id= form
+	status2, body2 := g9Get(t, mux, "/api/g9/intent?role=project&id=DEMO")
+	if status2 != http.StatusOK {
+		t.Fatalf("status=%d want 200; body=%s", status2, body2)
+	}
+	var demoEvents []map[string]any
+	_ = json.Unmarshal(body2, &demoEvents)
+	if len(demoEvents) != 2 {
+		t.Errorf("role=project&id=DEMO: expected 2, got %d", len(demoEvents))
 	}
 }
 
