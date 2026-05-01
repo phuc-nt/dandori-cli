@@ -2,7 +2,7 @@
 
 [![Go](https://img.shields.io/badge/go-1.21%2B-blue)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-274%20unit%20%2B%205%20E2E-brightgreen)](docs/devlog/)
+[![Tests](https://img.shields.io/badge/tests-835%20unit%20%2B%20E2E-brightgreen)](docs/devlog/)
 
 Lightweight CLI outer harness for managing AI agent dev teams. Wraps agent execution, tracks runs, integrates with Jira/Confluence, and provides analytics for PO/PDM and QA.
 
@@ -21,7 +21,7 @@ See [Outer Harness](https://phuc-nt.github.io/dandori-pitch/outer-harness.html) 
 - **Real-time cost tracking** — token counts × model price table (Claude Sonnet/Opus/Haiku)
 - **Jira integration** — task start/done, status transitions, completion comments
 - **Confluence integration** — auto-post run reports with metadata, files changed, git diff
-- **Web dashboard** — charts, per-task cost breakdown, clickable Jira links
+- **G9 analytics dashboard** — 3-level surface (engineer · project · org), CWD-aware landing, DORA scorecard, attribution composite, intent feed, insight engine, drilldowns, mobile-responsive
 - **Agent assignment** — scoring algorithm (capability 40% + type 30% + history 20% + load 10%)
 - **Analytics CLI** — agent stats, cost breakdown, sprint summary
 

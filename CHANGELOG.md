@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-05-01
+
+G9 dashboard redesign GA: 3-level analytics surface (engineer · project · org) replacing the single-page legacy dashboard. CWD-aware landing, role switcher, period selector, vs-prior comparison, insight engine, drilldowns.
+
+### Added — G9 dashboard
+
+- **3-level navigation** — bookmarkable `?role=org|project|engineer&id=&period=&compare=` URL state. Role switcher dropdown reads/writes URL.
+- **CWD-aware landing** — `/api/g9/landing` resolves `cwd` git remote → project key (e.g. inside CLITEST repo lands on `?role=project&id=CLITEST`); falls back to `org` outside any repo.
+- **Per-level hero tiles**
+  - Org: total monthly · DORA composite · avg autonomy · interventions · active engineers
+  - Project: cost · tasks completed · $/task · DORA 4-light mini · 3 sparklines
+  - Engineer: today cost · success 7d · interventions 7d · autonomy % · retention % · 4-bucket weekly retention chart
+- **DORA scorecard** (org + project) — surfaces latest `metric_snapshot` with Elite/High/Medium/Low ratings per DORA 2023 thresholds. Stale-banner when snapshot >24h old. Project scope honors both `?role=project&id=` and `?project=` query forms; falls back to org when project snapshot missing.
+- **Attribution composite tile** — `AI Authored X% · Retained Y%` with 28-day sparkline (G7 surface).
+- **Intent feed** — chronological layer-4 events (`intent.extracted`, `decision.point`), click-to-expand inline. Filterable by `?engineer=` and `?project=` (LIKE `<KEY>-%` against `runs.jira_issue_key`).
+- **Insight engine** — `internal/insights/` ships 5 SQL heuristics (WoW spike, retention decay, intervention anomaly, cost outlier, DORA degradation) rendered as cards on org + project views with drilldown URLs.
+- **Drilldowns** — run-row inline expand shows iterations + intent events; engineer name click → `/api/g9/engineer/{name}` with last 50 runs and weekly retention sparkline.
+- **Mobile responsive** — verified at 375×812: header wraps, table x-scroll, single-column hero, no horizontal page overflow.
+
+### Changed
+
+- `dandori dashboard` no longer requires `--experimental`. The G9 surface is the only dashboard; flag and legacy `newExperimentalDashboardMux` removed. Legacy panels (Overview, Agents, Cost charts, Recent Runs, Quality KPI) remain mounted unchanged.
+- Sidebar badge updated `⚗ Experimental` → `G9 Analytics`; page title `Dandori Analytics`.
+
+### Fixed
+
+- DORA scorecard now scopes by project (was always returning org snapshot).
+- Project view intent feed now renders (was hidden via `applyRoleVisibility`); only the org-wide attribution-tile card hides at project scope.
+
+### Tests
+
+- 835 unit tests across 24 packages; all green.
+- 4 new server tests for DORA/intent project scoping; 1 new DB test for `GetRecentIntentEvents` project filter.
+- E2E (`-tags=e2e`) Phase 8 flow green (14.7s).
+- Live test matrix: 30 cells × 3 levels + mobile 375 + bookmark restore + CWD landing all verified via Playwright.
+- Cross-check vs `dandori analytics` CLI: dashboard `/api/overview` ($68.80, 36 runs, 24500 tokens) matches engineer sums; `/api/cost/agent` byte-identical to `analytics cost --format json`.
+
+### Plan / devlog
+
+- Plan: `plans/260430-2039-g9-dashboard-redesign/` (P1–P4)
+- Devlog: `docs/devlog/2026-05-01-g9-dashboard-ga.md`
+
 ## [0.6.0] — 2026-04-30
 
 Intent preservation: captures why an agent ran (G8). Sub-30-minute RCA without reading the full transcript.
