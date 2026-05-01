@@ -27,18 +27,15 @@ func TestExtractProjectKey(t *testing.T) {
 	}
 }
 
-// TestExperimentalFlagOff_KeepsLegacyMux asserts that without --experimental
-// the G9 routes are not registered.
-// The legacy mux uses a catch-all "/" handler, so unregistered paths return 200
-// with HTML (the dashboard page). We verify /api/g9/dora returns HTML (not JSON)
-// while /api/overview returns valid JSON.
-func TestExperimentalFlagOff_KeepsLegacyMux(t *testing.T) {
+// TestG9RoutesAlwaysRegistered asserts that after GA cutover the default
+// dashboard mux registers all G9 routes — no flag required.
+func TestG9RoutesAlwaysRegistered(t *testing.T) {
 	store := setupDashboardDB(t)
 	defer store.Close()
 
 	mux := newDashboardMux(store, "https://jira.example.com")
 
-	// legacy route returns valid JSON
+	// Legacy route still works.
 	status, body := getJSON(t, mux, "/api/overview")
 	if status != http.StatusOK {
 		t.Errorf("/api/overview status=%d, want 200", status)
@@ -48,23 +45,7 @@ func TestExperimentalFlagOff_KeepsLegacyMux(t *testing.T) {
 		t.Errorf("/api/overview body not JSON: %s", body)
 	}
 
-	// /api/g9/dora on legacy mux hits the catch-all "/" → returns HTML, not JSON.
-	_, doraBody := getJSON(t, mux, "/api/g9/dora")
-	var doraJSON map[string]any
-	if err := json.Unmarshal(doraBody, &doraJSON); err == nil {
-		// If it parses as JSON, G9 routes were unexpectedly registered.
-		t.Errorf("/api/g9/dora returned JSON on legacy mux (G9 routes should not be registered)")
-	}
-}
-
-// TestExperimentalFlagOn_RegistersG9Routes asserts that when experimental is
-// true, all four /api/g9/* routes return 200.
-func TestExperimentalFlagOn_RegistersG9Routes(t *testing.T) {
-	store := setupDashboardDB(t)
-	defer store.Close()
-
-	mux := newExperimentalDashboardMux(store, "https://jira.example.com")
-
+	// All G9 routes return 200.
 	routes := []string{
 		"/api/g9/dora",
 		"/api/g9/attribution",
@@ -75,9 +56,9 @@ func TestExperimentalFlagOn_RegistersG9Routes(t *testing.T) {
 		"/api/g9/insights",
 	}
 	for _, route := range routes {
-		status, body := getJSON(t, mux, route)
-		if status != http.StatusOK {
-			t.Errorf("%s status=%d, want 200; body=%s", route, status, body)
+		st, b := getJSON(t, mux, route)
+		if st != http.StatusOK {
+			t.Errorf("%s status=%d, want 200; body=%s", route, st, b)
 		}
 	}
 }

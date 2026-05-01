@@ -1,6 +1,6 @@
-// Package server/g9_routes.go — experimental G9 dashboard API handlers.
-// Registered only when --experimental flag is passed to `dandori dashboard`.
-// All handlers are read-only; no data is mutated by this file.
+// Package server/g9_routes.go — G9 dashboard API handlers (DORA scorecard,
+// attribution, intent feed, drilldowns). Registered unconditionally by the
+// dashboard mux. All handlers are read-only; no data is mutated by this file.
 package server
 
 import (

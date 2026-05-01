@@ -602,7 +602,7 @@ func TestLegacyEndpointsStillWork(t *testing.T) {
 	store := setupG9DB(t)
 	defer store.Close()
 
-	// Build a mux that has BOTH legacy and G9 routes (simulates --experimental on).
+	// Build a mux that has BOTH legacy and G9 routes (default GA dashboard mux).
 	mux := http.NewServeMux()
 	// Register legacy routes manually (same as newDashboardMux does internally).
 	// We import server package to register G9 routes; for legacy routes we call

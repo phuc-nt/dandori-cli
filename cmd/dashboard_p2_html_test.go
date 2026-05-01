@@ -5,12 +5,12 @@ import (
 	"testing"
 )
 
-// TestDashboardHTMLv2_ContainsProjectViewMarkup asserts that dashboardHTMLv2
+// TestDashboardHTMLv2_ContainsProjectViewMarkup asserts that dashboardHTML
 // contains the required P2 UI elements. This catches accidental deletion during
 // future edits without requiring a running browser.
 func TestDashboardHTMLv2_ContainsProjectViewMarkup(t *testing.T) {
 	t.Helper()
-	html := dashboardHTMLv2
+	html := dashboardHTML
 
 	checks := []struct {
 		desc    string
@@ -60,29 +60,29 @@ func TestDashboardHTMLv2_ContainsProjectViewMarkup(t *testing.T) {
 
 	for _, c := range checks {
 		if !strings.Contains(html, c.snippet) {
-			t.Errorf("dashboardHTMLv2 missing %s: expected to find %q", c.desc, c.snippet)
+			t.Errorf("dashboardHTML missing %s: expected to find %q", c.desc, c.snippet)
 		}
 	}
 }
 
-// TestDashboardHTMLv2_ContainsExperimentalMarker asserts the experimental
-// marker comment is present (regression guard for the G9 boundary comment).
-func TestDashboardHTMLv2_ContainsExperimentalMarker(t *testing.T) {
-	if !strings.Contains(dashboardHTMLv2, "G9-") {
-		t.Error("dashboardHTMLv2 missing G9- marker comments")
+// TestDashboardHTML_ContainsG9Markers asserts the G9 boundary comments are
+// present (regression guard so future edits don't accidentally strip them).
+func TestDashboardHTML_ContainsG9Markers(t *testing.T) {
+	if !strings.Contains(dashboardHTML, "G9-") {
+		t.Error("dashboardHTML missing G9- marker comments")
 	}
-	if !strings.Contains(dashboardHTMLv2, "Experimental") {
-		t.Error("dashboardHTMLv2 missing Experimental label in sidebar")
+	if !strings.Contains(dashboardHTML, "G9 Analytics") {
+		t.Error("dashboardHTML missing G9 Analytics sidebar badge")
 	}
 }
 
 // TestDashboardHTMLv2_PeriodDefaultValues asserts that the period selector
 // option values match the spec (7d, 28d, 90d, custom).
 func TestDashboardHTMLv2_PeriodDefaultValues(t *testing.T) {
-	html := dashboardHTMLv2
+	html := dashboardHTML
 	for _, val := range []string{`value="7d"`, `value="28d"`, `value="90d"`, `value="custom"`} {
 		if !strings.Contains(html, val) {
-			t.Errorf("dashboardHTMLv2 period selector missing option %s", val)
+			t.Errorf("dashboardHTML period selector missing option %s", val)
 		}
 	}
 }
