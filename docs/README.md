@@ -1,61 +1,67 @@
-# dandori-cli — Handover
+# dandori-cli — Documentation
 
-> Đọc 3 file này là đủ nắm repo. Tổng ~15 phút.
+> CLI outer harness cho mô hình **PO/PDM + QA + AI agent** vận hành dự án phần mềm. Wrap Claude Code, track mọi run, tích hợp Jira + Confluence, dashboard 3-level analytics.
 
-## 1. Abstract — outer harness là gì (5 phút)
-
-[`../../dandori-pitch/outer-harness.md`](../../dandori-pitch/outer-harness.md)
-
-Công ty 50 dev, hoá đơn AI $10K/tháng, không ai trả lời được tiền đi đâu, agent nào commit code sai, team A/B team nào hiệu quả hơn. Đó không phải lỗi AI — là thiếu **lớp hạ tầng quản lý** quanh AI: cost, audit, task tracking, quality gates, knowledge flow. Lớp đó là **outer harness**. Dandori là hiện thực hóa lớp đó.
-
-## 2. Vision — repo này giải gì (3 phút)
-
-[`../CLAUDE.md`](../CLAUDE.md)
-
-- CLI outer harness: wrap Claude Code, track mọi run, tích hợp Jira + Confluence, analytics đa cấp.
-- **Chứng minh**: công ty phần mềm có thể vận hành bởi **PO/PDM + QA + AI agent**, không cần human developer.
-- Design principles: wrapper non-negotiable, Jira là task board, Confluence là knowledge store, single binary, offline-capable.
-
-## 3. Current State — đang ở đâu (5 phút)
-
-[`status-assessment.md`](status-assessment.md)
-
-- **v0.3.0** đã publish · 8/8 phase done · **~88% vision**
-- 5 Pillars: Cost 100% · Task Tracking 100% · Audit 100% · Quality 75% · Knowledge Flow 55%
-- 5 business questions outer-harness đặt ra → 4/5 trả lời được bằng 1 command; câu cuối (knowledge retention) chỉ partial qua Confluence reports.
-- **Hackday prep (2026-04-25)**: tailer timing fix · `analytics all` 4-block snapshot · engineer/department group-by · demo seed · rehearsal script (xem [devlog 2026-04-25](devlog/2026-04-25-hackday-prep-and-snapshot-fix.md)).
-- Known gaps (ưu tiên giảm dần): multi-agent · context inheritance · skill library · homebrew tap.
+**Current**: v0.8.0 · 858 unit tests · 24 packages · vision coverage ~97%
 
 ---
 
-## Khi cần đào sâu
+## Cho người dùng (engineer · PO/PDM · QA)
 
-| Cần gì | Đọc |
+| Nếu bạn cần... | Đọc |
 |---|---|
-| Install + config | [`setup-guide.md`](setup-guide.md) |
-| Cách dùng theo use case | [`user-guide.md`](user-guide.md) |
-| Gặp lỗi | [`faq.md`](faq.md) |
-| Architecture đầy đủ + 8 phase chi tiết | [`../../plans/260418-1301-dandori-cli/plan.md`](../../plans/260418-1301-dandori-cli/plan.md) |
-| Lịch sử implement + quyết định | [`devlog/`](devlog/) |
-| Release quy trình | [`release-setup.md`](release-setup.md) |
-| Hackday demo flow (3 phút, 1 command/stage) | [`hackday-demo-script.md`](hackday-demo-script.md) |
-| AI đã build repo này thế nào | [`ck-tools-usage.md`](ck-tools-usage.md) |
+| Cài đặt + cấu hình lần đầu | [01-setup-guide.md](01-setup-guide.md) |
+| Sử dụng theo từng use case | [02-user-guide.md](02-user-guide.md) |
+| Gặp lỗi / troubleshoot | [03-faq.md](03-faq.md) |
+| Hiểu giá trị 4 release gần nhất (v0.5.0 → v0.8.0) | [04-release-summary-v0.5.0-to-v0.8.0.md](04-release-summary-v0.5.0-to-v0.8.0.md) |
+| Vision · giá trị enterprise scale · gap còn lại | [06-vision-and-roadmap.md](06-vision-and-roadmap.md) |
+| Lịch sử thay đổi chi tiết | [../CHANGELOG.md](../CHANGELOG.md) |
+
+## Cho stakeholder (lead · sponsor · audit)
+
+- **Tầm nhìn**: [outer-harness](https://phuc-nt.github.io/dandori-pitch/outer-harness.html) — vì sao cần lớp quản lý quanh AI agent
+- **Giá trị đã giao**: [04-release-summary-v0.5.0-to-v0.8.0.md](04-release-summary-v0.5.0-to-v0.8.0.md) — 4 release đóng câu hỏi gì cho PO/QA
+- **Roadmap + giá trị enterprise**: [06-vision-and-roadmap.md](06-vision-and-roadmap.md) — ROI ở scale 9,000 active AI users + 6 gap chi tiết
+- **Bằng chứng vận hành**: [../CHANGELOG.md](../CHANGELOG.md) + [devlog/](devlog/) — release cadence + bài học triển khai
+
+## Cho maintainer (contribute · release · debug)
+
+| Nếu bạn cần... | Đọc |
+|---|---|
+| Quy trình release (tag → goreleaser → Homebrew tap) | [05-release-setup.md](05-release-setup.md) |
+| Devlog từng release (v0.5.0 → v0.8.0) | [devlog/](devlog/) |
+| Architecture + 8 phase implementation | [../../plans/260418-1301-dandori-cli/plan.md](../../plans/260418-1301-dandori-cli/plan.md) |
+| Convention code Go + thiết kế nguyên tắc | [../CLAUDE.md](../CLAUDE.md) |
+
+## Reference (deep-dive theo feature)
+
+| Feature | Module |
+|---|---|
+| **G6** — DORA + Rework Rate export | [reference/01-metric-export.md](reference/01-metric-export.md) |
+| **G7** — Agent contribution attribution | [reference/02-agent-attribution.md](reference/02-agent-attribution.md) |
+| **G8** — Intent preservation (RCA via incident-report) | [reference/03-intent-preservation.md](reference/03-intent-preservation.md) |
+
+---
 
 ## Source code điểm vào
 
 ```
-cmd/dandori/        → CLI entry + subcommands
-internal/runner/    → 3-layer instrumentation, session tailer (trọng tâm)
-internal/store/     → SQLite schema + queries
-internal/jira/      → Jira client, poller
-internal/analytics/ → 8 query types
-internal/quality/   → Lint/test delta, commit scoring
+cmd/                  → CLI entry + subcommands (dashboard, task, analytics, ...)
+internal/runner/      → 3-layer instrumentation, session tailer
+internal/store/       → SQLite schema + queries
+internal/jira/        → Jira client, poller
+internal/confluence/  → Confluence read/write
+internal/analytics/   → query types, alerts, KPI
+internal/server/      → G9 dashboard handlers + g10 expansion
+internal/intent/      → G8 extraction
+internal/attribution/ → G7 line-blame + intervention classifier
+internal/metric/      → G6 DORA exporter
 ```
 
 ## Smoke test
 
 ```bash
-make build && make test && make lint
+make build && make test
 ./bin/dandori version
-./bin/dandori task run PROJ-123 --dry-run
+./bin/dandori dashboard   # → http://localhost:8088
 ```

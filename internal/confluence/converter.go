@@ -26,6 +26,15 @@ var (
 	codeRe     = regexp.MustCompile(`(?s)<ac:structured-macro[^>]*ac:name="code"[^>]*>.*?<ac:parameter[^>]*ac:name="language"[^>]*>([^<]*)</ac:parameter>.*?<ac:plain-text-body><!\[CDATA\[(.*?)\]\]></ac:plain-text-body>.*?</ac:structured-macro>`)
 	codeSimple = regexp.MustCompile(`(?s)<ac:structured-macro[^>]*ac:name="code"[^>]*>.*?<ac:plain-text-body><!\[CDATA\[(.*?)\]\]></ac:plain-text-body>.*?</ac:structured-macro>`)
 	stripTags  = regexp.MustCompile(`<[^>]*>`)
+
+	// Promoted from function bodies to avoid per-call recompilation.
+	reMultiNewline  = regexp.MustCompile(`\n{3,}`)
+	reTablePattern  = regexp.MustCompile(`(?s)<table[^>]*>(.*?)</table>`)
+	reRowPattern    = regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
+	reHeaderPattern = regexp.MustCompile(`(?s)<th[^>]*>(.*?)</th>`)
+	reDataPattern   = regexp.MustCompile(`(?s)<td[^>]*>(.*?)</td>`)
+	reBold          = regexp.MustCompile(`\*\*([^*]+)\*\*`)
+	reItalic        = regexp.MustCompile(`\*([^*]+)\*`)
 )
 
 func StorageToMarkdown(storage string) string {
@@ -68,7 +77,7 @@ func StorageToMarkdown(storage string) string {
 	md = html.UnescapeString(md)
 
 	// Clean up whitespace
-	md = regexp.MustCompile(`\n{3,}`).ReplaceAllString(md, "\n\n")
+	md = reMultiNewline.ReplaceAllString(md, "\n\n")
 	md = strings.TrimSpace(md)
 
 	return md
@@ -105,12 +114,8 @@ func convertLists(s string) string {
 }
 
 func convertTables(s string) string {
-	// Use (?s) flag for dotall mode
-	tablePattern := regexp.MustCompile(`(?s)<table[^>]*>(.*?)</table>`)
-
-	return tablePattern.ReplaceAllStringFunc(s, func(table string) string {
-		rowPattern := regexp.MustCompile(`(?s)<tr[^>]*>(.*?)</tr>`)
-		rows := rowPattern.FindAllStringSubmatch(table, -1)
+	return reTablePattern.ReplaceAllStringFunc(s, func(table string) string {
+		rows := reRowPattern.FindAllStringSubmatch(table, -1)
 		if len(rows) == 0 {
 			return ""
 		}
@@ -123,8 +128,7 @@ func convertTables(s string) string {
 
 			// Get cells (th or td)
 			var cells []string
-			headerPattern := regexp.MustCompile(`(?s)<th[^>]*>(.*?)</th>`)
-			headers := headerPattern.FindAllStringSubmatch(row[1], -1)
+			headers := reHeaderPattern.FindAllStringSubmatch(row[1], -1)
 			if len(headers) > 0 {
 				for _, h := range headers {
 					if len(h) > 1 {
@@ -132,8 +136,7 @@ func convertTables(s string) string {
 					}
 				}
 			} else {
-				dataPattern := regexp.MustCompile(`(?s)<td[^>]*>(.*?)</td>`)
-				data := dataPattern.FindAllStringSubmatch(row[1], -1)
+				data := reDataPattern.FindAllStringSubmatch(row[1], -1)
 				for _, d := range data {
 					if len(d) > 1 {
 						cells = append(cells, strings.TrimSpace(stripTags.ReplaceAllString(d[1], "")))
@@ -238,11 +241,8 @@ func MarkdownToStorage(md string) string {
 			content := line
 
 			// Bold and italic
-			boldRe := regexp.MustCompile(`\*\*([^*]+)\*\*`)
-			content = boldRe.ReplaceAllString(content, "<strong>$1</strong>")
-
-			italicRe := regexp.MustCompile(`\*([^*]+)\*`)
-			content = italicRe.ReplaceAllString(content, "<em>$1</em>")
+			content = reBold.ReplaceAllString(content, "<strong>$1</strong>")
+			content = reItalic.ReplaceAllString(content, "<em>$1</em>")
 
 			storage.WriteString("<p>" + content + "</p>")
 		}

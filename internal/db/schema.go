@@ -1,6 +1,6 @@
 package db
 
-const SchemaVersion = 6
+const SchemaVersion = 7
 
 const SchemaSQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS quality_metrics (
 );
 
 CREATE INDEX IF NOT EXISTS idx_runs_jira ON runs(jira_issue_key);
+CREATE INDEX IF NOT EXISTS idx_runs_started_at ON runs(started_at);
 CREATE INDEX IF NOT EXISTS idx_runs_synced ON runs(synced) WHERE synced = 0;
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
 CREATE INDEX IF NOT EXISTS idx_runs_engineer ON runs(engineer_name);

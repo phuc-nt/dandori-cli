@@ -21,10 +21,16 @@ func Open(path string) (*LocalDB, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
+	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=mmap_size(134217728)&_pragma=temp_store(MEMORY)&_pragma=cache_size(-64000)")
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+
+	// SQLite requires a single writer connection. Setting MaxOpenConns=1
+	// prevents SQLITE_BUSY under concurrent dashboard + CLI use.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)
 
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("ping db: %w", err)

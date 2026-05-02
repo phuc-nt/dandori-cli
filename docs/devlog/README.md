@@ -1,60 +1,30 @@
-# dandori-cli Development Log
+# dandori-cli Devlog
 
-Development history organized by date and topic.
+Chỉ giữ devlog **per-release** từ v0.5.0 trở đi. Chi tiết phase-level pre-v0.5 đã được tổng hợp trong [release-summary](../04-release-summary-v0.5.0-to-v0.8.0.md) và [CHANGELOG](../../CHANGELOG.md).
 
-## 2026-04-18 — Initial Implementation
+## Release devlogs
 
-| File | Topics | Status |
-|------|--------|--------|
-| [phase-01-03](2026-04-18-phase-01-03.md) | Foundation, Wrapper, Jira | ✅ |
-| [phase-04-05](2026-04-18-phase-04-05.md) | Confluence, Server | ✅ |
-| [phase-06-07](2026-04-18-phase-06-07.md) | Assignment, Analytics | ✅ |
-| [phase-08-final](2026-04-18-phase-08-final.md) | E2E, Integration, Summary | ✅ |
-| [shell-alias-watch](2026-04-18-shell-alias-watch-daemon.md) | Shell transparency + watch daemon | ✅ |
+| Date | Release | Topic |
+|---|---|---|
+| 2026-04-30 | [v0.5.0](2026-04-30-v0.5.0-release.md) | G6 DORA + Rework Rate exporter, G7 agent contribution attribution |
+| 2026-04-30 | [v0.6.0](2026-04-30-v0.6.0-release.md) | G8 intent preservation — 3 event types + `incident-report` + Jira G8 sections |
+| 2026-05-01 | [v0.7.0](2026-05-01-v0.7.0-release.md) | G9 dashboard GA — 3-level surface, DORA scorecard, attribution composite, mobile-responsive |
+| 2026-05-01 | [v0.8.0](2026-05-01-v0.8.0-release.md) | G10 dashboard expansion — KPI strip, alerts banner, sparklines, leaderboard, rework tile |
 
-## 2026-04-19 — Context Injection + Session Detection
+## Stats (current)
 
-| File | Topics | Status |
-|------|--------|--------|
-| [context-injection](2026-04-19-context-injection.md) | Task context flow | ✅ |
-| [session-detection-fix](2026-04-19-session-detection-fix.md) | Wrapper session ID detection | ✅ |
+- **858 unit tests** across 24 packages
+- **Vision coverage**: ~97% của outer-harness pillars
+- **Released cadence**: 4 release trong 2 tuần (Apr 18 → May 1)
 
-## 2026-04-25 — Hackday Prep
+## Cách viết devlog mới
 
-| File | Topics | Status |
-|------|--------|--------|
-| [hackday-prep-and-snapshot-fix](2026-04-25-hackday-prep-and-snapshot-fix.md) | 5 phases + tokens=0 regression fix | ✅ |
+Khi release tag mới, tạo file `YYYY-MM-DD-vX.Y.Z-release.md` theo template của [v0.8.0](2026-05-01-v0.8.0-release.md):
 
-## 2026-04-26 — Tracking Layer-3 Completion
+1. **What shipped** — bullet feature + impact 1 dòng
+2. **Phase ship order** — bảng commit hash + scope
+3. **Test posture** — số tests, browser sweep, live-test cross-check
+4. **Lessons** — chỉ ghi điều mới học được lần này
+5. **Docs updated** + **Plan reference** + **Open items deferred**
 
-| File | Topics | Status |
-|------|--------|--------|
-| [tracking-layer-3-completion](2026-04-26-tracking-layer-3-completion.md) | tool/skill events, confluence.read, iteration tracking, bug-link core, analytics queries | ✅ 4/5 phases live |
-
-## 2026-04-29 — DORA + Rework Rate Exporter (G6)
-
-| File | Topics | Status |
-|------|--------|--------|
-| [dora-rework-exporter](2026-04-29-dora-rework-exporter.md) | `dandori metric export`, 5 metrics, faros/oobeya/raw, httptest E2E + dogfood live | ✅ 6/6 phases live |
-
-## Progress
-
-**Overall: 97/97 items = 100%**
-
-| Phase | Status |
-|-------|--------|
-| 01 Foundation | ✅ |
-| 02 Agent Wrapper | ✅ |
-| 03 Jira Integration | ✅ |
-| 04 Confluence Integration | ✅ |
-| 05 Monitoring Server | ✅ |
-| 06 Agent Assignment | ✅ |
-| 07 Analytics | ✅ |
-| 08 E2E Flow | ✅ |
-
-## Stats
-
-- 308 tests pass
-- ~5500 LOC
-- 90 Go files
-- 15 packages
+Mục tiêu: future-you (hoặc maintainer mới) đọc 1 file là đủ ngữ cảnh release.

@@ -406,4 +406,4 @@ If tokens show as 0, check:
 
 ## Troubleshooting
 
-See [FAQ](faq.md) for known issues and fixes.
+See [FAQ](03-faq.md) for known issues and fixes.

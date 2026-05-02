@@ -55,6 +55,10 @@ var decisionPatterns = []*regexp.Regexp{
 // patternCount must equal len(decisionPatterns) — used for index-based dispatch.
 const patternCount = 5
 
+// followUpRe matches confirming phrases after a "could either…or…" candidate block.
+// Promoted to package-level to avoid per-call recompilation inside findFollowUp.
+var followUpRe = regexp.MustCompile(`(?i)(?:decided|chose|choosing|going with|i'?ll (?:go with|use)|will use)\s+(.+?)(?:\.|,|$)`)
+
 // ExtractDecisions scans reasoning blocks for decision patterns and returns
 // up to maxDecisionsPerRun Decision values. The cap is enforced early so that
 // iteration stops once the limit is reached. Blocks with no matching pattern
@@ -148,8 +152,6 @@ func ExtractDecisions(blocks []ReasoningBlock) []Decision {
 // that confirms a decision ("decided", "chose", "going with", "I'll go with",
 // "use X"). Returns the captured noun phrase, or "" if not found.
 func findFollowUp(blocks []ReasoningBlock, startIdx, maxLook int) string {
-	followUpRe := regexp.MustCompile(`(?i)(?:decided|chose|choosing|going with|i'?ll (?:go with|use)|will use)\s+(.+?)(?:\.|,|$)`)
-
 	for i := startIdx; i < len(blocks) && i < startIdx+maxLook; i++ {
 		sub := followUpRe.FindStringSubmatch(blocks[i].Text)
 		if sub != nil {

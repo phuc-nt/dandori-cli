@@ -2,7 +2,7 @@ BINARY_NAME=dandori
 VERSION?=dev
 COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS=-ldflags "-X github.com/phuc-nt/dandori-cli/cmd.Version=$(VERSION) -X github.com/phuc-nt/dandori-cli/cmd.Commit=$(COMMIT) -X github.com/phuc-nt/dandori-cli/cmd.BuildDate=$(BUILD_DATE)"
+LDFLAGS=-ldflags "-s -w -X github.com/phuc-nt/dandori-cli/cmd.Version=$(VERSION) -X github.com/phuc-nt/dandori-cli/cmd.Commit=$(COMMIT) -X github.com/phuc-nt/dandori-cli/cmd.BuildDate=$(BUILD_DATE)"
 
 .PHONY: build test lint clean install deps rehearsal rehearsal-live rehearsal-e2e
 
@@ -10,7 +10,7 @@ build:
 	go build $(LDFLAGS) -o bin/$(BINARY_NAME) .
 
 build-server:
-	go build $(LDFLAGS) -o bin/$(BINARY_NAME)-server ./cmd/server
+	go build -tags server $(LDFLAGS) -o bin/$(BINARY_NAME)-server ./cmd/server
 
 build-all: build build-server
 

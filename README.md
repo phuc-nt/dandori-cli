@@ -64,7 +64,7 @@ claude "fix the auth bug"
 dandori dashboard
 ```
 
-See [User Guide](docs/user-guide.md) for step-by-step use cases.
+See [User Guide](docs/02-user-guide.md) for step-by-step use cases.
 
 ## Commands
 
@@ -142,9 +142,9 @@ See [User Guide](docs/user-guide.md) for step-by-step use cases.
 
 ## Documentation
 
-- [User Guide](docs/user-guide.md) — Step-by-step use cases
-- [Setup Guide](docs/setup-guide.md) — Config and first run
-- [FAQ](docs/faq.md) — Troubleshooting
+- [User Guide](docs/02-user-guide.md) — Step-by-step use cases
+- [Setup Guide](docs/01-setup-guide.md) — Config and first run
+- [FAQ](docs/03-faq.md) — Troubleshooting
 - [Devlog](docs/devlog/) — Development history
 - [Changelog](CHANGELOG.md) — Version history
 

@@ -134,7 +134,7 @@ The report includes:
 - `## Reasoning Trace` — top reasoning blocks (plain text)
 - `## Diff Stats`, `## Tool / Skill Usage`, `## Quality` — existing sections
 
-See `docs/user-guide.md` for the full command reference.
+See `docs/02-user-guide.md` for the full command reference.
 
 ---
 
@@ -196,6 +196,6 @@ EventTypeDecisionPoint   = "decision.point"
 
 ## See Also
 
-- [Agent Attribution (G7)](agent-attribution.md) — line-level blame + intervention classifier
-- [DORA + Rework Rate Export (G6)](metric-export.md) — 5 engineering metrics, 3 wire formats
-- [User Guide](user-guide.md) — full command reference including `incident-report`
+- [Agent Attribution (G7)](02-agent-attribution.md) — line-level blame + intervention classifier
+- [DORA + Rework Rate Export (G6)](01-metric-export.md) — 5 engineering metrics, 3 wire formats
+- [User Guide](../02-user-guide.md) — full command reference including `incident-report`

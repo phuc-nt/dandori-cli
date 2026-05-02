@@ -26,16 +26,18 @@ func wowCostSpike(store Store, projectKey string) ([]Card, error) {
 	if err != nil {
 		return nil, fmt.Errorf("wow cost spike query: %w", err)
 	}
-	defer rows.Close()
 
 	var thisWeek, lastWeek float64
 	if rows.Next() {
 		if err := rows.Scan(&thisWeek, &lastWeek); err != nil {
+			rows.Close()
 			return nil, fmt.Errorf("wow cost spike scan: %w", err)
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("wow cost spike rows: %w", err)
+	rowsErr := rows.Err()
+	rows.Close() // explicit close before next query — required with MaxOpenConns=1
+	if rowsErr != nil {
+		return nil, fmt.Errorf("wow cost spike rows: %w", rowsErr)
 	}
 
 	// Must exceed noise floor and ratio threshold.

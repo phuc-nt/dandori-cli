@@ -95,5 +95,5 @@ Insufficient data semantics match v0.5.0: zero rows in window → block is `null
 
 ## See Also
 
-- [Agent Attribution (G7)](agent-attribution.md) — line-level blame + intervention classifier
-- [Intent Preservation (G8)](intent-preservation.md) — captures *why* the agent ran: first user message, design decisions, spec links
+- [Agent Attribution (G7)](02-agent-attribution.md) — line-level blame + intervention classifier
+- [Intent Preservation (G8)](03-intent-preservation.md) — captures *why* the agent ran: first user message, design decisions, spec links

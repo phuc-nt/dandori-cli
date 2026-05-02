@@ -1,8 +1,10 @@
 package wrapper
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"io"
 
 	"github.com/phuc-nt/dandori-cli/internal/db"
 )
@@ -17,19 +19,22 @@ type MessageCounts struct {
 	Approvals     int // human texts <30 chars after at least one agent tool_use
 }
 
-// aggregateMessageCounts walks a JSONL transcript byte slice and returns the
-// counts. Stateful: tracks whether we've seen an agent tool_use yet so the
-// classifier can distinguish initial framing from mid-session feedback.
-// Malformed or unrecognised lines are skipped silently — the tailer reads
-// while Claude is still writing, so half-flushed records must not poison
-// the count.
-func aggregateMessageCounts(jsonl []byte) MessageCounts {
+// aggregateMessageCountsFromReader streams a JSONL transcript from r and
+// returns the message counts. Uses bufio.Scanner to avoid loading the full
+// transcript into memory — important for long Claude sessions (2–5 MB JSONL).
+// MaxScanTokenSize is set to 4 MB to match the cap used by intent.Walk.
+// Malformed or unrecognised lines are skipped silently.
+func aggregateMessageCountsFromReader(r io.Reader) MessageCounts {
 	var counts MessageCounts
 	seenAgentTool := false
 	humanSeen := 0
 
-	for _, line := range bytes.Split(jsonl, []byte("\n")) {
-		if len(bytes.TrimSpace(line)) == 0 {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024) // initial 64 KB, max 4 MB per line
+
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
 			continue
 		}
 
@@ -82,6 +87,13 @@ func aggregateMessageCounts(jsonl []byte) MessageCounts {
 	}
 
 	return counts
+}
+
+// aggregateMessageCounts walks a JSONL transcript byte slice and returns the
+// counts. Delegates to aggregateMessageCountsFromReader — kept for
+// backward-compatibility with tests that supply []byte fixtures directly.
+func aggregateMessageCounts(jsonl []byte) MessageCounts {
+	return aggregateMessageCountsFromReader(bytes.NewReader(jsonl))
 }
 
 func hasTextPart(parts []contentPart) bool {

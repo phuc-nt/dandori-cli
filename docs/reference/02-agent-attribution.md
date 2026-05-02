@@ -71,5 +71,5 @@ Attribution is computed automatically by `dandori task run` and `dandori task do
 
 ## See Also
 
-- [Intent Preservation (G8)](intent-preservation.md) — captures *why* the agent ran: first user message, design decisions, spec links
-- [DORA + Rework Rate Export (G6)](metric-export.md) — 5 engineering metrics, 3 wire formats
+- [Intent Preservation (G8)](03-intent-preservation.md) — captures *why* the agent ran: first user message, design decisions, spec links
+- [DORA + Rework Rate Export (G6)](01-metric-export.md) — 5 engineering metrics, 3 wire formats

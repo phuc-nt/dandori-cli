@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-05-02
+
+Performance + DX patch. No new features, no breaking changes. Binary size 22MB → 14MB (-36%).
+
+### Performance
+
+- **Strip symbols**: `Makefile` adds `-ldflags="-s -w"` (-7MB).
+- **pgx build-tag split**: `//go:build server` on 14 files in `internal/{analytics,assignment,server}` + `cmd/server`. CLI binary no longer links pgx (-1MB). Server build now requires `make build-server` (passes `-tags server`).
+- **Regex package-level cache**: hoisted 7 regex in `internal/confluence/converter.go` and 1 in `internal/intent/decisions.go` out of hot loops — no per-call recompile.
+- **SQLite tuning** (`internal/db/local.go`): `synchronous=NORMAL`, `mmap_size=128MB`, `temp_store=MEMORY`, `cache_size=64MB`. Connection pool serialized (`SetMaxOpenConns(1)`) to match WAL writer model.
+- **JSONL streaming** (`internal/wrapper/message_counter.go`, `wrapper.go`): G7 path now uses `os.Open` + `bufio.Scanner` (4MB max line) instead of `os.ReadFile`. Memory peak stable for large sessions.
+- **Index** (migration v6→v7): `idx_runs_started_at` for analytics range scans.
+
+### Fixed
+
+- **Latent deadlock** in `internal/insights/insights_cost.go` `wowCostSpike`: explicit `rows.Close()` before nested `topCostContributor` query — exposed by pool size 1.
+
+### Tests
+
+- New benchmark suite (was zero before): 4 files, 29 benchmarks across `internal/{intent,wrapper,confluence}`. Includes 1MB JSONL fixture for regression.
+- Profile on 86MB session: parse 470ms, peak RAM 64.6MB, throughput 183 MB/sec.
+
+### Docs
+
+- Restructure `docs/` by audience (user · stakeholder · maintainer) with numeric prefix ordering.
+- New: `docs/04-release-summary-v0.5.0-to-v0.8.0.md`, `docs/06-vision-and-roadmap.md` (enterprise-scale ROI + 6 gaps), `docs/reference/` (G6/G7/G8 deep-dive).
+- Removed 16 stale files (12 pre-v0.5 micro-phase devlogs + status-assessment, hackday-demo-script, onboarding, ck-tools-usage).
+
 ## [0.8.0] — 2026-05-01
 
 G10 dashboard expansion: closes 5 high-impact data gaps from the G9 GA audit (engineer KPI strip, org alerts banner, DORA history sparklines, mix leaderboard, rework rate) plus 1 P0 mislabel fix (Iteration Distribution rewire to actual round counts). No schema migration — all features additive on existing tables.
@@ -107,7 +135,7 @@ Additional changes:
 - **`dandori incident-report --task <key>`** — multi-run aggregation across all runs for a Jira task: cross-run summary + per-run blocks.
 - **Jira completion comment extension** (`jira-sync`) — when `intent.extracted` exists for a run, the comment gains `h3. Intent` and `h3. Key Decisions` sections. Falls back silently to pre-G8 format for legacy runs.
 - **Env gate** `DANDORI_INTENT_DISABLED=1` — skips all extraction; no Layer-4 events written; Jira comment and incident report render without G8 sections.
-- See [`docs/intent-preservation.md`](docs/intent-preservation.md) for event schema, heuristic limitations, privacy notes, and v2 roadmap.
+- See [`docs/reference/03-intent-preservation.md`](docs/reference/03-intent-preservation.md) for event schema, heuristic limitations, privacy notes, and v2 roadmap.
 
 ### Fixed
 
@@ -128,18 +156,18 @@ Enterprise measurement layer: DORA + Rework Rate exporter (G6) and agent contrib
   - Lead time uses NIST linear-interpolation percentiles (p50/p75/p90); MTTR reports p50/p90 + ongoing-incident count
   - Rework Rate uses 10% threshold with strict `>` (10/100 = NOT exceeding); threshold version stamped (`v1-2026Q2`)
   - Reports `tickets_without_in_progress` count in `data_quality` so process gaps surface
-- See [`docs/metric-export.md`](docs/metric-export.md) for command reference + config schema.
+- See [`docs/reference/01-metric-export.md`](docs/reference/01-metric-export.md) for command reference + config schema.
 
 ### Added — Agent contribution attribution (G7)
 - **`dandori metric export --include-attribution`** — per-task accounting of agent vs human code contribution, plus aggregate intervention/iteration/cost percentiles:
   - **Line-level attribution** via `git blame` at the final HEAD when Jira moved to Done. Each line's introducing commit is membership-tested against the union of session-reachable commits (`rev-list HeadBefore..HeadAfter`); pre-session baseline lines are excluded from totals
-  - **Intervention classifier** (v1 heuristic): human text ≥30 chars after agent tool use = intervention, <30 = approval. Documented as a proxy in [`docs/agent-attribution.md`](docs/agent-attribution.md)
+  - **Intervention classifier** (v1 heuristic): human text ≥30 chars after agent tool use = intervention, <30 = approval. Documented as a proxy in [`docs/reference/02-agent-attribution.md`](docs/reference/02-agent-attribution.md)
   - **Computed BEFORE Jira transition** — `dandori task run` (auto-flow) and `dandori task done` (manual) both write the `task_attribution` row before calling `TransitionToDone`. Failure is non-fatal so observability never blocks the Jira move
   - 6 fields surfaced in the export block: `agent_autonomy_rate` (share of tasks with `intervention_rate < 0.2`), `agent_code_retention_p50/p90`, `intervention_rate_p50`, `iterations_p50/p90`, `cost_per_retained_line_usd_p50`, `session_outcomes` (merged histogram of `agent_finished` / `user_interrupted` / `error`)
   - Insufficient-data semantics: zero rows in window → block is `null` and `task_attribution` is added to `data_quality.insufficient_data`
   - Backwards-compat: without the flag, output is byte-for-byte identical to G6 dashboards
 - **SQLite migration v4 → v6**: `task_attribution` table + 5 new `runs` columns (`session_end_reason`, `human_message_count`, `agent_message_count`, `human_intervention_count`, `human_approval_count`); v5 → v6 backfills `jira_done_at` to UTC `Z` for window-scan correctness
-- See [`docs/agent-attribution.md`](docs/agent-attribution.md) for definitions, output schema, three named limitations (format reflow, cross-repo, heuristic threshold), and 6 example questions.
+- See [`docs/reference/02-agent-attribution.md`](docs/reference/02-agent-attribution.md) for definitions, output schema, three named limitations (format reflow, cross-repo, heuristic threshold), and 6 example questions.
 
 ### Fixed
 - **`go-build*` temp-dir leak** (high severity): `dandori run` with `quality.enabled=true` (the previous default) spawned `go test` whose 30s SIGKILL timeout prevented the Go toolchain from cleaning up its scratch dirs. One user accumulated ~43k dirs / ~199 GB in `$TMPDIR`. Three-part fix:

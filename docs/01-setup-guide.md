@@ -156,7 +156,7 @@ DANDORI_DB_HOST=localhost ./bin/dandori-server
 
 ## Next Steps
 
-- Read [User Guide](user-guide.md) for step-by-step use cases
-- Read [FAQ](faq.md) for common issues
+- Read [User Guide](02-user-guide.md) for step-by-step use cases
+- Read [FAQ](03-faq.md) for common issues
 - Check `dandori --help` for all commands
 - See [devlog/](devlog/) for implementation details

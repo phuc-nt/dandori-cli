@@ -209,11 +209,13 @@ func Run(ctx context.Context, localDB *db.LocalDB, opts Options) (*Result, error
 	}
 
 	// G7: re-read the JSONL transcript once session is complete and persist
-	// the message counters that drive intervention_rate. Failures non-fatal —
-	// attribution is observability, must not break the run.
+	// the message counters that drive intervention_rate. Streamed via
+	// bufio.Scanner to avoid loading the full transcript into RAM.
+	// Failures non-fatal — attribution is observability, must not break the run.
 	if logPath := GetSessionLogPath(cwd, sessionSnapshot); logPath != "" {
-		if data, err := os.ReadFile(logPath); err == nil {
-			counts := aggregateMessageCounts(data)
+		if f, err := os.Open(logPath); err == nil {
+			counts := aggregateMessageCountsFromReader(f)
+			_ = f.Close()
 			if err := persistMessageCounts(localDB, runID, counts); err != nil {
 				slog.Warn("persist message counts failed", "run_id", runID, "error", err)
 			} else {
