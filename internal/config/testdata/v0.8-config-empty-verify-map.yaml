@@ -1,0 +1,6 @@
+server_url: http://localhost:8080
+log_level: info
+agent:
+  type: claude_code
+  name: default
+verify: {}

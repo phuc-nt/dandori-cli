@@ -140,7 +140,7 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	runID := util.GenerateRunID()
 	if err := insertPendingRun(localDB, runID, issueKey, ""); err != nil {
 		// Non-fatal: tracking degrades to wrapper-managed insert.
-		fmt.Printf("Warning: pre-create run row failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: pre-create run row failed: %v\n", err)
 	}
 	recorder := event.NewRecorder(localDB)
 
@@ -149,7 +149,9 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	var taskDescription string
 	var taskLabels []string
 	if !taskRunNoContext {
-		fmt.Printf("Fetching context for %s...\n", issueKey)
+		if !Quiet() {
+			fmt.Printf("Fetching context for %s...\n", issueKey)
+		}
 
 		fetcher := taskcontext.NewFetcher(jiraClient, confClient).WithRecorder(recorder, runID)
 		taskCtx, err := fetcher.Fetch(ctx, issueKey)
@@ -160,19 +162,21 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		// Backfill engineer_name now that we have the Jira issue assignee.
 		if taskCtx.Assignee != "" {
 			if updErr := updateRunEngineerName(localDB, runID, taskCtx.Assignee); updErr != nil {
-				fmt.Printf("Warning: set engineer_name failed: %v\n", updErr)
+				fmt.Fprintf(os.Stderr, "Warning: set engineer_name failed: %v\n", updErr)
 			}
 		}
 
 		taskDescription = taskCtx.Description // Save for AC extraction later
 		taskLabels = taskCtx.Labels           // Save for verify gate (skip-verify label)
 
-		fmt.Printf("  Issue: %s\n", taskCtx.Summary)
-		fmt.Printf("  Type: %s | Priority: %s | Status: %s\n", taskCtx.IssueType, taskCtx.Priority, taskCtx.Status)
-		if len(taskCtx.LinkedDocs) > 0 {
-			fmt.Printf("  Linked docs: %d\n", len(taskCtx.LinkedDocs))
-			for _, doc := range taskCtx.LinkedDocs {
-				fmt.Printf("    - %s\n", doc.Title)
+		if !Quiet() {
+			fmt.Printf("  Issue: %s\n", taskCtx.Summary)
+			fmt.Printf("  Type: %s | Priority: %s | Status: %s\n", taskCtx.IssueType, taskCtx.Priority, taskCtx.Status)
+			if len(taskCtx.LinkedDocs) > 0 {
+				fmt.Printf("  Linked docs: %d\n", len(taskCtx.LinkedDocs))
+				for _, doc := range taskCtx.LinkedDocs {
+					fmt.Printf("    - %s\n", doc.Title)
+				}
 			}
 		}
 
@@ -193,16 +197,20 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		}
 		defer os.Remove(contextFile)
 
-		fmt.Printf("  Context written to: %s\n\n", contextFile)
+		if !Quiet() {
+			fmt.Printf("  Context written to: %s\n\n", contextFile)
+		}
 	}
 
 	// Capture git HEAD before run
 	gitHeadBefore := getGitHead()
 
 	// Transition Jira to In Progress
-	fmt.Printf("Starting task %s...\n", issueKey)
+	if !Quiet() {
+		fmt.Printf("Starting task %s...\n", issueKey)
+	}
 	if err := jiraClient.TransitionToRunning(issueKey, jira.DefaultStatusMapping); err != nil {
-		fmt.Printf("Warning: could not transition to In Progress: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: could not transition to In Progress: %v\n", err)
 	}
 
 	// Add start comment
@@ -216,7 +224,9 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 	// Build agent command with context
 	finalCmd := injectClaudeContext(agentCmd, contextFile)
 
-	fmt.Printf("Running: %v\n\n", finalCmd)
+	if !Quiet() {
+		fmt.Printf("Running: %v\n\n", finalCmd)
+	}
 
 	// Get quality config
 	qualityCfg := quality.DefaultConfig()
@@ -244,21 +254,25 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("run agent: %w", err)
 	}
 
-	fmt.Printf("\n--- Run Complete ---\n")
-	fmt.Printf("Run ID: %s\n", result.RunID)
-	fmt.Printf("Duration: %s\n", result.Duration)
-	fmt.Printf("Tokens: %d in / %d out\n", result.TokenUsage.Input, result.TokenUsage.Output)
-	fmt.Printf("Cost: $%.4f\n", result.CostUSD)
-	fmt.Printf("Exit code: %d\n", result.ExitCode)
+	if !Quiet() {
+		fmt.Printf("\n--- Run Complete ---\n")
+		fmt.Printf("Run ID: %s\n", result.RunID)
+		fmt.Printf("Duration: %s\n", result.Duration)
+		fmt.Printf("Tokens: %d in / %d out\n", result.TokenUsage.Input, result.TokenUsage.Output)
+		fmt.Printf("Cost: $%.4f\n", result.CostUSD)
+		fmt.Printf("Exit code: %d\n", result.ExitCode)
 
-	if result.NoCommitDetected {
-		fmt.Println("\n⚠️  Agent edited files but didn't commit. Attribution will count 0 agent lines.")
-		fmt.Println("    Commit the changes before 'dandori task done' to get accurate per-task attribution.")
+		if result.NoCommitDetected {
+			fmt.Println("\n⚠️  Agent edited files but didn't commit. Attribution will count 0 agent lines.")
+			fmt.Println("    Commit the changes before 'dandori task done' to get accurate per-task attribution.")
+		}
 	}
 
 	// Auto-sync if enabled
 	if !taskRunNoSync && result.ExitCode == 0 {
-		fmt.Println("\nSyncing to Jira...")
+		if !Quiet() {
+			fmt.Println("\nSyncing to Jira...")
+		}
 
 		// Get git changes (compare HEAD before vs after the run)
 		gitHeadAfter := getGitHead()
@@ -299,7 +313,9 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 		doneComment = appendGateVerdict(doneComment, gateRes)
 
 		jiraClient.AddComment(issueKey, doneComment)
-		fmt.Println("  ✓ Jira updated")
+		if !Quiet() {
+			fmt.Println("  ✓ Jira updated")
+		}
 
 		if gateRes.Pass {
 			// Attribution must be computed BEFORE the Jira transition so
@@ -308,25 +324,27 @@ func runTaskRun(cmd *cobra.Command, args []string) error {
 			finalHead := getFullGitHead()
 			if finalHead != "" {
 				if err := attribution.ComputeAndPersist(localDB, issueKey, ".", finalHead); err != nil {
-					fmt.Printf("Warning: attribution compute failed: %v\n", err)
+					fmt.Fprintf(os.Stderr, "Warning: attribution compute failed: %v\n", err)
 				}
 			}
 
 			if err := jiraClient.TransitionToDone(issueKey, jira.DefaultStatusMapping); err != nil {
-				fmt.Printf("Warning: could not transition to Done: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Warning: could not transition to Done: %v\n", err)
 			}
-			if gateRes.Skipped {
-				fmt.Printf("  ✓ Transitioned to Done (gate skipped: %s)\n", gateRes.Reason)
-			} else {
-				fmt.Println("  ✓ Transitioned to Done (gate passed)")
+			if !Quiet() {
+				if gateRes.Skipped {
+					fmt.Printf("  ✓ Transitioned to Done (gate skipped: %s)\n", gateRes.Reason)
+				} else {
+					fmt.Println("  ✓ Transitioned to Done (gate passed)")
+				}
 			}
 		} else {
-			fmt.Printf("  ⚠ Gate flagged: %s\n", gateRes.Reason)
-			fmt.Println("  ⚠ Leaving Jira ticket In Progress for human review.")
+			fmt.Fprintf(os.Stderr, "  ⚠ Gate flagged: %s\n", gateRes.Reason)
+			fmt.Fprintln(os.Stderr, "  ⚠ Leaving Jira ticket In Progress for human review.")
 		}
 
 		// Write Confluence report if configured
-		if cfg.Confluence.AutoPost && confClient != nil {
+		if cfg.Confluence.AutoPost && confClient != nil && !Quiet() {
 			fmt.Println("Writing Confluence report...")
 			fmt.Printf("  → Run: dandori conf-write --run %s\n", result.RunID)
 		}

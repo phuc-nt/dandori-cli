@@ -10,24 +10,27 @@
 ## Quick Start
 
 ```bash
-# 1. Build (or `go install github.com/phuc-nt/dandori-cli@latest`)
-go build -o bin/dandori .
+# 1. Install
+go install github.com/phuc-nt/dandori-cli@latest
+# or: brew install phuc-nt/dandori/dandori
 
-# 2. Initialize config + DB + shell aliases
-./bin/dandori init
+# 2. Full wizard (Jira email + token + Confluence space, test connection)
+dandori init
 
-# 3. Restart shell (or source rc) so `claude`/`codex` aliases load
-source ~/.zshrc   # or ~/.bashrc
-
-# 4. Edit config
-vim ~/.dandori/config.yaml
+# → Config + database created, ready to use immediately
 ```
 
-**Skip shell aliases:** `dandori init --no-shell`. You'll still need to run commands explicitly as `dandori run -- claude "..."`.
+The wizard prompts for:
+- Agent name
+- Jira email + API token
+- Confluence space key
+- Test connection (validates credentials live)
+
+After init, you can start using dandori right away. No manual config editing needed.
 
 ## Configuration
 
-### Minimal Config (`~/.dandori/config.yaml`)
+### Config File (`~/.dandori/config.yaml`)
 
 ```yaml
 agent:
@@ -60,12 +63,16 @@ confluence:
 
 ## Verify Setup
 
+The init wizard tests both Jira and Confluence connections automatically. If either fails, the wizard shows the error and prompts to retry.
+
+To manually verify after init:
+
 ```bash
 # Test Jira connection
-./bin/dandori task info PROJ-1
+dandori task info PROJ-1
 
 # Test Confluence connection
-./bin/dandori conf-write --task PROJ-1 --dry-run
+dandori conf-write --task PROJ-1 --dry-run
 ```
 
 ## Basic Workflow
@@ -107,20 +114,31 @@ dandori dashboard
 
 ## Background Capture (Optional)
 
-If you sometimes bypass the wrapper with `\claude` or forget the alias, run the watcher to capture those runs:
+If you sometimes run `claude` directly without `dandori` context, the watcher can capture those "orphan" runs:
 
 ```bash
-# Manual single pass
+# Manual single pass (good for cron / launchd / systemd)
 dandori watch --once
 
 # Continuous foreground (Ctrl-C to stop)
 dandori watch
 
-# Auto-start on macOS via launchd
-launchctl submit -l com.phuc.dandori-watch -- $(which dandori) watch
+# Auto-start on macOS
+dandori watch enable
+
+# Auto-start on Linux (systemd-user)
+dandori watch enable
+
+# Check status
+dandori watch status
+
+# Stop auto-start
+dandori watch disable
 ```
 
 The watcher polls `~/.claude/projects/*/*.jsonl` and inserts orphan runs with `agent_name='orphan'`.
+
+**Note:** On Windows, use manual cron-like scheduling. The `dandori watch enable` command will show guidance if unsupported.
 
 ## Server Setup (Optional)
 

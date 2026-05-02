@@ -15,6 +15,7 @@ import (
 
 	"github.com/phuc-nt/dandori-cli/internal/db"
 	"github.com/phuc-nt/dandori-cli/internal/util"
+	"github.com/phuc-nt/dandori-cli/internal/watchctl"
 	"github.com/phuc-nt/dandori-cli/internal/wrapper"
 )
 
@@ -107,6 +108,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 }
 
 // PollOnce scans all projects under ClaudeProjectsRoot once.
+// On completion it writes a timestamp to ~/.dandori/.watch-stamp (best-effort).
 func (w *Watcher) PollOnce() error {
 	projects, err := DiscoverProjects(w.claudeProjectsRoot)
 	if err != nil {
@@ -125,6 +127,9 @@ func (w *Watcher) PollOnce() error {
 			}
 		}
 	}
+
+	// Best-effort stamp — lets `dandori watch status` report last poll time.
+	watchctl.WriteStampFile()
 	return nil
 }
 

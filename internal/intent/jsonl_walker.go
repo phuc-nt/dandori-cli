@@ -19,9 +19,9 @@ type sessionLine struct {
 
 // contentPart represents one element inside message.content.
 type contentPart struct {
-	Type      string `json:"type"`                 // text | thinking | tool_use | tool_result
-	Text      string `json:"text,omitempty"`       // text / thinking body
-	Thinking  string `json:"thinking,omitempty"`   // extended thinking (some models)
+	Type      string `json:"type"`                  // text | thinking | tool_use | tool_result
+	Text      string `json:"text,omitempty"`        // text / thinking body
+	Thinking  string `json:"thinking,omitempty"`    // extended thinking (some models)
 	ToolUseID string `json:"tool_use_id,omitempty"` // tool_result linkage
 }
 

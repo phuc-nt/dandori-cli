@@ -52,9 +52,23 @@ type MetricConfig struct {
 
 // VerifyConfig — Bug #3 pre-sync gate (semantic check + quality gate).
 // See plans/260428-0812-bug-3-fake-completion-spike/plan.md.
+//
+// Default (v0.9.0+): both gates are OFF. This is an intentional opt-in design
+// so new users are not surprised by verify failures on first run.
+//
+// To enable, set in ~/.dandori/config.yaml:
+//
+//	verify:
+//	  semantic_check: true   # path-match spec vs diff
+//	  quality_gate: true     # lint/test on changed files before Jira sync
+//
+// Upgrade note: v0.8.x users who had verify.semantic_check: true explicitly in
+// their yaml will keep that value (YAML unmarshal overwrites the false default).
+// v0.8.x users who never had a verify: section will silently default to false
+// on upgrade — see CHANGELOG migration notes.
 type VerifyConfig struct {
-	SemanticCheck bool   `yaml:"semantic_check"` // Q3: path-match spec vs diff
-	QualityGate   bool   `yaml:"quality_gate"`   // Q4: lint/test on changed files
+	SemanticCheck bool   `yaml:"semantic_check"` // Q3: path-match spec vs diff; default false (opt-in)
+	QualityGate   bool   `yaml:"quality_gate"`   // Q4: lint/test on changed files; default false (opt-in)
 	SkipLabel     string `yaml:"skip_label"`     // Q2: Jira label to bypass gates
 }
 
@@ -153,8 +167,8 @@ func DefaultConfig() *Config {
 			PostExitTimeout: "10s",
 		},
 		Verify: VerifyConfig{
-			SemanticCheck: true,
-			QualityGate:   true,
+			SemanticCheck: false,
+			QualityGate:   false,
 			SkipLabel:     "skip-verify",
 		},
 	}

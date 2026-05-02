@@ -8,8 +8,8 @@ import (
 
 // IntentData holds the G8 intent.extracted event payload for a run.
 type IntentData struct {
-	FirstUserMsg string        `json:"first_user_msg"`
-	Summary      string        `json:"summary"`
+	FirstUserMsg string          `json:"first_user_msg"`
+	Summary      string          `json:"summary"`
 	SpecLinks    IntentSpecLinks `json:"spec_links"`
 }
 

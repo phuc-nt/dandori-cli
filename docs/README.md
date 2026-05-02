@@ -2,7 +2,7 @@
 
 > CLI outer harness cho mô hình **PO/PDM + QA + AI agent** vận hành dự án phần mềm. Wrap Claude Code, track mọi run, tích hợp Jira + Confluence, dashboard 3-level analytics.
 
-**Current**: v0.8.0 · 858 unit tests · 24 packages · vision coverage ~97%
+**Current**: v0.9.0 · 789 unit test funcs (~906 test runs) · 26 packages · vision coverage ~97%
 
 ---
 

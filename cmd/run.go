@@ -129,8 +129,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	if dryRunFlag {
-		fmt.Printf("Would execute: %v\n", args)
-		fmt.Printf("Run ID: %s\n", result.RunID)
+		if !Quiet() {
+			fmt.Printf("Would execute: %v\n", args)
+			fmt.Printf("Run ID: %s\n", result.RunID)
+		}
 		return nil
 	}
 

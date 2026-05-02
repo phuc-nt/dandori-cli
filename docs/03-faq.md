@@ -7,40 +7,18 @@
 **Symptom:** Run completes but tokens and cost show as 0.
 
 **Causes:**
-1. Session log not found (symlink issue on macOS)
-2. Wrong working directory
-3. Session file not yet created when tailer reads
+1. Wrong working directory
+2. Session file not yet created when tailer reads
 
-**Fix 1: Symlink issue (macOS)**
-
-On macOS, `/tmp` is a symlink to `/private/tmp`. If you run from `/tmp/project`:
+**Fix:**
 ```bash
-# Claude stores session at:
-~/.claude/projects/-private-tmp-project/
-
-# But dandori looks for:
-~/.claude/projects/-tmp-project/  # Wrong!
-```
-
-**Solution:** Use real path or work from non-symlinked directory:
-```bash
-cd /private/tmp/project  # Use real path
-# OR
-cd ~/projects/myproject  # Use home directory
-```
-
-**Fix 2: Check session directory exists**
-```bash
-# Get the expected directory name
-echo "-$(pwd | tr '/' '-')"
-
-# Check if it exists
-ls ~/.claude/projects/-$(pwd | tr '/' '-')/
-```
-
-**Fix 3: Use watch to capture orphan sessions**
-```bash
+# Capture orphan sessions manually
 dandori watch --once
+```
+
+Or enable auto-capture:
+```bash
+dandori watch enable
 ```
 
 ### Jira Connection Failed
@@ -90,34 +68,42 @@ confluence:
 pkill -f "dandori run"
 ```
 
-### Shell Alias Not Working
+### Using `dandori claude` Instead of Shell Alias
 
-**Symptom:** Typing `claude "..."` runs bare Claude without wrapping.
+**v0.9.0 change:** Shell aliases have been removed in favor of explicit `dandori claude` subcommand.
 
-**Fix:**
-1. Restart shell or `source ~/.zshrc`
-2. Check alias is installed: `grep "dandori aliases" ~/.zshrc`
-3. If missing, run `dandori init --shell`
-4. Verify alias expands: `type claude` → should show `claude is an alias for 'dandori run -- claude'`
+**If you have an old shell alias block from v0.8.x:**
+```bash
+# Clean up legacy alias from ~/.zshrc or ~/.bashrc
+dandori init --uninstall-shell
+
+# Or manually remove the block:
+sed -i '' '/>>> dandori aliases/,/<<< dandori aliases/d' ~/.zshrc
+```
+
+**Use the subcommand instead:**
+```bash
+# Instead of: claude "..."
+dandori claude "fix the auth bug"
+
+# Or run with Jira context:
+dandori task run PROJ-123
+```
 
 ### Watch Daemon Misses Runs
 
-**Symptom:** `dandori watch` doesn't pick up recent `\claude` invocations.
+**Symptom:** `dandori watch` doesn't pick up recent direct `claude` invocations.
 
 **Fix:**
-1. Verify root is correct: `dandori watch --once --root ~/.claude/projects`
-2. Check session file exists: `ls ~/.claude/projects/*/\*.jsonl | tail -3`
-3. Orphan runs use `agent_name='orphan'` — filter analytics: `sqlite3 ~/.dandori/local.db "SELECT * FROM runs WHERE agent_name='orphan'"`
-
-### Uninstall Shell Aliases
-
 ```bash
-# Manually edit the rc file and remove block between markers:
-#   # >>> dandori aliases (managed) >>>
-#   ...
-#   # <<< dandori aliases (managed) <<<
-# Or use the markers as grep anchors:
-sed -i '' '/>>> dandori aliases/,/<<< dandori aliases/d' ~/.zshrc
+# Enable auto-capture daemon
+dandori watch enable
+
+# Or run manually once
+dandori watch --once
+
+# Check status
+dandori watch status
 ```
 
 ## Configuration Questions
@@ -170,6 +156,32 @@ confluence:
 
 **Fix:** Ensure agent commits changes during the run. Git HEAD is compared before/after.
 
+### Verify Gate Fails on Every Task Run
+
+**Symptom:** `dandori task run` prints "semantic check failed" or "quality gate failed" every time.
+
+**Cause:** v0.9.0 default changed — `verify.semantic_check` and `verify.quality_gate` are now **off** by default.
+
+**To enable (if you want stricter verification):**
+```yaml
+verify:
+  semantic_check: true
+  quality_gate: true
+```
+
+**Or use the flag to skip for one run:**
+```bash
+dandori task run PROJ-123 --no-verify
+```
+
+**To disable permanently** (recommended for most workflows):
+Ensure your config has:
+```yaml
+verify:
+  semantic_check: false
+  quality_gate: false
+```
+
 ### Quality Metrics Show Zero
 
 **Symptom:** `dandori analytics quality` shows all zeros for lint/test.
@@ -203,7 +215,7 @@ confluence:
 
 | Command | Purpose |
 |---------|---------|
-| `dandori init` | Create config + database + shell aliases |
+| `dandori init` | Interactive wizard: config + database + connection test |
 | `dandori task run KEY` | **Recommended**: Run agent with full Jira+Confluence context |
 | `dandori run` | Execute agent with tracking (explicit) |
 | `dandori watch` | Background capture of orphan runs |

@@ -41,8 +41,9 @@ func BenchmarkWalkSmall(b *testing.B) {
 // If not set, benchmark is skipped (file too large to include in repo).
 //
 // Run with:
-//   DANDORI_BENCH_JSONL_LARGE=/path/to/90mb.jsonl \
-//   go test -bench=BenchmarkWalkLarge -benchmem -benchtime=3s -run=^$ ./internal/intent/
+//
+//	DANDORI_BENCH_JSONL_LARGE=/path/to/90mb.jsonl \
+//	go test -bench=BenchmarkWalkLarge -benchmem -benchtime=3s -run=^$ ./internal/intent/
 func BenchmarkWalkLarge(b *testing.B) {
 	path := os.Getenv("DANDORI_BENCH_JSONL_LARGE")
 	if path == "" {

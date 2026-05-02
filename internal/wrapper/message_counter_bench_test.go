@@ -62,10 +62,10 @@ func BenchmarkClassifyHumanMessage(b *testing.B) {
 		seenTool  bool
 		prevCount int
 	}{
-		{"Implement login feature", false, 0},        // initial prompt
-		{"That looks good", true, 1},                 // approval (13 chars)
+		{"Implement login feature", false, 0},                                 // initial prompt
+		{"That looks good", true, 1},                                          // approval (13 chars)
 		{"Actually, add rate limiting to the auth endpoint instead", true, 1}, // intervention (57 chars)
-		{"ok", true, 1},                              // approval boundary
+		{"ok", true, 1}, // approval boundary
 		{"please use bcrypt instead of plain sha256", true, 2}, // intervention
 	}
 

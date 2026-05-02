@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	maxIntentBytes    = 2 * 1024       // 2 KB cap for first_user_msg and summary
-	maxReasoningBytes = 1 * 1024       // 1 KB cap per reasoning block
-	maxReasoningBlocks = 10            // max reasoning blocks stored per run
+	maxIntentBytes     = 2 * 1024 // 2 KB cap for first_user_msg and summary
+	maxReasoningBytes  = 1 * 1024 // 1 KB cap per reasoning block
+	maxReasoningBlocks = 10       // max reasoning blocks stored per run
 )
 
 // ReasoningBlock is one captured reasoning signal from the session.

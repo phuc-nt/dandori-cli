@@ -8,24 +8,21 @@ Step-by-step guide organized by use case.
 
 ```bash
 go install github.com/phuc-nt/dandori-cli@latest
-dandori init         # installs shell aliases by default
-source ~/.zshrc      # or restart your shell
+dandori init         # full wizard
 ```
-
-From now on, `claude "..."` is automatically tracked. To bypass per-invocation: `\claude "..."`.
 
 ---
 
-## Use Case 1 — Solo Engineer: Track My Agent Runs
+## Use Case 1 — Solo Engineer: Ad-hoc Tracking
 
-**Goal:** Every `claude` invocation is recorded. You can review cost and time spent.
+**Goal:** Run Claude with tracking when you don't have a Jira task.
 
 ```bash
 # One-time setup
 dandori init
 
-# Use Claude normally — wrapper transparently tracks via alias
-claude "refactor auth module"
+# Run with tracking (no Jira context)
+dandori claude "refactor auth module"
 
 # View last 10 runs
 dandori analytics runs
@@ -36,6 +33,12 @@ dandori dashboard
 
 **What's recorded:** run_id, cwd, git HEAD, duration, exit code, input/output tokens, cache tokens, model, cost.
 
+**Quiet mode:** Suppress run summary and keep logs concise:
+```bash
+dandori claude -q "refactor auth module"
+# Errors/warnings still print to stderr; info logs suppressed
+```
+
 ---
 
 ## Use Case 2 — Run Agent with Full Task Context (Recommended)
@@ -43,10 +46,7 @@ dandori dashboard
 **Goal:** Agent automatically receives full context from Jira issue + linked Confluence docs. All activities tracked and synced to Jira.
 
 ```bash
-# Configure Jira + Confluence (first time only)
-vim ~/.dandori/config.yaml
-
-# Run agent with auto-context injection
+# Setup done via init wizard — just run:
 dandori task run PROJ-123
 
 # What happens:
@@ -370,19 +370,18 @@ h3. Output Location
 
 ## Best Practices
 
-### Use `task run` for Jira Tasks
+### Choose Your Command Path
 
 | Command | Use When |
 |---------|----------|
 | `dandori task run KEY` | Working on Jira tasks (recommended) |
-| `dandori run -- claude "..."` | Ad-hoc work without Jira link |
-| `dandori run --task KEY -- claude "..."` | Manual prompt with Jira link |
+| `dandori claude "..."` | Ad-hoc work, no Jira context, just tracking |
+| `dandori run --task KEY -- <any-cmd>` | Power user / scripting; wrap any agent CLI |
 
-**Why `task run` is better:**
-- Auto-fetches context from Jira + Confluence
-- Agent has full task details without manual copy-paste
-- Comprehensive Jira comments with activity details
-- Proper token/cost capture
+**Why choose each:**
+- **`task run`** — Auto-fetches context from Jira + Confluence, comprehensive Jira sync, best for daily workflow
+- **`claude`** — Fast, tracked, no Jira overhead, good for quick fixes and exploration
+- **`run`** — Low-level scripting, when you need to wrap non-Claude tools or batch processes
 
 ### Ensure Agent Commits Changes
 
@@ -401,8 +400,7 @@ dandori task run PROJ-123 -- claude -p "Add login feature and commit"
 
 If tokens show as 0, check:
 1. Config has correct session directory
-2. No symlink issues (`/tmp` vs `/private/tmp` on macOS)
-3. Run `dandori watch --once` to capture from session files
+2. Run `dandori watch --once` to capture from session files
 
 ## Troubleshooting
 

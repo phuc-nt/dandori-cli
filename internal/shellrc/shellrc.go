@@ -13,19 +13,6 @@ const (
 	EndMarker   = "# <<< dandori aliases (managed) <<<"
 )
 
-// aliasBlock is the content inserted between markers.
-const aliasBlock = `
-alias claude='dandori run -- claude'
-alias codex='dandori run -- codex'
-`
-
-// Result reports what InstallAliases did.
-type Result struct {
-	Installed      bool
-	AlreadyPresent bool
-	RCFile         string
-}
-
 // DetectShell returns "zsh", "bash", or "" from the SHELL env value.
 func DetectShell(shellEnv string) string {
 	switch {
@@ -61,30 +48,13 @@ func RCFilePath() (string, error) {
 	return filepath.Join(home, RCFileName(shell)), nil
 }
 
-// InstallAliases appends the alias block to rcFile if not already present.
-// Creates the file if missing. Idempotent.
-func InstallAliases(rcFile string) (Result, error) {
-	result := Result{RCFile: rcFile}
-
-	existing, err := os.ReadFile(rcFile)
-	if err != nil && !os.IsNotExist(err) {
-		return result, fmt.Errorf("read rc: %w", err)
+// HasAliasBlock reports whether rcFile contains the dandori-managed alias block.
+func HasAliasBlock(rcFile string) bool {
+	content, err := os.ReadFile(rcFile)
+	if err != nil {
+		return false
 	}
-
-	if strings.Contains(string(existing), StartMarker) {
-		result.AlreadyPresent = true
-		return result, nil
-	}
-
-	block := fmt.Sprintf("\n%s%s%s\n", StartMarker, aliasBlock, EndMarker)
-	content := string(existing) + block
-
-	if err := os.WriteFile(rcFile, []byte(content), 0644); err != nil {
-		return result, fmt.Errorf("write rc: %w", err)
-	}
-
-	result.Installed = true
-	return result, nil
+	return strings.Contains(string(content), StartMarker)
 }
 
 // UninstallAliases removes the managed block from rcFile. Leaves surrounding content intact.

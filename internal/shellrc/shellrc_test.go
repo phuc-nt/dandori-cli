@@ -27,7 +27,7 @@ func TestDetectShell(t *testing.T) {
 	}
 }
 
-func TestRCFilePath(t *testing.T) {
+func TestRCFileName(t *testing.T) {
 	tests := []struct {
 		shell    string
 		wantFile string
@@ -45,104 +45,113 @@ func TestRCFilePath(t *testing.T) {
 	}
 }
 
-func TestInstallAliases_FreshFile(t *testing.T) {
+func TestHasAliasBlock(t *testing.T) {
 	tmpDir := t.TempDir()
-	rcFile := filepath.Join(tmpDir, ".zshrc")
-	os.WriteFile(rcFile, []byte("# existing content\nexport PATH=/bin\n"), 0644)
 
-	result, err := InstallAliases(rcFile)
-	if err != nil {
-		t.Fatalf("InstallAliases: %v", err)
-	}
-	if !result.Installed {
-		t.Error("expected Installed=true")
-	}
+	t.Run("no block", func(t *testing.T) {
+		rcFile := filepath.Join(tmpDir, "no_block.zshrc")
+		_ = os.WriteFile(rcFile, []byte("# plain rc\nexport PATH=/bin\n"), 0644)
+		if HasAliasBlock(rcFile) {
+			t.Error("expected false for file without alias block")
+		}
+	})
 
-	content, _ := os.ReadFile(rcFile)
-	s := string(content)
-	if !strings.Contains(s, StartMarker) {
-		t.Error("missing start marker")
-	}
-	if !strings.Contains(s, EndMarker) {
-		t.Error("missing end marker")
-	}
-	if !strings.Contains(s, "alias claude=") {
-		t.Error("missing claude alias")
-	}
-	if !strings.Contains(s, "# existing content") {
-		t.Error("original content removed")
+	t.Run("has block", func(t *testing.T) {
+		rcFile := filepath.Join(tmpDir, "with_block.zshrc")
+		content := "# original\n" + StartMarker + "\nalias claude='dandori run -- claude'\n" + EndMarker + "\n"
+		_ = os.WriteFile(rcFile, []byte(content), 0644)
+		if !HasAliasBlock(rcFile) {
+			t.Error("expected true for file with alias block")
+		}
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		if HasAliasBlock(filepath.Join(tmpDir, "nonexistent.zshrc")) {
+			t.Error("expected false for missing file")
+		}
+	})
+}
+
+// writeBlockFixture writes a rc file that contains the managed alias block
+// (as left by v0.8 InstallAliases), plus surrounding user content.
+func writeBlockFixture(t *testing.T, rcFile string) {
+	t.Helper()
+	content := "# original\nexport PATH=/bin\n\n" +
+		StartMarker + "\nalias claude='dandori run -- claude'\nalias codex='dandori run -- codex'\n" + EndMarker + "\n"
+	if err := os.WriteFile(rcFile, []byte(content), 0644); err != nil {
+		t.Fatalf("writeBlockFixture: %v", err)
 	}
 }
 
-func TestInstallAliases_Idempotent(t *testing.T) {
+func TestUninstallAliases_RemovesBlock(t *testing.T) {
 	tmpDir := t.TempDir()
 	rcFile := filepath.Join(tmpDir, ".zshrc")
-	os.WriteFile(rcFile, []byte(""), 0644)
+	writeBlockFixture(t, rcFile)
 
-	// First install
-	if _, err := InstallAliases(rcFile); err != nil {
-		t.Fatalf("first install: %v", err)
-	}
-
-	// Second install should be no-op
-	result, err := InstallAliases(rcFile)
-	if err != nil {
-		t.Fatalf("second install: %v", err)
-	}
-	if result.Installed {
-		t.Error("second install should report not installed")
-	}
-	if !result.AlreadyPresent {
-		t.Error("expected AlreadyPresent=true")
-	}
-
-	// Verify no duplication
-	content, _ := os.ReadFile(rcFile)
-	count := strings.Count(string(content), StartMarker)
-	if count != 1 {
-		t.Errorf("marker count = %d, want 1", count)
-	}
-}
-
-func TestInstallAliases_CreateIfMissing(t *testing.T) {
-	tmpDir := t.TempDir()
-	rcFile := filepath.Join(tmpDir, ".zshrc")
-
-	result, err := InstallAliases(rcFile)
-	if err != nil {
-		t.Fatalf("InstallAliases: %v", err)
-	}
-	if !result.Installed {
-		t.Error("expected Installed=true")
-	}
-
-	if _, err := os.Stat(rcFile); os.IsNotExist(err) {
-		t.Error("RC file was not created")
-	}
-}
-
-func TestUninstallAliases(t *testing.T) {
-	tmpDir := t.TempDir()
-	rcFile := filepath.Join(tmpDir, ".zshrc")
-	original := "# original\nexport PATH=/bin\n"
-	os.WriteFile(rcFile, []byte(original), 0644)
-
-	// Install
-	if _, err := InstallAliases(rcFile); err != nil {
-		t.Fatalf("install: %v", err)
-	}
-
-	// Uninstall
 	if err := UninstallAliases(rcFile); err != nil {
-		t.Fatalf("uninstall: %v", err)
+		t.Fatalf("UninstallAliases: %v", err)
 	}
 
 	content, _ := os.ReadFile(rcFile)
 	s := string(content)
 	if strings.Contains(s, StartMarker) {
-		t.Error("marker not removed")
+		t.Error("start marker not removed")
+	}
+	if strings.Contains(s, EndMarker) {
+		t.Error("end marker not removed")
 	}
 	if !strings.Contains(s, "# original") {
-		t.Error("original content destroyed")
+		t.Error("original content was destroyed")
+	}
+}
+
+func TestUninstallAliases_Idempotent(t *testing.T) {
+	tmpDir := t.TempDir()
+	rcFile := filepath.Join(tmpDir, ".zshrc")
+	writeBlockFixture(t, rcFile)
+
+	// First uninstall
+	if err := UninstallAliases(rcFile); err != nil {
+		t.Fatalf("first uninstall: %v", err)
+	}
+	// Second uninstall should not error
+	if err := UninstallAliases(rcFile); err != nil {
+		t.Fatalf("second uninstall: %v", err)
+	}
+}
+
+func TestUninstallAliases_MissingFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	rcFile := filepath.Join(tmpDir, "nonexistent.zshrc")
+	// Must not error when file doesn't exist.
+	if err := UninstallAliases(rcFile); err != nil {
+		t.Fatalf("UninstallAliases on missing file: %v", err)
+	}
+}
+
+func TestUninstallAliases_HandEditedBlock(t *testing.T) {
+	// Simulates a user who hand-edited content OUTSIDE the markers.
+	// The block itself should be removed; surrounding content preserved.
+	tmpDir := t.TempDir()
+	rcFile := filepath.Join(tmpDir, ".zshrc")
+	content := "export A=1\n\n" +
+		StartMarker + "\nalias claude='dandori run -- claude'\n" + EndMarker +
+		"\nexport B=2\n"
+	_ = os.WriteFile(rcFile, []byte(content), 0644)
+
+	if err := UninstallAliases(rcFile); err != nil {
+		t.Fatalf("UninstallAliases: %v", err)
+	}
+
+	result, _ := os.ReadFile(rcFile)
+	s := string(result)
+	if strings.Contains(s, StartMarker) {
+		t.Error("marker not removed")
+	}
+	if !strings.Contains(s, "export A=1") {
+		t.Error("content before block destroyed")
+	}
+	if !strings.Contains(s, "export B=2") {
+		t.Error("content after block destroyed")
 	}
 }

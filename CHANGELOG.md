@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-05-02
+
+UX overhaul. Setup from 4-6 steps → 1 command. Removed shell alias override (footgun), added explicit subcommands. Verify gate now opt-in (was noisy by default).
+
+### Added
+
+- **`dandori init` full wizard** — 13 interactive prompts: agent name, Jira email + token, Confluence space key + derived URL, test connection live (masks token input), creates config + database, ready to use immediately
+- **`dandori claude "..."` subcommand** — explicit pass-through to Claude binary, tracked like any run, replaces shell alias `claude='dandori run -- claude'` footgun
+- **`dandori watch enable/disable/status`** — daemon orchestration: `launchd` on macOS, `systemd-user` on Linux, scheduled background capture. Windows shows guidance on error.
+- **`dandori init --uninstall-shell`** — clean up legacy `claude` alias block from `~/.zshrc` / `~/.bashrc` for users migrating from v0.8.x
+- **`-q / --quiet` global flag** — suppress run summary + info logs, keep errors/warnings to stderr, mutual exclusion with `-v`
+
+### Changed
+
+- **Default `verify.semantic_check` + `verify.quality_gate`: `true` → `false`** — User configs with explicit `true` values are honored; users without the field get `false` (behavior change by design to reduce friction)
+- **`dandori init` wizard flow** — no longer writes shell aliases to rc files; config yaml fully populated by wizard so no manual editing needed
+- **Init wizard mask token input** — uses `golang.org/x/term.ReadPassword` so credentials not echoed to screen
+
+### Removed
+
+- **Shell alias auto-install** — `InstallAliases` function and related rc-file write logic (`internal/shellrc/`) removed entirely; `dandori init --shell` / `--no-shell` flags removed
+- **Symlink `/tmp` workaround documentation** — workaround was fixed in v0.4.0; stale FAQ entries removed from `docs/01-setup-guide.md`, `docs/02-user-guide.md`, `docs/03-faq.md`
+- **Manual `launchctl submit` pattern** — replaced with `dandori watch enable` for consistency
+
+### Fixed
+
+- **`dandori claude` persistent flag propagation** — `-q/--quiet`, `-v/--verbose`, and `--config` were silently ignored when used with `dandori claude` because `DisableFlagParsing:true` (needed to forward arbitrary claude flags like `--dangerously-skip-permissions`) also blocked cobra from parsing dandori's own flags. `runClaude` now strips dandori-owned flags from args manually before forwarding the rest to claude. Patterns supported: `dandori -q claude …`, `dandori claude -q …`, `dandori claude … -q`, `--config path`, `--config=path`.
+
+### Migration from v0.8.x
+
+**For users with no existing config:**
+- Just run `dandori init` once, follow the wizard, done. No manual editing, no rc-file sourcing.
+
+**For users with v0.8.x config (`~/.dandori/config.yaml`):**
+- Verify gate behavior: if yaml has explicit `verify.semantic_check: true` or `verify.quality_gate: true`, they stay enabled. If field missing, gate is OFF (new default).
+- Example: to re-enable verification, add:
+  ```yaml
+  verify:
+    semantic_check: true
+    quality_gate: true
+  ```
+- Shell alias removal: if you have `claude=...` alias block in `~/.zshrc` / `~/.bashrc`, run `dandori init --uninstall-shell` to remove, then use `dandori claude "..."` directly.
+- Watch daemon: if you had manual `launchctl submit ... dandori watch` or similar cron setup, unload it first (`launchctl remove com.phuc.dandori-watch` or equivalent), then run `dandori watch enable`.
+
+**Migration checklist (if upgrading existing v0.8.x user):**
+- [ ] Verify gate behavior: read config, decide if you want `verify: {semantic_check: true, quality_gate: true}` or accept new OFF default
+- [ ] Shell alias: run `dandori init --uninstall-shell` OR manually `unalias claude`
+- [ ] Watch daemon: disable old cron / launchd / systemd setup, then `dandori watch enable`
+
+### Tests
+
+- **Phase 01 (init wizard):** 20 tests — Jira healthcheck, Confluence healthcheck, wizard happy path (13 prompts), sad path (cred failure), `deriveConfluenceURL` from Jira base_url
+- **Phase 02 (symlink resolution):** 3 regression tests — symlink resolve path, git.ResolveSymlink behavior, no false positives on regular paths
+- **Phase 03 (claude subcommand + init cleanup):** 9 tests — `HasAliasBlock` scanner, `UninstallAliasBlock` remover, claude subcommand pass-through, mutual exclusion `-q` vs `-v`
+- **Phase 04 (verify gate defaults):** 5 tests — default OFF, backcompat with explicit `true`, env override, yaml load behavior
+- **Phase 05 (quiet flag):** 7 tests — quiet flag sets log level, errors still visible, conflict detection `-q -v`
+- **Phase 06 (watch daemon):** 12 tests — watchctl darwin file generation, linux systemd-user unit, status check, enable/disable state transitions
+
+**Total new tests:** ~42 top-level test functions across Phase 01–06 + claude flag-strip fix (subtests + table-driven cases bring effective coverage higher). Suite now: 789 top-level test funcs / ~906 test runs across 26 packages.
+
+**E2E:**
+- Manual sweep: `dandori init` wizard flow, `dandori claude`, `dandori watch enable`, verify gate opt-in behavior
+- Browser: N/A (CLI release)
+
+### Docs updated
+
+- `README.md` — quick start (removed `source ~/.zshrc` step), commands table (added `dandori claude`, `dandori watch enable/disable/status`), feature bullet (changed alias transparency to explicit subcommands)
+- `docs/01-setup-guide.md` — wizard walkthrough + test connection, dropped `vim config.yaml` step, `dandori watch enable` instead of manual launchctl
+- `docs/02-user-guide.md` — Use Case 1 rewritten (ad-hoc `dandori claude`), Use Case 2 removed config step, "Best Practices" now has 3-path table (`task run` / `claude` / `run`), quiet flag example
+- `docs/03-faq.md` — removed symlink workaround (fixed in v0.4.0), replaced alias Q&A with v0.9.0 guidance + `--uninstall-shell`, new Q about verify gate opt-in, watch daemon status commands
+- `docs/devlog/2026-05-02-v0.9.0-release.md` — release notes, phase ship order, test posture, lessons learned
+- `docs/devlog/README.md` — index updated with v0.9.0 entry
+
 ## [0.8.1] — 2026-05-02
 
 Performance + DX patch. No new features, no breaking changes. Binary size 22MB → 14MB (-36%).

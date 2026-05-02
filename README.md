@@ -1,8 +1,8 @@
 # dandori-cli
 
-[![Go](https://img.shields.io/badge/go-1.21%2B-blue)](https://go.dev)
+[![Go](https://img.shields.io/badge/go-1.26%2B-blue)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-858%20unit%20%2B%20E2E-brightgreen)](docs/devlog/)
+[![Tests](https://img.shields.io/badge/tests-906%20runs%20%2B%20E2E-brightgreen)](docs/devlog/)
 
 Lightweight CLI outer harness for managing AI agent dev teams. Wraps agent execution, tracks runs, integrates with Jira/Confluence, and provides analytics for PO/PDM and QA.
 
@@ -15,7 +15,7 @@ See [Outer Harness](https://phuc-nt.github.io/dandori-pitch/outer-harness.html) 
 ## Features
 
 - **Context injection** — `dandori task run KEY` auto-fetches Jira issue + linked Confluence docs
-- **Transparent wrapper** — `claude "..."` is auto-tracked via shell aliases
+- **Explicit subcommands** — `dandori claude` for ad-hoc tracking, `dandori task run` for Jira-driven work
 - **Background watcher** — `dandori watch` catches runs even when the wrapper is bypassed
 - **3-layer instrumentation** — fork/exec + session log tailer + semantic events
 - **Real-time cost tracking** — token counts × model price table (Claude Sonnet/Opus/Haiku)
@@ -49,16 +49,15 @@ sudo mv dandori /usr/local/bin/
 ## Quick Start
 
 ```bash
-# Setup (installs shell aliases to ~/.zshrc or ~/.bashrc)
+# Setup (full wizard: Jira + Confluence + test connection)
 dandori init
-source ~/.zshrc
 
 # Option 1: Run agent with full Jira+Confluence context (recommended)
 dandori task run PROJ-123
 # → Fetches issue + linked docs → injects context → runs agent → syncs results
 
-# Option 2: Use Claude normally — wrapper transparently tracks
-claude "fix the auth bug"
+# Option 2: Ad-hoc tracking without Jira
+dandori claude "fix the auth bug"
 
 # View analytics
 dandori dashboard
@@ -70,11 +69,13 @@ See [User Guide](docs/02-user-guide.md) for step-by-step use cases.
 
 | Command | Purpose |
 |---------|---------|
-| `dandori init` | Config + DB + shell aliases |
+| `dandori init` | Full wizard: Jira + Confluence + test connection |
 | `dandori task run KEY` | Run with full Jira+Confluence context |
+| `dandori claude "..."` | Ad-hoc tracked run (no Jira context) |
+| `dandori watch enable/disable/status` | Background daemon (macOS/Linux) |
 | `dandori task start/done/info` | Manual Jira task lifecycle |
-| `dandori run --task KEY -- <cmd>` | Explicit wrapper (for scripts) |
-| `dandori watch [--once]` | Capture orphan runs |
+| `dandori run --task KEY -- <cmd>` | Low-level explicit wrapper (scripts) |
+| `dandori watch [--once]` | Single/continuous orphan capture |
 | `dandori jira-sync` | Transition Jira + add comments |
 | `dandori conf-write --task KEY` | Confluence report |
 | `dandori analytics {runs\|agents\|cost}` | Terminal analytics |
@@ -174,8 +175,8 @@ All 8 phases complete. See [implementation plan](../plans/260418-1301-dandori-cl
 | 08 E2E Flow | ✅ |
 
 **Vision-aligned additions** (post Phase 08):
-- Shell alias transparency (wrapper invisibility)
-- Watch daemon (background tracking)
+- Explicit subcommands (`dandori claude`, `dandori watch enable/disable/status`) — no shell rc mutation
+- Watch daemon (background tracking via launchd/systemd-user)
 
 ## License
 

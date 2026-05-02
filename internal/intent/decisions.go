@@ -34,11 +34,11 @@ type Decision struct {
 // concurrent use. Order matters: more specific patterns appear first.
 //
 // Each entry carries capture semantics:
-//   1. "I'll go with X because Y"  → chosen=X, rationale=Y
-//   2. "using X over/instead of Y" → chosen=X, rejected=[Y]
-//   3. "better to X than/rather than Y" → chosen=X, rejected=[Y]
-//   4. "decided to X"              → chosen=X, no rejected
-//   5. "could either X or Y"       → candidates only (need follow-up block)
+//  1. "I'll go with X because Y"  → chosen=X, rationale=Y
+//  2. "using X over/instead of Y" → chosen=X, rejected=[Y]
+//  3. "better to X than/rather than Y" → chosen=X, rejected=[Y]
+//  4. "decided to X"              → chosen=X, no rejected
+//  5. "could either X or Y"       → candidates only (need follow-up block)
 var decisionPatterns = []*regexp.Regexp{
 	// Pattern 1: "I'll go with X because Y"  (high confidence)
 	regexp.MustCompile(`(?i)i'?ll go with (.+?) because (.+)`),

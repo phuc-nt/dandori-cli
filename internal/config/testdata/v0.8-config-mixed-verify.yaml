@@ -1,0 +1,4 @@
+server_url: http://localhost:8080
+log_level: info
+verify:
+  semantic_check: true

@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	incidentRunID  string
-	incidentTask   string
-	incidentOut    string
-	incidentSince  string
+	incidentRunID string
+	incidentTask  string
+	incidentOut   string
+	incidentSince string
 )
 
 var incidentReportCmd = &cobra.Command{

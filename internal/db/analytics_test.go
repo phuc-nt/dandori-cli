@@ -362,9 +362,9 @@ func TestGetCostByTaskFiltered_ProjectAndPeriod(t *testing.T) {
 	oldTime := now.Add(-60 * 24 * time.Hour) // 60 days ago — outside any 7d window
 
 	rows := []struct {
-		id, key    string
-		startedAt  time.Time
-		costUSD    float64
+		id, key   string
+		startedAt time.Time
+		costUSD   float64
 	}{
 		{"r1", "CLITEST-1", dayAgo, 1.00},
 		{"r2", "CLITEST-2", weekAgo, 2.00},
@@ -523,4 +523,4 @@ func TestGetDistinctProjectKeys(t *testing.T) {
 	if !reflect.DeepEqual(keys, want) {
 		t.Errorf("keys = %v; want %v", keys, want)
 	}
-} 
+}

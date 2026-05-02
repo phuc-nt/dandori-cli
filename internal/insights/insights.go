@@ -12,10 +12,10 @@ import (
 // Card is a single actionable insight surfaced by a heuristic.
 type Card struct {
 	ID       string `json:"id"`
-	Severity string `json:"severity"`          // "low" | "medium" | "high"
+	Severity string `json:"severity"` // "low" | "medium" | "high"
 	Title    string `json:"title"`
 	Body     string `json:"body"`
-	Action   string `json:"action,omitempty"`   // dashboard view to drill into
+	Action   string `json:"action,omitempty"`    // dashboard view to drill into
 	ActionID string `json:"action_id,omitempty"` // optional ID for action target
 }
 
