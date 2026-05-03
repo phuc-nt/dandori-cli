@@ -29,7 +29,7 @@ See [Outer Harness](https://phuc-nt.github.io/dandori-pitch/outer-harness.html) 
 
 Choose one:
 
-**Go (needs Go 1.21+ in PATH):**
+**Go (needs Go 1.26+ in PATH):**
 ```bash
 go install github.com/phuc-nt/dandori-cli@latest
 ```
@@ -122,7 +122,7 @@ See [User Guide](docs/02-user-guide.md) for step-by-step use cases.
 - Jira integration (lifecycle, status sync)
 - Confluence integration (reports, context)
 - Agent assignment (hybrid suggest + PO confirm)
-- Shell transparency (alias wrapper)
+- Explicit subcommands (`dandori claude`, `dandori watch enable/disable/status`)
 - Background capture (watch daemon)
 
 **Out of scope:**
@@ -135,7 +135,7 @@ See [User Guide](docs/02-user-guide.md) for step-by-step use cases.
 
 | Component | Choice |
 |---------|---------|
-| CLI + Server | Go 1.21+ |
+| CLI + Server | Go 1.26+ |
 | CLI local DB | SQLite (modernc.org/sqlite — pure Go, no CGO) |
 | Server DB | PostgreSQL (optional) |
 | CLI framework | Cobra |

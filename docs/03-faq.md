@@ -215,10 +215,12 @@ verify:
 
 | Command | Purpose |
 |---------|---------|
-| `dandori init` | Interactive wizard: config + database + connection test |
+| `dandori init` | Interactive wizard: config + database + live healthcheck |
+| `dandori doctor` | Health check: config + Jira + Confluence + DB + claude binary |
+| `dandori claude "..."` | Ad-hoc agent run with tracking (no Jira context) |
 | `dandori task run KEY` | **Recommended**: Run agent with full Jira+Confluence context |
-| `dandori run` | Execute agent with tracking (explicit) |
-| `dandori watch` | Background capture of orphan runs |
+| `dandori run` | Execute agent with tracking (explicit, power-user) |
+| `dandori watch [enable\|disable\|status\|--once]` | Daemon: catches orphan claude runs |
 | `dandori task start/done/info` | Manage Jira task lifecycle |
 | `dandori jira-sync` | Sync run status to Jira |
 | `dandori conf-write` | Write report to Confluence |

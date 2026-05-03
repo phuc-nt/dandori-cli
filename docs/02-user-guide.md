@@ -138,25 +138,21 @@ confluence:
 
 ## Use Case 5 — Capture Runs Even Without the Wrapper
 
-**Goal:** You (or a teammate) ran `\claude` to bypass the wrapper, or forgot the alias. Catch those runs after the fact.
+**Goal:** You (or a teammate) ran `claude` directly (without `dandori`). Catch those runs after the fact.
 
 ```bash
-# Single pass (good for cron, launchd, systemd timers)
+# Recommended: enable auto-start daemon (macOS launchd / Linux systemd-user)
+dandori watch enable
+dandori watch status
+
+# Single pass (one-off / custom scheduling)
 dandori watch --once
 
 # Long-running foreground (Ctrl-C to stop)
 dandori watch
-
-# Custom cadence
-dandori watch --interval 30
 ```
 
 The watcher scans `~/.claude/projects/*/*.jsonl`, finds sessions with no matching DB run, and inserts them as `agent_name='orphan'` with tokens + cost extracted from the session.
-
-**Auto-start on login (macOS):**
-```bash
-launchctl submit -l com.phuc.dandori-watch -- /usr/local/bin/dandori watch
-```
 
 ---
 
@@ -245,11 +241,13 @@ Scoring: capability 40%, issue type 30%, history 20%, load balance 10%.
 
 ## Use Case 8 — Bypass the Wrapper Once
 
+Just call `claude` directly (no `dandori` prefix):
+
 ```bash
-\claude "..."                   # leading backslash bypasses the alias
+claude "quick exploration"
 ```
 
-The run is NOT tracked. Use sparingly; `dandori watch` can catch it later.
+The run is NOT tracked by `dandori claude`. Use sparingly; `dandori watch` (auto-daemon) catches it later as an orphan run.
 
 ---
 
@@ -299,11 +297,13 @@ beta   8     +1.0    +5.0     820    8        60%       50%
 
 | Command | Purpose |
 |---------|---------|
-| `dandori init` | Config + DB + shell aliases |
+| `dandori init` | Interactive wizard: config + DB + live Jira/Confluence healthcheck |
+| `dandori doctor` | Health check: config + Jira + Confluence + DB + claude binary |
+| `dandori claude "..."` | Ad-hoc agent run with tracking (no Jira context) |
 | `dandori task run KEY` | Run agent with full Jira+Confluence context |
 | `dandori task start/done/info KEY` | Manual Jira task lifecycle |
 | `dandori run --task KEY -- <cmd>` | Explicit wrapper (for cron/scripts) |
-| `dandori watch [--once]` | Catch orphan runs |
+| `dandori watch [enable\|disable\|status\|--once]` | Daemon orchestration + catch orphan runs |
 | `dandori jira-sync` | Push run status to Jira |
 | `dandori conf-write --task KEY` | Confluence report |
 | `dandori analytics {runs\|agents\|cost\|quality\|all}` | Terminal analytics |

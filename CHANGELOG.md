@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-05-03
+
+Polish on top of v0.9.0 — adds `dandori doctor` for ongoing health checks and sweeps stale legacy mentions from docs.
+
+### Added
+
+- **`dandori doctor`** — health check: config completeness, `claude` binary in PATH, SQLite DB writability, Jira `/myself` reachable, Confluence space readable. Exit 0 if all green, 1 otherwise. Useful after token expiry, space rename, or before raising a support ticket. 11 unit tests cover each probe.
+
+### Fixed
+
+- **Goreleaser** — `dandori-server` build needs `-tags=server` (build constraint added in v0.8.1 perf split). Without it, `goreleaser release` failed at the build step.
+- **README badges + Tech Stack table** — Go version `1.21+` → `1.26+` (matches `go.mod` directive added in v0.8.1).
+- **Docs stale references** (sweep):
+  - `01-setup-guide.md` Quick Start — removed "via shell alias" example (was already removed in init flow but doc still showed it)
+  - `01-setup-guide.md` Background Capture — collapsed manual `dandori watch --once` + `launchctl submit` steps, promoted `dandori watch enable`
+  - `01-setup-guide.md` Verify Setup — replaced manual `task info` / `conf-write --dry-run` probes with `dandori doctor`
+  - `02-user-guide.md` Use Case 5 — removed legacy `launchctl submit -l com.phuc.dandori-watch` example (label was renamed to `com.dandori.watch` in v0.9.0)
+  - `02-user-guide.md` Use Case 8 — `\claude` backslash-bypass now meaningless (no alias to bypass); replaced with plain `claude`
+  - `02-user-guide.md` Common Commands table — `dandori init` mistakenly described as "Config + DB + shell aliases"; corrected
+  - `03-faq.md` Command Reference — added `doctor`, `claude`, expanded `watch` row
+
 ## [0.9.0] — 2026-05-02
 
 UX overhaul. Setup from 4-6 steps → 1 command. Removed shell alias override (footgun), added explicit subcommands. Verify gate now opt-in (was noisy by default).

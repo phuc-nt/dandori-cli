@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.21+
+- Go 1.26+ (only if building from source — prebuilt binaries via Homebrew/GitHub releases need no Go)
 - Claude Code CLI (`claude`)
 - Jira Cloud account with API token
 - Confluence Cloud account (same Atlassian instance)
@@ -65,15 +65,13 @@ confluence:
 
 The init wizard tests both Jira and Confluence connections automatically. If either fails, the wizard shows the error and prompts to retry.
 
-To manually verify after init:
+For ongoing health check (token expired, space renamed, claude binary missing):
 
 ```bash
-# Test Jira connection
-dandori task info PROJ-1
-
-# Test Confluence connection
-dandori conf-write --task PROJ-1 --dry-run
+dandori doctor
 ```
+
+It checks: config file presence, Jira `/myself` reachable, Confluence space readable, SQLite DB writable, `claude` binary in PATH. Exit code 0 if all green.
 
 ## Basic Workflow
 
@@ -98,9 +96,9 @@ dandori task run PROJ-123
 # 1. Start a task
 dandori task start PROJ-123
 
-# 2. Run agent — either transparent (via alias) or explicit
-claude "implement feature X"                          # via shell alias
-# OR: dandori run --task PROJ-123 -- claude "..."     # explicit
+# 2. Run agent (explicit subcommand — no shell alias needed)
+dandori claude "implement feature X"
+# OR: dandori run --task PROJ-123 -- claude "..."     # power-user form
 
 # 3. Sync status back to Jira
 dandori jira-sync
@@ -114,31 +112,25 @@ dandori dashboard
 
 ## Background Capture (Optional)
 
-If you sometimes run `claude` directly without `dandori` context, the watcher can capture those "orphan" runs:
+If you run `claude` directly (without `dandori`) on the same machine, the watcher catches those orphan runs:
 
 ```bash
-# Manual single pass (good for cron / launchd / systemd)
-dandori watch --once
-
-# Continuous foreground (Ctrl-C to stop)
-dandori watch
-
-# Auto-start on macOS
+# Auto-start daemon (macOS launchd or Linux systemd-user)
 dandori watch enable
 
-# Auto-start on Linux (systemd-user)
-dandori watch enable
-
-# Check status
+# Status
 dandori watch status
 
 # Stop auto-start
 dandori watch disable
+
+# Manual single pass (for custom cron / one-off)
+dandori watch --once
 ```
 
 The watcher polls `~/.claude/projects/*/*.jsonl` and inserts orphan runs with `agent_name='orphan'`.
 
-**Note:** On Windows, use manual cron-like scheduling. The `dandori watch enable` command will show guidance if unsupported.
+**Note:** Windows is not yet supported by `watch enable`; use Task Scheduler with `dandori watch --once` instead.
 
 ## Server Setup (Optional)
 
