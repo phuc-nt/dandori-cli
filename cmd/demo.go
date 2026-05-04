@@ -16,6 +16,7 @@ var (
 	demoSeed    bool
 	demoUse     bool
 	demoRestore bool
+	demoVariant string
 )
 
 var demoCmd = &cobra.Command{
@@ -35,6 +36,8 @@ func init() {
 	demoCmd.Flags().BoolVar(&demoSeed, "seed", false, "Insert blog scenario rows")
 	demoCmd.Flags().BoolVar(&demoUse, "use", false, "Point dandori at demo.db for subsequent commands")
 	demoCmd.Flags().BoolVar(&demoRestore, "restore", false, "Stop using demo.db (restore real DB)")
+	demoCmd.Flags().StringVar(&demoVariant, "variant", "blog",
+		"Seed variant: 'blog' (default, single team) or 'cross-project' (3 projects × 3 sprints)")
 	rootCmd.AddCommand(demoCmd)
 }
 
@@ -97,10 +100,20 @@ func runDemo(cmd *cobra.Command, args []string) error {
 			fmt.Println("Demo DB reset (runs/events/quality_metrics cleared).")
 		}
 		if demoSeed {
-			if err := demo.SeedBlogScenario(d); err != nil {
-				return fmt.Errorf("seed: %w", err)
+			switch demoVariant {
+			case "blog", "":
+				if err := demo.SeedBlogScenario(d); err != nil {
+					return fmt.Errorf("seed: %w", err)
+				}
+				fmt.Println("Seeded blog scenario: Alice+alpha (12), Bob human-only (9), Carol+beta (7).")
+			case "cross-project":
+				if err := demo.SeedCrossProject(d); err != nil {
+					return fmt.Errorf("seed cross-project: %w", err)
+				}
+				fmt.Println("Seeded cross-project scenario: 3 projects (CLITEST1/2/3) × 3 sprints × 4 runs = 36 runs.")
+			default:
+				return fmt.Errorf("unknown --variant %q (expected 'blog' or 'cross-project')", demoVariant)
 			}
-			fmt.Println("Seeded blog scenario: Alice+alpha (12), Bob human-only (9), Carol+beta (7).")
 		}
 	}
 

@@ -14,7 +14,10 @@ import (
 	"github.com/phuc-nt/dandori-cli/internal/db"
 )
 
-const seedTag = "blog-v1"
+const (
+	seedTag      = "blog-v1"
+	seedTagCross = "cross-v1"
+)
 
 type seedRow struct {
 	id            string
@@ -184,6 +187,114 @@ func SeedBlogScenario(d *db.LocalDB) error {
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
+}
+
+// SeedCrossProject inserts deterministic rows spanning 3 Jira projects
+// (CLITEST1/2/3) × 3 sprints × 4 engineers, so the dashboard's project /
+// sprint / engineer filters all have data to slice. Idempotent via
+// seedTagCross stored in runs.command.
+//
+// Layout: 3 projects × 3 sprints × ~4 runs per sprint = 36 runs over 6 weeks.
+func SeedCrossProject(d *db.LocalDB) error {
+	var existing int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM runs WHERE command = ?`, seedTagCross).Scan(&existing); err != nil {
+		return fmt.Errorf("check existing cross seed: %w", err)
+	}
+	if existing > 0 {
+		return nil
+	}
+
+	type proj struct {
+		key, dept, remote string
+	}
+	projects := []proj{
+		{"CLITEST1", "Platform", "github.com/acme/platform"},
+		{"CLITEST2", "Growth", "github.com/acme/growth"},
+		{"CLITEST3", "Quality", "github.com/acme/quality"},
+	}
+	engineers := []struct{ name, agent string }{
+		{"Alice", "alpha"},
+		{"Bob", "beta"},
+		{"Carol", "gamma"},
+		{"Dan", "alpha"},
+	}
+	sprints := []string{"S1", "S2", "S3"}
+	start := time.Now().Add(-42 * 24 * time.Hour) // 6 weeks ago
+
+	tx, err := d.DB().Begin()
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback()
+
+	row := 0
+	for pIdx, p := range projects {
+		for sIdx, sprint := range sprints {
+			// Each (project, sprint) gets 4 runs distributed over 14 days.
+			// Sprint window: weeks (2*sIdx, 2*sIdx+2) since start.
+			sprintStart := start.Add(time.Duration(sIdx*14*24) * time.Hour)
+			for rIdx := 0; rIdx < 4; rIdx++ {
+				eng := engineers[(pIdx+rIdx)%len(engineers)]
+				issueKey := fmt.Sprintf("%s-%d", p.key, sIdx*10+rIdx+1)
+				sprintID := fmt.Sprintf("%s-%s", p.key, sprint)
+				startedAt := sprintStart.Add(time.Duration(rIdx*84+pIdx*4) * time.Hour)
+				durationSec := 1200.0 + float64(rIdx)*180.0
+				endedAt := startedAt.Add(time.Duration(durationSec) * time.Second)
+				cost := 0.4 + 0.18*float64(rIdx) + 0.05*float64(pIdx)
+				inTok := 8000 + rIdx*600
+				outTok := 1800 + rIdx*120
+
+				id := fmt.Sprintf("cross-%s-%s-%02d", p.key, sprint, rIdx+1)
+				_, err := tx.Exec(`
+					INSERT INTO runs (
+						id, jira_issue_key, jira_sprint_id,
+						agent_name, agent_type, user, workstation_id,
+						git_remote, command,
+						started_at, ended_at, duration_sec, exit_code, status,
+						input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+						model, cost_usd,
+						engineer_name, department
+					) VALUES (?, ?, ?, ?, 'claude_code', 'seed-cross', 'ws-seed-cross',
+					          ?, ?, ?, ?, ?, 0, 'done',
+					          ?, ?, 4000, 1500,
+					          'claude-sonnet-4-6', ?,
+					          ?, ?)
+				`,
+					id, issueKey, sprintID,
+					eng.agent,
+					p.remote, seedTagCross,
+					startedAt.Format(time.RFC3339), endedAt.Format(time.RFC3339), durationSec,
+					inTok, outTok,
+					cost,
+					eng.name, p.dept,
+				)
+				if err != nil {
+					return fmt.Errorf("insert cross run %s: %w", id, err)
+				}
+
+				// 3 of every 4 runs improve quality; the 4th regresses (lint+test deltas zero).
+				lintDelta, testsDelta, quality, commitQ := -1, 8, 0.88, 0.85
+				if rIdx == 3 {
+					lintDelta, testsDelta, quality, commitQ = 1, -2, 0.45, 0.55
+				}
+				_, err = tx.Exec(`
+					INSERT INTO quality_metrics (
+						run_id, lint_errors_before, lint_errors_after,
+						lint_delta, tests_delta, commit_count, commit_msg_quality, quality_score
+					) VALUES (?, 0, 0, ?, ?, 1, ?, ?)
+				`, id, lintDelta, testsDelta, commitQ, quality)
+				if err != nil {
+					return fmt.Errorf("insert cross quality %s: %w", id, err)
+				}
+				row++
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit cross: %w", err)
 	}
 	return nil
 }

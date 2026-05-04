@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dandori Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">D</div>
+                <span class="logo-text">Dandori</span>
+            </div>
+            <nav class="nav">
+                <a class="nav-item active" href="#">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                    </svg>
+                    Overview
+                </a>
+                <a class="nav-item" href="#g9-section">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    DORA + G9
+                </a>
+                <a class="nav-item" href="#agents">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    Agents
+                </a>
+                <a class="nav-item" href="#runs">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    Runs
+                </a>
+                <a class="nav-item" href="#costs">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Costs
+                </a>
+                <a class="nav-item" href="#quality">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Quality KPI
+                </a>
+            </nav>
+            <div style="padding: 16px 12px; border-top: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="live-dot"></div>
+                    <span style="font-size: 12px; color: var(--text-muted);">Auto-refresh: 30s</span>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px; color: rgba(99,102,241,0.7); font-weight: 500;">G9 Analytics</div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="sticky-controls">
+            <header class="header">
+                <div class="header-left">
+                    <h1>Analytics Dashboard</h1>
+                    <p id="last-updated">Last updated: --</p>
+                </div>
+                <div class="header-actions">
+                    <!-- G9-ROLE-SWITCHER (P2: added project option) -->
+                    <div class="role-switcher">
+                        <label for="role-select">View:</label>
+                        <select id="role-select" class="role-select" onchange="updateState({role: this.value, id: ''})">
+                            <option value="org">Organization</option>
+                            <option value="engineer">Engineer</option>
+                            <option value="project">Project</option>
+                        </select>
+                    </div>
+                    <!-- G9-PERIOD-SELECTOR -->
+                    <select id="period-selector" class="period-selector" onchange="onPeriodChange(this.value)">
+                        <option value="">Default</option>
+                        <option value="7d">7 days</option>
+                        <option value="28d">28 days</option>
+                        <option value="90d">90 days</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                    <div class="custom-date-range" id="custom-date-range">
+                        <input type="date" id="custom-from" class="date-input" onchange="onCustomDateChange()">
+                        <span>to</span>
+                        <input type="date" id="custom-to" class="date-input" onchange="onCustomDateChange()">
+                        <span id="custom-date-error" style="color:var(--error);font-size:12px;display:none;">Invalid range</span>
+                    </div>
+                    <!-- G9-COMPARE-TOGGLE -->
+                    <label class="compare-label">
+                        <input type="checkbox" id="compare-toggle" onchange="updateState({compare: this.checked})">
+                        vs prior period
+                    </label>
+                    <button class="btn btn-ghost" onclick="loadAll()">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                    <!-- Alert Center (Dashboard v2): unified dropdown replacing g9-stale + org-alerts banners -->
+                    <div class="alert-center" id="alert-center">
+                        <button type="button" class="alert-center-btn" id="alert-center-btn" onclick="toggleAlertCenter()" aria-haspopup="true" aria-expanded="false">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            <span class="alert-badge" id="alert-badge" hidden>0</span>
+                        </button>
+                        <div class="alert-center-panel" id="alert-center-panel" hidden>
+                            <div class="alert-center-header">
+                                <span>Alerts</span>
+                                <button type="button" class="alert-center-close" onclick="toggleAlertCenter(false)" aria-label="Close">×</button>
+                            </div>
+                            <ul class="alert-center-list" id="alert-center-list">
+                                <li class="alert-center-empty">Loading…</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- G9-P2: Filter pill bar (persisted in URL as &filter=engineer:NAME&filter=project:KEY) -->
+            <div id="filter-pill-bar" class="filter-pill-bar" style="margin-bottom:8px;"></div>
+
+            <!-- G9-P2: Project selector (shown when role=project and no ?id= set) -->
+            <div id="project-selector-wrap" class="project-selector-wrap">
+                <label for="project-select" style="color:var(--text-muted);">Select project:</label>
+                <select id="project-select" class="project-select" onchange="onProjectSelect(this.value)">
+                    <option value="">-- choose project --</option>
+                </select>
+            </div>
+            </div><!-- /.sticky-controls -->
+
+            <!-- KPI Strip (Dashboard v2 Step 5): 4 tiles with 14d sparkline + WoW delta. -->
+            <div class="kpi-strip" id="kpi-strip">
+                <div class="kpi-tile" data-metric="runs">
+                    <div class="kpi-label">Total Runs · 14d</div>
+                    <div class="kpi-row">
+                        <div class="kpi-value" id="kpi-runs-value">--</div>
+                        <div class="kpi-delta" id="kpi-runs-delta"></div>
+                    </div>
+                    <svg class="kpi-spark" id="kpi-runs-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"></svg>
+                </div>
+                <div class="kpi-tile" data-metric="cost">
+                    <div class="kpi-label">Total Cost · 14d</div>
+                    <div class="kpi-row">
+                        <div class="kpi-value success" id="kpi-cost-value">--</div>
+                        <div class="kpi-delta" id="kpi-cost-delta"></div>
+                    </div>
+                    <svg class="kpi-spark" id="kpi-cost-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"></svg>
+                </div>
+                <div class="kpi-tile" data-metric="tokens">
+                    <div class="kpi-label">Total Tokens · 14d</div>
+                    <div class="kpi-row">
+                        <div class="kpi-value warning" id="kpi-tokens-value">--</div>
+                        <div class="kpi-delta" id="kpi-tokens-delta"></div>
+                    </div>
+                    <svg class="kpi-spark" id="kpi-tokens-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"></svg>
+                </div>
+                <div class="kpi-tile" data-metric="avg">
+                    <div class="kpi-label">Avg Cost/Run · 7d</div>
+                    <div class="kpi-row">
+                        <div class="kpi-value accent" id="kpi-avg-value">--</div>
+                        <div class="kpi-delta" id="kpi-avg-delta"></div>
+                    </div>
+                    <svg class="kpi-spark" id="kpi-avg-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true"></svg>
+                </div>
+            </div>
+
+            <!-- Legacy hidden anchors (kept so legacy code paths fail safe). -->
+            <div hidden>
+                <span id="total-runs"></span>
+                <span id="total-cost"></span>
+                <span id="total-tokens"></span>
+                <span id="avg-cost"></span>
+            </div>
+
+            <!-- G9-P2: Project view panels (visible only when role=project) -->
+            <section id="project-view">
+                <!-- Project hero tiles -->
+                <div class="project-hero-grid" id="project-hero-grid">
+                    <div class="hero-tile">
+                        <div class="stat-label">Project Cost</div>
+                        <div class="stat-value" id="proj-cost">--</div>
+                        <div class="hero-delta neutral" id="proj-cost-delta"></div>
+                        <div class="hero-spark"><canvas id="spark-proj-cost"></canvas></div>
+                    </div>
+                    <div class="hero-tile">
+                        <div class="stat-label">Tasks Completed</div>
+                        <div class="stat-value" id="proj-tasks">--</div>
+                        <div class="hero-delta neutral" id="proj-tasks-delta"></div>
+                        <div class="hero-spark"><canvas id="spark-proj-tasks"></canvas></div>
+                    </div>
+                    <div class="hero-tile">
+                        <div class="stat-label">Avg Cost / Task</div>
+                        <div class="stat-value" id="proj-avg-cost">--</div>
+                        <div class="hero-delta neutral" id="proj-avg-delta"></div>
+                        <div class="hero-spark"><canvas id="spark-proj-avg"></canvas></div>
+                    </div>
+                    <div class="hero-tile">
+                        <div class="stat-label">DORA (mini)</div>
+                        <div class="stat-value" id="proj-dora-light" style="font-size:16px;">--</div>
+                    </div>
+                </div>
+
+                <!-- Project DORA scorecard -->
+                <div class="card fade-in" style="margin-bottom:16px;" id="project-dora-card">
+                    <div class="card-header">
+                        <span class="card-title">DORA Scorecard — Project</span>
+                        <span style="font-size:12px;color:var(--text-muted);" id="proj-dora-age"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="dora-grid" id="proj-dora-grid">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Project cost burn line chart -->
+                <div class="card fade-in" style="margin-bottom:16px;" id="project-burn-chart-wrap">
+                    <div class="card-header">
+                        <span class="card-title">Cost Burn</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container"><canvas id="project-burn-chart"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Project tasks table -->
+                <div class="card fade-in" style="margin-bottom:16px;">
+                    <div class="card-header"><span class="card-title">Tasks</span></div>
+                    <div class="card-body no-padding">
+                        <div class="table-wrapper" style="max-height:400px;overflow:auto;">
+                            <table id="project-tasks-table">
+                                <thead><tr>
+                                    <th>Issue</th><th>Cost</th><th>Runs</th><th>Iterations</th><th>Status</th><th>Engineer</th>
+                                </tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Iteration distribution histogram -->
+                <div class="card fade-in" style="margin-bottom:16px;">
+                    <div class="card-header"><span class="card-title">Iteration Distribution</span><span class="card-subtitle" style="color:var(--text-muted);font-size:12px;margin-left:8px;">tasks bucketed by rework rounds</span></div>
+                    <div class="card-body">
+                        <div id="iteration-histogram-wrap">
+                            <canvas id="iteration-histogram-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Insights (project scope) -->
+                <div class="card fade-in" style="margin-bottom:16px;">
+                    <div class="card-header"><span class="card-title">Insights</span></div>
+                    <div class="card-body">
+                        <div class="insights-grid" id="project-insights-grid">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- G9-P4a: Engineer detail drilldown (visible only when role=engineer) -->
+            <section id="engineer-detail-view">
+                <div class="card g9-card">
+                    <div class="eng-detail-header">
+                        <h2 id="eng-detail-name">Engineer</h2>
+                        <span class="eng-back" onclick="drillToOrg()">← back to org</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- G10 P1: Engineer KPI strip (7d window) -->
+                        <h4 style="margin:0 0 8px 0;font-size:11px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;">7-day KPIs</h4>
+                        <div class="project-hero-grid" id="engineer-kpi-grid" style="margin-bottom:16px;">
+                            <div class="hero-tile">
+                                <div class="stat-label">Cost (7d)</div>
+                                <div class="stat-value" id="eng-kpi-cost">—</div>
+                                <div class="hero-delta neutral" id="eng-kpi-cost-delta"></div>
+                            </div>
+                            <div class="hero-tile">
+                                <div class="stat-label">Runs (7d)</div>
+                                <div class="stat-value" id="eng-kpi-runs">—</div>
+                            </div>
+                            <div class="hero-tile">
+                                <div class="stat-label">Interventions (7d)</div>
+                                <div class="stat-value" id="eng-kpi-interv">—</div>
+                            </div>
+                            <div class="hero-tile">
+                                <div class="stat-label">Autonomy</div>
+                                <div class="stat-value" id="eng-kpi-autonomy">—</div>
+                            </div>
+                            <div class="hero-tile">
+                                <div class="stat-label">Success</div>
+                                <div class="stat-value" id="eng-kpi-success">—</div>
+                            </div>
+                        </div>
+                        <h4 style="margin:0 0 8px 0;font-size:11px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;">Retention sparkline (4 weekly buckets)</h4>
+                        <div style="height:80px;position:relative;"><canvas id="engineer-retention-spark"></canvas></div>
+                        <h4 style="margin:16px 0 8px 0;font-size:11px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.5px;">Last 50 runs</h4>
+                        <div style="overflow-x:auto;">
+                            <table id="engineer-runs-table">
+                                <thead><tr><th>ID</th><th>Issue</th><th>Agent</th><th>Status</th><th>Cost</th><th>Started</th></tr></thead>
+                                <tbody><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- G9-SECTION: DORA + Attribution + Intent Feed -->
+            <section id="g9-section" class="g9-panels fade-in">
+                <!-- Old g9-stale-banner + org-alerts-banner replaced by Alert Center in header (Dashboard v2). -->
+                <!-- Hidden no-op anchors kept so legacy code paths fail safe; they are never displayed. -->
+                <div id="g9-stale-banner" hidden><span id="g9-stale-msg"></span></div>
+
+                <!-- DORA Scorecard collapsed to traffic light row (click to expand modal) -->
+                <div id="g9-dora-section" class="card fade-in dora-traffic-card"
+                     style="margin-bottom: 16px;"
+                     role="button" tabindex="0"
+                     onclick="openDoraModal()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDoraModal();}">
+                    <div class="card-header">
+                        <span class="card-title">DORA Scorecard — Last 28 days</span>
+                        <span style="font-size: 12px; color: var(--text-muted);" id="dora-age"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="dora-traffic-light" id="dora-traffic-light">
+                            <span class="dora-traffic-dots" id="dora-traffic-dots">⚪⚪⚪⚪</span>
+                            <span class="dora-traffic-summary" id="dora-traffic-summary">DORA: loading…</span>
+                            <span class="dora-traffic-cta">click to expand</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DORA detail modal (hidden by default; opened from traffic-light card) -->
+                <div id="dora-modal" class="dora-modal" hidden aria-hidden="true">
+                    <div class="dora-modal-backdrop" onclick="closeDoraModal()"></div>
+                    <div class="dora-modal-panel" role="dialog" aria-labelledby="dora-modal-title">
+                        <div class="dora-modal-header">
+                            <span id="dora-modal-title" class="card-title">DORA Scorecard — Last 28 days</span>
+                            <button class="dora-modal-close" onclick="closeDoraModal()" aria-label="Close">×</button>
+                        </div>
+                        <div class="dora-modal-body">
+                            <div class="dora-grid" id="dora-grid">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rework Rate tile (DORA-adjacent, org scope) -->
+                <div id="org-rework-card" class="card fade-in" style="margin-bottom:16px;">
+                    <div class="card-header">
+                        <span class="card-title">Rework Rate — Last 28 days</span>
+                        <span style="font-size:12px;color:var(--text-muted);" id="org-rework-meta"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="dora-metric" id="org-rework-tile" style="max-width:200px;">
+                            <div class="dora-label">Rework %</div>
+                            <div class="dora-value" id="org-rework-value">—</div>
+                            <div class="dora-unit" id="org-rework-delta" style="color:var(--text-muted);"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- G9-HERO-GRID: Attribution + Intent -->
+                <div class="g9-hero-grid">
+                    <!-- Attribution Tile -->
+                    <div class="card fade-in">
+                        <div class="card-header">
+                            <span class="card-title">Attribution — 28d</span>
+                            <div class="engineer-filter" id="attr-engineer-filter" style="display:none;">
+                                <input type="text" class="engineer-input" id="attr-engineer-input"
+                                    placeholder="engineer name" oninput="loadG9Attribution()">
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="attribution-tile" class="attribution-tile">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Intent Feed -->
+                    <div class="card fade-in">
+                        <div class="card-header">
+                            <span class="card-title">Intent Feed — Recent Decisions</span>
+                            <div class="engineer-filter" id="intent-engineer-filter" style="display:none;">
+                                <input type="text" class="engineer-input" id="intent-engineer-input"
+                                    placeholder="engineer name" oninput="loadG9Intent()">
+                            </div>
+                        </div>
+                        <div class="card-body no-padding">
+                            <div class="intent-feed" id="intent-feed">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Insights (org/engineer scope) -->
+                <div class="card fade-in" style="margin-top:16px;">
+                    <div class="card-header"><span class="card-title">Insights</span></div>
+                    <div class="card-body">
+                        <div class="insights-grid" id="org-insights-grid">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="grid-3-1">
+                <div class="card fade-in" style="animation-delay: 0.2s;">
+                    <div class="card-header">
+                        <span class="card-title">Cost Trend (Last 7 Days)</span>
+                        <div class="tab-group">
+                            <button class="tab-btn active" data-chart="cost">Cost</button>
+                            <button class="tab-btn" data-chart="runs">Runs</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container"><canvas id="trend-chart"></canvas></div>
+                    </div>
+                </div>
+                <div class="card fade-in" style="animation-delay: 0.25s;">
+                    <div class="card-header"><span class="card-title">Cost by Agent</span></div>
+                    <div class="card-body">
+                        <div class="chart-container"><canvas id="cost-chart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card fade-in" style="animation-delay: 0.3s; margin-bottom: 24px;" id="agents">
+                <div class="card-header"><span class="card-title">Agent Performance</span></div>
+                <div class="card-body no-padding">
+                    <div class="table-wrapper">
+                        <table id="agents-table">
+                            <thead><tr>
+                                <th>Agent</th><th>Runs</th><th>Success Rate</th>
+                                <th>Total Cost</th><th>Avg Cost</th><th>Avg Duration</th><th>Tokens</th>
+                            </tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="quality" style="margin-bottom: 24px;">
+                <div class="card fade-in" style="animation-delay: 0.35s; margin-bottom: 16px;">
+                    <div class="card-header">
+                        <span class="card-title">Quality KPI — Regression Rate</span>
+                        <select class="dim-selector" data-kpi="regression">
+                            <option value="agent">By Agent</option>
+                            <option value="engineer">By Engineer</option>
+                            <option value="sprint">By Sprint</option>
+                        </select>
+                    </div>
+                    <div class="card-body no-padding">
+                        <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+                            <table id="quality-regression-table">
+                                <thead><tr>
+                                    <th class="dim-header">Agent</th><th>Tasks</th>
+                                    <th>Regressed</th><th>Regression %</th>
+                                </tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="card fade-in" style="animation-delay: 0.4s; margin-bottom: 16px;">
+                    <div class="card-header">
+                        <span class="card-title">Quality KPI — Bug Rate</span>
+                        <select class="dim-selector" data-kpi="bugs">
+                            <option value="agent">By Agent</option>
+                            <option value="engineer">By Engineer</option>
+                            <option value="sprint">By Sprint</option>
+                        </select>
+                    </div>
+                    <div class="card-body no-padding">
+                        <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+                            <table id="quality-bugs-table">
+                                <thead><tr>
+                                    <th class="dim-header">Agent</th><th>Runs</th>
+                                    <th>Bugs</th><th>Bugs / Run</th>
+                                </tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="card fade-in" style="animation-delay: 0.45s;">
+                    <div class="card-header">
+                        <span class="card-title">Quality KPI — Quality-Adjusted Cost</span>
+                        <select class="dim-selector" data-kpi="cost">
+                            <option value="agent">By Agent</option>
+                            <option value="engineer">By Engineer</option>
+                            <option value="sprint">By Sprint</option>
+                        </select>
+                    </div>
+                    <div class="card-body no-padding">
+                        <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+                            <table id="quality-cost-table">
+                                <thead><tr>
+                                    <th>Task</th><th class="dim-header">Agent</th><th>Cost</th>
+                                    <th>Runs</th><th>Iterations</th><th>Bugs</th><th>Clean</th>
+                                </tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card fade-in" style="animation-delay: 0.48s; margin-bottom: 16px;" id="mix-leaderboard-card">
+                <div class="card-header">
+                    <span class="card-title">Engineer × Agent Leaderboard — last 28 days</span>
+                    <span style="font-size:12px;color:var(--text-muted);">click engineer to drill in</span>
+                </div>
+                <div class="card-body no-padding">
+                    <div class="table-wrapper" style="max-height: 420px; overflow-y: auto;">
+                        <table id="mix-leaderboard-table">
+                            <thead><tr>
+                                <th data-sort="engineer">Engineer</th>
+                                <th data-sort="agent">Agent</th>
+                                <th data-sort="run_count" style="width:80px;">Runs</th>
+                                <th data-sort="total_cost" style="width:120px;">Cost</th>
+                                <th data-sort="avg_cost" style="width:120px;">Avg Cost</th>
+                            </tr></thead>
+                            <tbody><tr><td colspan="5" class="empty-state">Loading…</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card fade-in" style="animation-delay: 0.5s;" id="runs">
+                <div class="card-header"><span class="card-title">Recent Runs</span></div>
+                <div class="card-body no-padding">
+                    <div class="table-wrapper" style="max-height: 500px; overflow-y: auto;">
+                        <table id="runs-table">
+                            <thead><tr>
+                                <th style="width: 100px;">Run ID</th>
+                                <th style="width: 120px;">Task</th>
+                                <th>Agent</th>
+                                <th style="width: 100px;">Status</th>
+                                <th style="width: 100px;">Duration</th>
+                                <th style="width: 100px;">Cost</th>
+                                <th style="width: 100px;">Tokens</th>
+                                <th style="width: 160px;">Started</th>
+                            </tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Run Detail drawer (Step 7): slide-in from right; ESC + backdrop close; URL ?run=<id> -->
+    <div id="run-drawer" class="run-drawer" hidden aria-hidden="true">
+        <div class="run-drawer-backdrop" onclick="closeRunDrawer()"></div>
+        <aside class="run-drawer-panel" role="dialog" aria-labelledby="run-drawer-title">
+            <header class="run-drawer-header">
+                <div>
+                    <div class="run-drawer-eyebrow">Run</div>
+                    <h2 id="run-drawer-title" class="run-drawer-title">—</h2>
+                </div>
+                <button class="run-drawer-close" onclick="closeRunDrawer()" aria-label="Close drawer">×</button>
+            </header>
+            <nav class="run-drawer-tabs" role="tablist">
+                <button class="run-drawer-tab active" data-tab="summary" role="tab"
+                        onclick="setRunDrawerTab('summary')">Summary</button>
+                <button class="run-drawer-tab" data-tab="events" role="tab"
+                        onclick="setRunDrawerTab('events')">Events</button>
+                <button class="run-drawer-tab" data-tab="quality" role="tab"
+                        onclick="setRunDrawerTab('quality')">Quality</button>
+                <button class="run-drawer-tab" data-tab="files" role="tab"
+                        onclick="setRunDrawerTab('files')">Files Changed</button>
+                <button class="run-drawer-tab" data-tab="audit" role="tab" disabled
+                        title="Available in Phase 04">Audit</button>
+            </nav>
+            <div class="run-drawer-body">
+                <section class="run-drawer-tab-pane active" data-pane="summary" id="run-drawer-summary">
+                    <div class="run-drawer-empty">Loading…</div>
+                </section>
+                <section class="run-drawer-tab-pane" data-pane="events" id="run-drawer-events" hidden>
+                    <div class="run-drawer-empty">Loading…</div>
+                </section>
+                <section class="run-drawer-tab-pane" data-pane="quality" id="run-drawer-quality" hidden>
+                    <div class="run-drawer-empty">No quality data yet.</div>
+                </section>
+                <section class="run-drawer-tab-pane" data-pane="files" id="run-drawer-files" hidden>
+                    <div class="run-drawer-empty">Files-changed capture lands in Phase 02.</div>
+                </section>
+            </div>
+        </aside>
+    </div>
+
+    <script>const JIRA_BASE_URL = '{{JIRA_BASE_URL}}';</script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -127,3 +127,45 @@ func TestSeed_DepartmentsPopulated(t *testing.T) {
 		t.Errorf("expected ≥2 departments, got %d", depts)
 	}
 }
+
+func TestSeedCrossProject_Counts(t *testing.T) {
+	d := newMigratedDB(t)
+	if err := SeedCrossProject(d); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3 projects × 3 sprints × 4 runs = 36.
+	if got := countRuns(t, d, `command = ?`, seedTagCross); got != 36 {
+		t.Errorf("cross-project runs = %d, want 36", got)
+	}
+
+	// Each project must contribute runs.
+	for _, p := range []string{"CLITEST1", "CLITEST2", "CLITEST3"} {
+		got := countRuns(t, d, `jira_issue_key LIKE ? AND command = ?`, p+"-%", seedTagCross)
+		if got != 12 {
+			t.Errorf("%s runs = %d, want 12", p, got)
+		}
+	}
+
+	// 3 distinct sprints per project (suffix S1/S2/S3).
+	var sprints int
+	if err := d.QueryRow(`SELECT COUNT(DISTINCT jira_sprint_id) FROM runs WHERE command = ?`, seedTagCross).Scan(&sprints); err != nil {
+		t.Fatal(err)
+	}
+	if sprints != 9 {
+		t.Errorf("distinct sprints = %d, want 9 (3 projects × 3 sprints)", sprints)
+	}
+}
+
+func TestSeedCrossProject_Idempotent(t *testing.T) {
+	d := newMigratedDB(t)
+	if err := SeedCrossProject(d); err != nil {
+		t.Fatal(err)
+	}
+	if err := SeedCrossProject(d); err != nil {
+		t.Fatal(err)
+	}
+	if got := countRuns(t, d, `command = ?`, seedTagCross); got != 36 {
+		t.Errorf("after double-seed: %d runs, want 36 (idempotent)", got)
+	}
+}

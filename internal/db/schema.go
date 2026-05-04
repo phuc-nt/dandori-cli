@@ -1,6 +1,6 @@
 package db
 
-const SchemaVersion = 7
+const SchemaVersion = 8
 
 const SchemaSQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -132,6 +132,17 @@ CREATE TABLE IF NOT EXISTS task_attribution (
 );
 
 CREATE INDEX IF NOT EXISTS idx_attribution_done_at ON task_attribution(jira_done_at);
+
+CREATE TABLE IF NOT EXISTS alerts_acked (
+    alert_key TEXT PRIMARY KEY,
+    acked_by TEXT,
+    acked_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_sprint_started ON runs(jira_sprint_id, started_at);
+CREATE INDEX IF NOT EXISTS idx_runs_dept_started ON runs(department, started_at);
+CREATE INDEX IF NOT EXISTS idx_runs_remote_started ON runs(git_remote, started_at);
 `
 
 // Migration from v1 to v2: add quality_metrics table

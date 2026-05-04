@@ -5,12 +5,28 @@ import (
 	"testing"
 )
 
-// TestDashboardHTMLv2_ContainsProjectViewMarkup asserts that dashboardHTML
+// dashboardHTMLForTest reads the embedded index.html for use in content-assertion tests.
+// This replaces the old dashboardHTML const after extraction to embed.FS.
+func dashboardHTMLForTest(t *testing.T) string {
+	t.Helper()
+	raw, err := dashboardFS.ReadFile("web/dashboard/index.html")
+	if err != nil {
+		t.Fatalf("failed to read embedded index.html: %v", err)
+	}
+	// Also append app.js so JS function checks still pass.
+	js, err := dashboardFS.ReadFile("web/dashboard/app.js")
+	if err != nil {
+		t.Fatalf("failed to read embedded app.js: %v", err)
+	}
+	return string(raw) + "\n" + string(js)
+}
+
+// TestDashboardHTMLv2_ContainsProjectViewMarkup asserts that the dashboard HTML+JS
 // contains the required P2 UI elements. This catches accidental deletion during
 // future edits without requiring a running browser.
 func TestDashboardHTMLv2_ContainsProjectViewMarkup(t *testing.T) {
 	t.Helper()
-	html := dashboardHTML
+	html := dashboardHTMLForTest(t)
 
 	checks := []struct {
 		desc    string
@@ -68,18 +84,19 @@ func TestDashboardHTMLv2_ContainsProjectViewMarkup(t *testing.T) {
 // TestDashboardHTML_ContainsG9Markers asserts the G9 boundary comments are
 // present (regression guard so future edits don't accidentally strip them).
 func TestDashboardHTML_ContainsG9Markers(t *testing.T) {
-	if !strings.Contains(dashboardHTML, "G9-") {
-		t.Error("dashboardHTML missing G9- marker comments")
+	html := dashboardHTMLForTest(t)
+	if !strings.Contains(html, "G9-") {
+		t.Error("dashboard HTML missing G9- marker comments")
 	}
-	if !strings.Contains(dashboardHTML, "G9 Analytics") {
-		t.Error("dashboardHTML missing G9 Analytics sidebar badge")
+	if !strings.Contains(html, "G9 Analytics") {
+		t.Error("dashboard HTML missing G9 Analytics sidebar badge")
 	}
 }
 
 // TestDashboardHTMLv2_PeriodDefaultValues asserts that the period selector
 // option values match the spec (7d, 28d, 90d, custom).
 func TestDashboardHTMLv2_PeriodDefaultValues(t *testing.T) {
-	html := dashboardHTML
+	html := dashboardHTMLForTest(t)
 	for _, val := range []string{`value="7d"`, `value="28d"`, `value="90d"`, `value="custom"`} {
 		if !strings.Contains(html, val) {
 			t.Errorf("dashboardHTML period selector missing option %s", val)
