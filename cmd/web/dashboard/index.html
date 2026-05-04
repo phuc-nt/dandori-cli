@@ -30,6 +30,20 @@
                     </svg>
                     DORA + G9
                 </a>
+                <!-- Phase 02 — PO View persona tab. Hosts Velocity / Cost / Attribution sub-tabs. -->
+                <a class="nav-item" href="#po-view-section" data-persona="po">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 14l4-4 4 4 5-5"/>
+                    </svg>
+                    PO View
+                </a>
+                <!-- Phase 02 — Tasks tab. Sprint board + Task lifecycle Gantt. -->
+                <a class="nav-item" href="#tasks-section" data-persona="tasks">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    Tasks
+                </a>
                 <a class="nav-item" href="#agents">
                     <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -95,6 +109,10 @@
                         <input type="date" id="custom-to" class="date-input" onchange="onCustomDateChange()">
                         <span id="custom-date-error" style="color:var(--error);font-size:12px;display:none;">Invalid range</span>
                     </div>
+                    <!-- Phase 02 — Sprint picker (Step 2): cross-project sprint dropdown that scopes the dashboard. -->
+                    <select id="sprint-picker" class="sprint-picker" onchange="onSprintChange(this.value)" aria-label="Sprint">
+                        <option value="">All sprints</option>
+                    </select>
                     <!-- G9-COMPARE-TOGGLE -->
                     <label class="compare-label">
                         <input type="checkbox" id="compare-toggle" onchange="updateState({compare: this.checked})">
@@ -312,6 +330,106 @@
                                 <tbody><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 02 — PO View section (Velocity / Cost / Attribution sub-tabs). -->
+            <section id="po-view-section" class="persona-section fade-in" hidden>
+                <div class="persona-tabs" role="tablist" aria-label="PO View sub-tabs">
+                    <button class="persona-tab active" data-pview="velocity"
+                            onclick="setPOSubTab('velocity')">Velocity</button>
+                    <button class="persona-tab" data-pview="cost"
+                            onclick="setPOSubTab('cost')">Cost</button>
+                    <button class="persona-tab" data-pview="attribution"
+                            onclick="setPOSubTab('attribution')">Attribution</button>
+                </div>
+                <!-- Velocity sub-tab: PO-1 sprint burndown + PO-2 lead time histogram + DORA traffic embed. -->
+                <div class="persona-pane" data-pview-pane="velocity">
+                    <div class="grid-2col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Sprint Burndown</h3>
+                                <span class="card-sub" id="po-burndown-sub">Pick a sprint</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="po-burndown-canvas"></canvas></div>
+                            <div class="empty-state" id="po-burndown-empty" hidden>Select a sprint to see burndown.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Lead Time</h3>
+                                <span class="card-sub">Distribution of run durations</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="po-leadtime-canvas"></canvas></div>
+                            <div class="empty-state" id="po-leadtime-empty" hidden>No runs in window.</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Cost sub-tab: KPI strip embed + PO-3 stacked bar + PO-4 projection tile. -->
+                <div class="persona-pane" data-pview-pane="cost" hidden>
+                    <div class="grid-2col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Cost by Department</h3>
+                                <span class="card-sub">Stacked daily totals</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="po-cost-dept-canvas"></canvas></div>
+                            <div class="empty-state" id="po-cost-dept-empty" hidden>No cost data.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Cost Projection · EOM</h3>
+                                <span class="card-sub" id="po-projection-sub">Linear regression · 14d</span>
+                            </div>
+                            <div class="projection-tile" id="po-projection-tile">
+                                <div class="projection-big" id="po-projection-big">--</div>
+                                <div class="projection-band" id="po-projection-band">±--</div>
+                                <svg class="projection-spark" id="po-projection-spark" viewBox="0 0 200 48" preserveAspectRatio="none" aria-hidden="true"></svg>
+                                <div class="projection-disclaimer" id="po-projection-disclaimer"></div>
+                            </div>
+                            <div class="empty-state" id="po-projection-empty" hidden>Insufficient data for projection (need ≥7 days).</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Attribution sub-tab: PO-5 authorship + PO-6 retention + PO-7 intervention. -->
+                <div class="persona-pane" data-pview-pane="attribution" hidden>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Authorship · Retention · Intervention</h3>
+                            <span class="card-sub">Weekly aggregates</span>
+                        </div>
+                        <div class="chart-frame"><canvas id="po-attribution-canvas"></canvas></div>
+                        <div class="empty-state" id="po-attribution-empty" hidden>No attribution data.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 02 — Tasks section (Sprint Board + Task Lifecycle Gantt). -->
+            <section id="tasks-section" class="persona-section fade-in" hidden>
+                <div class="persona-tabs" role="tablist" aria-label="Tasks sub-tabs">
+                    <button class="persona-tab active" data-tview="sprint"
+                            onclick="setTasksSubTab('sprint')">Sprint Board</button>
+                    <button class="persona-tab" data-tview="lifecycle"
+                            onclick="setTasksSubTab('lifecycle')">Task Lifecycle</button>
+                </div>
+                <div class="persona-pane" data-tview-pane="sprint">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title" id="tasks-sprint-title">Sprint Board</h3>
+                            <span class="card-sub" id="tasks-sprint-sub">Pick a sprint</span>
+                        </div>
+                        <div id="tasks-sprint-board" class="sprint-board"></div>
+                        <div class="empty-state" id="tasks-sprint-empty" hidden>Select a sprint above.</div>
+                    </div>
+                </div>
+                <div class="persona-pane" data-tview-pane="lifecycle" hidden>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Task Lifecycle</h3>
+                            <span class="card-sub" id="tasks-lifecycle-sub">Click a PBI in the Sprint Board to load its lifecycle</span>
+                        </div>
+                        <div id="tasks-lifecycle-gantt" class="task-gantt"></div>
+                        <div class="empty-state" id="tasks-lifecycle-empty" hidden>Select a PBI from the Sprint Board.</div>
                     </div>
                 </div>
             </section>

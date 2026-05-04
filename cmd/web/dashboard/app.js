@@ -19,6 +19,7 @@
                 from:    p.get('from')    || '',
                 to:      p.get('to')      || '',
                 compare: p.get('compare') === 'true',
+                sprint:  p.get('sprint')  || '', // Phase 02 sprint scope
                 filters: p.getAll('filter'), // array of "engineer:NAME" or "project:KEY"
             };
         }
@@ -31,8 +32,11 @@
             if (s.from)    p.set('from', s.from);
             if (s.to)      p.set('to', s.to);
             if (s.compare) p.set('compare', 'true');
+            if (s.sprint)  p.set('sprint', s.sprint);
             (s.filters || []).forEach(f => p.append('filter', f));
-            history.replaceState(null, '', '?' + p.toString());
+            // Preserve hash (persona routing uses #po-view-section / #tasks-section).
+            const hash = window.location.hash || '';
+            history.replaceState(null, '', '?' + p.toString() + hash);
         }
 
         // Merge partial into current state, write URL, re-render + reload.
@@ -62,6 +66,8 @@
             // Scope from role + id
             if (s.role === 'engineer' && s.id) p.set('engineer', s.id);
             if (s.role === 'project'  && s.id) p.set('project', s.id);
+            // Phase 02: sprint scope propagates into every API call.
+            if (s.sprint) p.set('sprint', s.sprint);
             // Filter pills append additional scopes
             (s.filters || []).forEach(f => {
                 const [type, val] = f.split(':');
@@ -123,10 +129,51 @@
             // Compare toggle
             const ct = document.getElementById('compare-toggle');
             if (ct) ct.checked = s.compare;
+            // Phase 02 sprint picker: reflect current sprint id and active styling.
+            const sp = document.getElementById('sprint-picker');
+            if (sp) {
+                sp.value = s.sprint || '';
+                sp.classList.toggle('active', !!s.sprint);
+            }
             // Role-based panel visibility
             applyRoleVisibility(role, s.id);
             // Filter pills
             renderFilterPills(s.filters || []);
+        }
+
+        // Phase 02 — Sprint picker handler: store sprint id (or '' for all) in URL state and re-render.
+        // If a persona section is open, re-load its widgets so they re-scope to the new sprint.
+        function onSprintChange(value) {
+            updateState({sprint: value});
+            const poOpen = !document.getElementById('po-view-section')?.hidden;
+            const tasksOpen = !document.getElementById('tasks-section')?.hidden;
+            if (poOpen) loadPOView();
+            if (tasksOpen) loadTasksView();
+        }
+
+        // Phase 02 — populate sprint picker from /api/sprints. Sort: active (latest end_at) first,
+        // then started_at desc. Idempotent: rebuilds on every call so cross-project seeds reflect immediately.
+        async function loadSprintPicker() {
+            const sel = document.getElementById('sprint-picker');
+            if (!sel) return;
+            try {
+                const res = await fetch('/api/sprints');
+                if (!res.ok) throw new Error('sprints fetch failed');
+                const sprints = await res.json();
+                // Sort: ended_at desc (newest first ≈ active first since active is most recently updated).
+                sprints.sort((a, b) => (b.ended_at || '').localeCompare(a.ended_at || ''));
+                const cur = readState().sprint;
+                sel.innerHTML = '<option value="">All sprints</option>' +
+                    sprints.map(s => {
+                        const label = `${s.id} · ${s.run_count} runs`;
+                        return `<option value="${s.id}">${label}</option>`;
+                    }).join('');
+                if (cur) sel.value = cur;
+                sel.classList.toggle('active', !!cur);
+            } catch (err) {
+                // Soft-fail: leave the "All sprints" placeholder. Phase 02 widgets handle absent sprint scope.
+                console.warn('sprint picker:', err);
+            }
         }
 
         // ---- Role/panel visibility ----
@@ -147,7 +194,11 @@
             // Attribution tile is org/engineer scoped; we hide just the
             // attribution card for project to avoid showing org numbers there.
             const g9Section = document.getElementById('g9-section');
-            g9Section.style.display = '';
+            // Phase 02: don't override persona-driven hide. If a persona section is active,
+            // togglePersonaVisibility owns g9-section visibility.
+            const personaActive = !document.getElementById('po-view-section')?.hidden ||
+                                  !document.getElementById('tasks-section')?.hidden;
+            if (!personaActive) g9Section.style.display = '';
             const attrTileCard = document.getElementById('attribution-tile')?.closest('.card');
             if (attrTileCard) attrTileCard.style.display = role === 'project' ? 'none' : '';
             // Project view section
@@ -1262,10 +1313,13 @@
 
             // Org-only widget visibility — must run for every role transition,
             // before any early-return branch (project/engineer return early).
+            // Phase 02: skip when persona section is active (PO View / Tasks own visibility).
+            const personaActive = !document.getElementById('po-view-section')?.hidden ||
+                                  !document.getElementById('tasks-section')?.hidden;
             const orgOnlyIDs = ['mix-leaderboard-card', 'org-rework-card'];
             orgOnlyIDs.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.style.display = (role === 'org') ? '' : 'none';
+                if (el && !personaActive) el.style.display = (role === 'org') ? '' : 'none';
             });
 
             if (role === 'project') {
@@ -1631,6 +1685,25 @@
 
         // Init: if no ?role= in URL, fetch /api/g9/landing once → adopt result → load.
         // Otherwise sync all UI controls from URL and load.
+        // Phase 02: synchronously toggle persona visibility based on initial hash
+        // before init's awaits run. Avoids stuck "Overview shown" in headless capture.
+        // Data loading happens later inside init via showPersonaSection.
+        (function earlyHashApply() {
+            const h = window.location.hash || '';
+            let persona = null;
+            if (h === '#po-view-section') persona = 'po';
+            else if (h === '#tasks-section') persona = 'tasks';
+            try { togglePersonaVisibility(persona); } catch(_) {}
+            if (persona) {
+                document.querySelectorAll('.nav-item').forEach(n => {
+                    n.classList.toggle('active', n.getAttribute('data-persona') === persona);
+                });
+            }
+        })();
+        window.addEventListener('hashchange', function() {
+            try { applyHashPersona(); } catch(_) {}
+        });
+
         (async function init() {
             let s = readState();
             if (!s.role) {
@@ -1649,16 +1722,49 @@
                 }
             }
             syncUIToState(s);
+            // Re-apply hash routing in case state init changed nav classes.
+            applyHashPersona();
+            loadSprintPicker().then(() => syncUIToState(readState()));
             loadAll();
         })();
+
+        // Map a #hash to a persona section (PO View / Tasks) and toggle visibility + nav active state.
+        // Also supports sub-tab via #po-view-section/cost or #tasks-section/lifecycle.
+        function applyHashPersona() {
+            const h = window.location.hash || '';
+            let persona = null;
+            let sub = '';
+            if (h.startsWith('#po-view-section')) {
+                persona = 'po';
+                sub = h.slice('#po-view-section'.length).replace(/^\//, '');
+            } else if (h.startsWith('#tasks-section')) {
+                persona = 'tasks';
+                sub = h.slice('#tasks-section'.length).replace(/^\//, '');
+            }
+            showPersonaSection(persona);
+            if (persona) {
+                document.querySelectorAll('.nav-item').forEach(n => {
+                    n.classList.toggle('active', n.getAttribute('data-persona') === persona);
+                });
+                if (persona === 'po' && sub) setPOSubTab(sub);
+                if (persona === 'tasks' && sub) setTasksSubTab(sub);
+            }
+        }
 
         setInterval(loadAll, REFRESH_INTERVAL);
 
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', function(e) {
                 const href = this.getAttribute('href');
-                if (href && href.startsWith('#') && href.length > 1) {
+                const persona = this.getAttribute('data-persona');
+                // Phase 02 persona tabs (PO View, Tasks) toggle a dedicated section visibility instead of scrolling.
+                if (persona) {
                     e.preventDefault();
+                    showPersonaSection(persona);
+                } else if (href && href.startsWith('#') && href.length > 1) {
+                    e.preventDefault();
+                    // Hide any persona section when returning to anchor-based nav.
+                    showPersonaSection(null);
                     const target = document.querySelector(href);
                     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
@@ -1666,3 +1772,330 @@
                 this.classList.add('active');
             });
         });
+
+        // Phase 02 — Persona sections: PO View + Tasks. Only one persona section is visible at a time
+        // and they REPLACE the default Overview layout (KPI strip, DORA, runs, etc.) so the persona
+        // dashboard isn't competing for vertical space. Pass null to restore the default layout.
+        // Toggle visibility of persona sections + default overview cards.
+        // Pure DOM toggling — no data fetches, safe to call before init.
+        function togglePersonaVisibility(persona) {
+            const poSec = document.getElementById('po-view-section');
+            const tasksSec = document.getElementById('tasks-section');
+            if (poSec) poSec.hidden = persona !== 'po';
+            if (tasksSec) tasksSec.hidden = persona !== 'tasks';
+
+            const defaultIDs = ['kpi-strip', 'g9-section', 'quality', 'agents', 'runs',
+                                'mix-leaderboard-card', 'org-rework-card'];
+            const showDefault = persona === null;
+            defaultIDs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = showDefault ? '' : 'none';
+            });
+            ['cost-chart', 'trend-chart'].forEach(id => {
+                const c = document.getElementById(id)?.closest('.card');
+                if (c) c.style.display = showDefault ? '' : 'none';
+            });
+        }
+
+        function showPersonaSection(persona) {
+            togglePersonaVisibility(persona);
+            if (persona === 'po') loadPOView();
+            if (persona === 'tasks') loadTasksView();
+        }
+
+        function setPOSubTab(name) {
+            document.querySelectorAll('#po-view-section .persona-tab').forEach(t =>
+                t.classList.toggle('active', t.getAttribute('data-pview') === name));
+            document.querySelectorAll('#po-view-section .persona-pane').forEach(p =>
+                p.hidden = p.getAttribute('data-pview-pane') !== name);
+        }
+
+        function setTasksSubTab(name) {
+            document.querySelectorAll('#tasks-section .persona-tab').forEach(t =>
+                t.classList.toggle('active', t.getAttribute('data-tview') === name));
+            document.querySelectorAll('#tasks-section .persona-pane').forEach(p =>
+                p.hidden = p.getAttribute('data-tview-pane') !== name);
+        }
+
+        // ---- Phase 02 PO View loaders ----
+        // Single entry called when PO nav clicked or sprint-picker changes while PO is active.
+        async function loadPOView() {
+            const s = readState();
+            // Velocity: burndown only loads if a sprint is selected; lead-time always.
+            renderPOBurndown(s.sprint);
+            renderPOLeadTime();
+            renderPOCostByDept();
+            renderPOCostProjection();
+            renderPOAttribution();
+        }
+
+        // Chart.js widget registry — keep references so we can destroy/replace on re-render.
+        const poCharts = { burndown: null, leadtime: null, costDept: null, attribution: null };
+        function destroyChart(key) {
+            if (poCharts[key]) { poCharts[key].destroy(); poCharts[key] = null; }
+        }
+
+        async function renderPOBurndown(sprintID) {
+            destroyChart('burndown');
+            const empty = document.getElementById('po-burndown-empty');
+            const sub = document.getElementById('po-burndown-sub');
+            const canvas = document.getElementById('po-burndown-canvas');
+            if (!sprintID) {
+                empty.hidden = false; canvas.style.display = 'none';
+                sub.textContent = 'Pick a sprint';
+                return;
+            }
+            sub.textContent = sprintID;
+            try {
+                const res = await fetch('/api/sprints/burndown?id=' + encodeURIComponent(sprintID));
+                const days = await res.json();
+                if (!days || days.length === 0) {
+                    empty.hidden = false; canvas.style.display = 'none';
+                    return;
+                }
+                empty.hidden = true; canvas.style.display = '';
+                // Cumulative burn (issues_done over time).
+                let cum = 0;
+                const labels = days.map(d => d.day);
+                const actual = days.map(d => { cum += d.issues_done; return cum; });
+                const totalIssues = actual[actual.length - 1] || 1;
+                // Ideal: linear from 0 to total over days.
+                const ideal = labels.map((_, i) => Math.round((i + 1) * totalIssues / labels.length));
+                poCharts.burndown = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Actual', data: actual, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)', fill: true, tension: 0.2 },
+                            { label: 'Ideal',  data: ideal,  borderColor: '#22c55e', borderDash: [4, 4], fill: false, tension: 0 },
+                        ],
+                    },
+                    options: chartOptionsLine('Issues completed'),
+                });
+            } catch (err) { console.warn('burndown:', err); }
+        }
+
+        async function renderPOLeadTime() {
+            destroyChart('leadtime');
+            const empty = document.getElementById('po-leadtime-empty');
+            const canvas = document.getElementById('po-leadtime-canvas');
+            try {
+                const res = await fetch('/api/runs/lead-time' + buildAPIQuery());
+                const buckets = await res.json();
+                const total = buckets.reduce((sum, b) => sum + b.count, 0);
+                if (total === 0) {
+                    empty.hidden = false; canvas.style.display = 'none';
+                    return;
+                }
+                empty.hidden = true; canvas.style.display = '';
+                poCharts.leadtime = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: buckets.map(b => b.label),
+                        datasets: [{ label: 'Runs', data: buckets.map(b => b.count), backgroundColor: '#6366f1' }],
+                    },
+                    options: chartOptionsBar('Runs'),
+                });
+            } catch (err) { console.warn('leadtime:', err); }
+        }
+
+        async function renderPOCostByDept() {
+            destroyChart('costDept');
+            const empty = document.getElementById('po-cost-dept-empty');
+            const canvas = document.getElementById('po-cost-dept-canvas');
+            try {
+                const res = await fetch('/api/cost/department' + buildAPIQuery());
+                const rows = await res.json();
+                if (!rows || rows.length === 0) {
+                    empty.hidden = false; canvas.style.display = 'none';
+                    return;
+                }
+                empty.hidden = true; canvas.style.display = '';
+                // Pivot: days × departments.
+                const days = [...new Set(rows.map(r => r.day))].sort();
+                const depts = [...new Set(rows.map(r => r.department))].sort();
+                const datasets = depts.map((d, i) => ({
+                    label: d,
+                    data: days.map(day => {
+                        const row = rows.find(r => r.day === day && r.department === d);
+                        return row ? row.cost : 0;
+                    }),
+                    backgroundColor: chartColors[i % chartColors.length],
+                }));
+                poCharts.costDept = new Chart(canvas, {
+                    type: 'bar',
+                    data: { labels: days, datasets },
+                    options: chartOptionsBar('USD', { stacked: true }),
+                });
+            } catch (err) { console.warn('cost-dept:', err); }
+        }
+
+        async function renderPOCostProjection() {
+            const empty = document.getElementById('po-projection-empty');
+            const tile = document.getElementById('po-projection-tile');
+            try {
+                const res = await fetch('/api/cost/projection' + buildAPIQuery());
+                const data = await res.json();
+                if (!data.data_sufficient) {
+                    empty.hidden = false; tile.style.display = 'none';
+                    return;
+                }
+                empty.hidden = true; tile.style.display = '';
+                document.getElementById('po-projection-big').textContent = '$' + data.projected_eom.toFixed(2);
+                document.getElementById('po-projection-band').textContent =
+                    `±$${(data.confidence_high - data.projected_eom).toFixed(2)} (low $${data.confidence_low.toFixed(2)} · high $${data.confidence_high.toFixed(2)})`;
+                document.getElementById('po-projection-disclaimer').textContent = data.disclaimer_note;
+                renderProjectionSpark(data.history);
+            } catch (err) { console.warn('projection:', err); }
+        }
+
+        function renderProjectionSpark(history) {
+            const svg = document.getElementById('po-projection-spark');
+            if (!svg) return;
+            const max = Math.max(...history.map(h => h.cost), 0.01);
+            const w = 200, h = 48;
+            const pts = history.map((d, i) => {
+                const x = (i / (history.length - 1)) * w;
+                const y = h - (d.cost / max) * (h - 2);
+                return `${x},${y}`;
+            }).join(' ');
+            svg.innerHTML = `<polyline fill="none" stroke="#6366f1" stroke-width="2" points="${pts}"/>`;
+        }
+
+        async function renderPOAttribution() {
+            destroyChart('attribution');
+            const empty = document.getElementById('po-attribution-empty');
+            const canvas = document.getElementById('po-attribution-canvas');
+            try {
+                const res = await fetch('/api/attribution/timeline' + buildAPIQuery());
+                const points = await res.json();
+                if (!points || points.length === 0) {
+                    empty.hidden = false; canvas.style.display = 'none';
+                    return;
+                }
+                empty.hidden = true; canvas.style.display = '';
+                const labels = points.map(p => p.week_start);
+                poCharts.attribution = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Agent authorship %', data: points.map(p => +(p.authorship_agent * 100).toFixed(1)), borderColor: '#6366f1', tension: 0.2 },
+                            { label: 'Human authorship %', data: points.map(p => +(p.authorship_human * 100).toFixed(1)), borderColor: '#22c55e', tension: 0.2 },
+                            { label: 'Intervention rate %', data: points.map(p => +(p.intervention_rate_avg * 100).toFixed(1)), borderColor: '#f59e0b', tension: 0.2 },
+                        ],
+                    },
+                    options: chartOptionsLine('Percent'),
+                });
+            } catch (err) { console.warn('attribution:', err); }
+        }
+
+        // Shared Chart.js option builders for the dark theme.
+        function chartOptionsLine(yLabel) {
+            return {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                scales: {
+                    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: !!yLabel, text: yLabel, color: '#94a3b8' } },
+                },
+            };
+        }
+        function chartOptionsBar(yLabel, opts = {}) {
+            const stacked = !!opts.stacked;
+            return {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                scales: {
+                    x: { stacked, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { stacked, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: !!yLabel, text: yLabel, color: '#94a3b8' } },
+                },
+            };
+        }
+
+        // ---- Phase 02 Tasks View loaders ----
+        async function loadTasksView() {
+            const s = readState();
+            await renderSprintBoard(s.sprint);
+        }
+
+        async function renderSprintBoard(sprintID) {
+            const board = document.getElementById('tasks-sprint-board');
+            const empty = document.getElementById('tasks-sprint-empty');
+            const sub = document.getElementById('tasks-sprint-sub');
+            if (!sprintID) {
+                empty.hidden = false; board.innerHTML = '';
+                sub.textContent = 'Pick a sprint';
+                return;
+            }
+            sub.textContent = sprintID;
+            try {
+                // Fetch runs scoped to this sprint via dedicated endpoint.
+                const runsRes = await fetch('/api/sprints/runs?id=' + encodeURIComponent(sprintID));
+                const sprintRuns = await runsRes.json();
+                if (!Array.isArray(sprintRuns) || sprintRuns.length === 0) {
+                    empty.hidden = false; board.innerHTML = '';
+                    return;
+                }
+                empty.hidden = true;
+                // Group by issue key.
+                const byIssue = {};
+                sprintRuns.forEach(r => {
+                    const k = r.jira_issue_key || '(no PBI)';
+                    if (!byIssue[k]) byIssue[k] = { runs: 0, cost: 0, lastStatus: 'done' };
+                    byIssue[k].runs++;
+                    byIssue[k].cost += r.cost_usd || 0;
+                    byIssue[k].lastStatus = r.status || byIssue[k].lastStatus;
+                });
+                board.innerHTML = Object.entries(byIssue).map(([key, info]) => `
+                    <div class="sprint-board-card" onclick="openTaskLifecycle('${key}')">
+                        <div class="pbi-key">${key}</div>
+                        <div class="pbi-meta">${info.runs} runs · $${info.cost.toFixed(2)} · ${info.lastStatus}</div>
+                    </div>
+                `).join('');
+            } catch (err) { console.warn('sprint-board:', err); }
+        }
+
+        // Open the lifecycle Gantt for a specific PBI: switches to the lifecycle sub-tab and renders SVG.
+        async function openTaskLifecycle(issueKey) {
+            setTasksSubTab('lifecycle');
+            document.getElementById('tasks-lifecycle-sub').textContent = issueKey;
+            const empty = document.getElementById('tasks-lifecycle-empty');
+            const gantt = document.getElementById('tasks-lifecycle-gantt');
+            try {
+                const res = await fetch('/api/tasks/lifecycle?key=' + encodeURIComponent(issueKey));
+                const runs = await res.json();
+                if (!runs || runs.length === 0) {
+                    empty.hidden = false; gantt.innerHTML = '';
+                    return;
+                }
+                empty.hidden = true;
+                renderLifecycleGantt(runs);
+            } catch (err) { console.warn('lifecycle:', err); }
+        }
+
+        function renderLifecycleGantt(runs) {
+            const gantt = document.getElementById('tasks-lifecycle-gantt');
+            const t0 = Math.min(...runs.map(r => Date.parse(r.started_at)));
+            const t1 = Math.max(...runs.map(r => Date.parse(r.ended_at || r.started_at) + (r.duration_sec || 60) * 1000));
+            const span = Math.max(t1 - t0, 1);
+            const W = 800, rowH = 28, padTop = 16, padLeft = 120;
+            const H = padTop + runs.length * rowH + 16;
+            const statusColor = { done: '#22c55e', running: '#6366f1', failed: '#ef4444' };
+            const bars = runs.map((r, i) => {
+                const start = Date.parse(r.started_at);
+                const end = Date.parse(r.ended_at || r.started_at) + (r.duration_sec || 60) * 1000;
+                const x = padLeft + ((start - t0) / span) * (W - padLeft - 20);
+                const w = Math.max(((end - start) / span) * (W - padLeft - 20), 4);
+                const y = padTop + i * rowH;
+                const fill = statusColor[r.status] || '#6b7280';
+                const label = (r.id || '').slice(0, 16);
+                const tip = `${r.id}\nstart: ${r.started_at}\ndur: ${(r.duration_sec || 0).toFixed(0)}s\ncost: $${(r.cost_usd || 0).toFixed(2)}`;
+                return `
+                    <text x="8" y="${y + 18}" fill="#cbd5e1" font-size="11">${label}</text>
+                    <rect class="gantt-bar" x="${x}" y="${y + 6}" width="${w}" height="16" rx="3" fill="${fill}">
+                        <title>${tip}</title>
+                    </rect>`;
+            }).join('');
+            gantt.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${bars}</svg>`;
+        }

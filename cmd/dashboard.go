@@ -125,6 +125,10 @@ func newDashboardMux(store *db.LocalDB, jiraBaseURL string) *http.ServeMux {
 	// Dashboard v2 KPI strip (14-day sparkline + WoW totals).
 	server.RegisterKPIRoutes(mux, store)
 
+	// Phase 02 PO View endpoints (sprints, burndown, cost-by-dept, projection,
+	// attribution timeline, task lifecycle, lead-time distribution).
+	server.RegisterPORoutes(mux, store)
+
 	return mux
 }
 

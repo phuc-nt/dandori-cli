@@ -246,6 +246,70 @@
             border-radius: var(--radius); cursor: pointer; transition: var(--transition);
         }
         .period-selector:focus { outline: none; border-color: var(--accent); }
+        /* Phase 02 — Sprint picker styling matches period selector for visual consistency. */
+        .sprint-picker {
+            background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary);
+            padding: 6px 12px; font-size: 13px; font-family: inherit;
+            border-radius: var(--radius); cursor: pointer; transition: var(--transition);
+            max-width: 200px;
+        }
+        .sprint-picker:focus { outline: none; border-color: var(--accent); }
+        .sprint-picker.active { border-color: var(--accent); background: rgba(99,102,241,0.08); }
+
+        /* Phase 02 — Persona section + sub-tab strip used by PO View and Tasks. */
+        .persona-section { margin-bottom: 24px; }
+        .persona-tabs {
+            display: flex; gap: 4px; border-bottom: 1px solid var(--border);
+            margin-bottom: 16px; flex-wrap: wrap;
+        }
+        .persona-tab {
+            background: transparent; border: none; color: var(--text-muted);
+            padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: 500;
+            border-bottom: 2px solid transparent; transition: var(--transition);
+        }
+        .persona-tab:hover { color: var(--text-primary); }
+        .persona-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .persona-pane { animation: fadeIn 0.18s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Phase 02 — generic 2-column grid for PO widgets. Stacks on narrow viewports. */
+        .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 900px) { .grid-2col { grid-template-columns: 1fr; } }
+
+        /* Phase 02 — chart frame keeps Chart.js canvases at a fixed visual height. */
+        .chart-frame { position: relative; height: 280px; }
+        .chart-frame canvas { width: 100% !important; height: 100% !important; }
+
+        /* Phase 02 — empty state shown when a widget has no data. */
+        .empty-state {
+            text-align: center; color: var(--text-muted); padding: 24px 16px;
+            font-size: 13px; background: rgba(255,255,255,0.02); border-radius: var(--radius);
+        }
+
+        /* Phase 02 — Cost projection tile presentation. */
+        .projection-tile { display: flex; flex-direction: column; gap: 6px; padding: 8px 4px; }
+        .projection-big { font-size: 36px; font-weight: 700; color: var(--accent); }
+        .projection-band { font-size: 13px; color: var(--text-muted); }
+        .projection-spark { width: 100%; height: 48px; opacity: 0.7; }
+        .projection-disclaimer { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+        /* Phase 02 — Sprint board + Task Lifecycle Gantt. */
+        .sprint-board {
+            display: grid; gap: 8px;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        }
+        .sprint-board-card {
+            background: var(--bg-tertiary); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 12px; cursor: pointer;
+            transition: var(--transition);
+        }
+        .sprint-board-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+        .sprint-board-card .pbi-key { font-weight: 600; color: var(--accent); font-size: 13px; }
+        .sprint-board-card .pbi-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+        .task-gantt { width: 100%; overflow-x: auto; }
+        .task-gantt svg { display: block; min-width: 600px; }
+        .task-gantt .gantt-bar { cursor: pointer; }
+        .task-gantt .gantt-bar:hover { opacity: 0.85; }
         .custom-date-range {
             display: none; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted);
         }
