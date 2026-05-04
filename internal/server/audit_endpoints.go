@@ -93,7 +93,13 @@ func handleAuditVerify(store *db.LocalDB) http.HandlerFunc {
 		if r.URL.Query().Get("full") == "true" {
 			limit = 100000
 		}
-		res, err := store.VerifyAuditChain(limit)
+		var res *db.AuditVerifyResult
+		var err error
+		if r.URL.Query().Get("with_anchor") == "true" {
+			res, err = store.VerifyAuditChainWithAnchors(limit)
+		} else {
+			res, err = store.VerifyAuditChain(limit)
+		}
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "verify failed")
 			return

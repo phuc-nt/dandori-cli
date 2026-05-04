@@ -1,6 +1,6 @@
 package db
 
-const SchemaVersion = 10
+const SchemaVersion = 11
 
 const SchemaSQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -157,6 +157,20 @@ CREATE TABLE IF NOT EXISTS buglinks (
 CREATE INDEX IF NOT EXISTS idx_buglinks_run    ON buglinks(run_id);
 CREATE INDEX IF NOT EXISTS idx_buglinks_linked ON buglinks(linked_at);
 CREATE INDEX IF NOT EXISTS idx_buglinks_bug    ON buglinks(jira_bug_key);
+
+CREATE TABLE IF NOT EXISTS audit_anchors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    anchored_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_audit_id INTEGER NOT NULL,
+    last_curr_hash TEXT NOT NULL,
+    confluence_page_id TEXT NOT NULL DEFAULT '',
+    confluence_version INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'local-only',
+    UNIQUE(last_audit_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_anchors_anchored ON audit_anchors(anchored_at);
+CREATE INDEX IF NOT EXISTS idx_audit_anchors_last_id  ON audit_anchors(last_audit_id);
 `
 
 // Migration from v1 to v2: add quality_metrics table

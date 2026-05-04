@@ -115,3 +115,47 @@ func TestAudit_VerifyChain_ValidThenTampered(t *testing.T) {
 		t.Errorf("want broken_at=2, got %d", bad.BrokenAt)
 	}
 }
+
+// Phase 05/Step 04: ?with_anchor=true cross-checks anchored tips.
+// A clean chain + valid anchor returns valid; a stale anchor flips it.
+func TestAudit_VerifyChain_WithAnchor_DetectsDrift(t *testing.T) {
+	mux, store := newAuditMux(t)
+	now := time.Now().UTC().Format(time.RFC3339)
+	if err := store.AppendAuditEntry("alice", "create", "task", "P-1", "{}", now); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	id, hash, err := store.LatestAuditTip()
+	if err != nil || id == 0 {
+		t.Fatalf("latest tip: id=%d err=%v", id, err)
+	}
+	if _, err := store.InsertAuditAnchor(id, hash, "", 0, "local-only"); err != nil {
+		t.Fatalf("insert anchor: %v", err)
+	}
+
+	// With matching anchor → still valid.
+	w := doGET(t, mux, "/api/audit-log/verify?with_anchor=true")
+	var ok db.AuditVerifyResult
+	_ = json.Unmarshal(w.Body.Bytes(), &ok)
+	if !ok.Valid {
+		t.Errorf("want valid=true, got %+v", ok)
+	}
+
+	// Append a 2nd audit row, then attach a stale anchor to *that* id —
+	// the chain stays self-consistent, but the anchored hash is wrong, so
+	// the witness should detect the drift.
+	if err := store.AppendAuditEntry("bob", "approve", "task", "P-1", "{}", now); err != nil {
+		t.Fatalf("append2: %v", err)
+	}
+	id2, _, _ := store.LatestAuditTip()
+	if _, err := store.Exec(
+		`INSERT INTO audit_anchors (last_audit_id, last_curr_hash, status) VALUES (?, ?, 'local-only')`,
+		id2, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"); err != nil {
+		t.Fatalf("stale anchor: %v", err)
+	}
+	w2 := doGET(t, mux, "/api/audit-log/verify?with_anchor=true")
+	var bad db.AuditVerifyResult
+	_ = json.Unmarshal(w2.Body.Bytes(), &bad)
+	if bad.Valid {
+		t.Errorf("want valid=false with stale anchor, got %+v", bad)
+	}
+}

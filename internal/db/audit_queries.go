@@ -14,6 +14,7 @@ package db
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"strings"
 )
 
@@ -211,6 +212,59 @@ func computeAuditHash(prev, actor, action, entityType, entityID, details, ts str
 	h.Write([]byte("|"))
 	h.Write([]byte(ts))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// VerifyAuditChainWithAnchors runs VerifyAuditChain (limit) and then, if
+// the chain itself is internally consistent, also asserts that every
+// recorded anchor still resolves: for each row in audit_anchors, the
+// audit_log entry at last_audit_id must exist and its curr_hash must
+// equal the anchored hash. Any drift means the chain has been rewritten
+// since the anchor was taken.
+//
+// If the underlying chain check fails, that result is returned unchanged
+// (anchor verification is skipped — there's no point cross-checking a
+// chain that doesn't even self-verify). If anchor verification fails,
+// Reason is prefixed with "anchor mismatch: ".
+func (l *LocalDB) VerifyAuditChainWithAnchors(limit int) (*AuditVerifyResult, error) {
+	res, err := l.VerifyAuditChain(limit)
+	if err != nil {
+		return nil, err
+	}
+	if !res.Valid {
+		return res, nil
+	}
+
+	anchors, err := l.ListAuditAnchors(0)
+	if err != nil {
+		return nil, fmt.Errorf("verify with anchors: %w", err)
+	}
+	for _, a := range anchors {
+		var hash string
+		row := l.QueryRow(`SELECT COALESCE(curr_hash,'') FROM audit_log WHERE id = ?`, a.LastAuditID)
+		if err := row.Scan(&hash); err != nil {
+			res.Valid = false
+			res.BrokenAt = a.LastAuditID
+			res.Reason = fmt.Sprintf("anchor mismatch: audit_log row %d (anchored at %s) is missing", a.LastAuditID, a.AnchoredAt)
+			return res, nil
+		}
+		if !strings.EqualFold(strings.TrimSpace(hash), strings.TrimSpace(a.LastCurrHash)) {
+			res.Valid = false
+			res.BrokenAt = a.LastAuditID
+			res.Reason = fmt.Sprintf("anchor mismatch: audit_log row %d hash drifted since %s (got %s, anchored %s)",
+				a.LastAuditID, a.AnchoredAt, truncHash(hash), truncHash(a.LastCurrHash))
+			return res, nil
+		}
+	}
+	return res, nil
+}
+
+// truncHash shortens a hex hash for human-readable error messages.
+func truncHash(h string) string {
+	h = strings.TrimSpace(h)
+	if len(h) <= 12 {
+		return h
+	}
+	return h[:12] + "…"
 }
 
 // AppendAuditEntry inserts a new audit_log row computing the proper hash

@@ -357,6 +357,29 @@ func SeedCrossProject(d *db.LocalDB) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit cross: %w", err)
 	}
+
+	// Seed a small audit_log so the audit view + `dandori audit anchor`
+	// have something to chain. Each entry uses AppendAuditEntry which
+	// computes the proper hash linkage (anchor verification then has a
+	// real chain to bite into during demo walkthroughs).
+	auditTimes := []string{
+		"2026-04-15T09:00:00Z",
+		"2026-04-22T11:30:00Z",
+		"2026-04-29T14:45:00Z",
+		"2026-05-04T10:15:00Z",
+	}
+	auditEntries := []struct{ actor, action, etype, eid, det string }{
+		{"alice", "task.create", "task", "CLITEST1-1", `{"sprint":"S25"}`},
+		{"bob", "task.assign", "task", "CLITEST2-3", `{"agent":"claude"}`},
+		{"alice", "policy.update", "policy", "qa-gate", `{"min_coverage":80}`},
+		{"qa-bot", "verification.pass", "run", "rA1", `{"score":92}`},
+	}
+	for i, e := range auditEntries {
+		if err := d.AppendAuditEntry(e.actor, e.action, e.etype, e.eid, e.det, auditTimes[i]); err != nil {
+			return fmt.Errorf("seed audit entry %d: %w", i, err)
+		}
+	}
+
 	return nil
 }
 
@@ -367,6 +390,8 @@ func ResetDB(d *db.LocalDB) error {
 		`DELETE FROM quality_metrics`,
 		`DELETE FROM events`,
 		`DELETE FROM buglinks`,
+		`DELETE FROM audit_anchors`,
+		`DELETE FROM audit_log`,
 		`DELETE FROM task_attribution`,
 		`DELETE FROM runs`,
 	}
