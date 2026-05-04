@@ -310,6 +310,14 @@
         .task-gantt svg { display: block; min-width: 600px; }
         .task-gantt .gantt-bar { cursor: pointer; }
         .task-gantt .gantt-bar:hover { opacity: 0.85; }
+        /* Phase 03 — Admin View widgets */
+        .repo-spark { width: 120px; height: 28px; display: block; }
+        .anomaly-badge {
+            display: inline-block; padding: 1px 6px; font-size: 10px; font-weight: 600;
+            color: #f59e0b; background: rgba(245,158,11,0.12); border-radius: 4px;
+            border: 1px solid rgba(245,158,11,0.3);
+        }
+        #admin-ws-table td, #admin-repos-table td { font-size: 12px; padding: 6px 8px; }
         .custom-date-range {
             display: none; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted);
         }

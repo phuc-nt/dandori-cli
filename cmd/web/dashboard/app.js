@@ -147,8 +147,12 @@
             updateState({sprint: value});
             const poOpen = !document.getElementById('po-view-section')?.hidden;
             const tasksOpen = !document.getElementById('tasks-section')?.hidden;
+            const engOpen = !document.getElementById('engineering-section')?.hidden;
+            const adminOpen = !document.getElementById('admin-section')?.hidden;
             if (poOpen) loadPOView();
             if (tasksOpen) loadTasksView();
+            if (engOpen) loadEngineeringView();
+            if (adminOpen) loadAdminView();
         }
 
         // Phase 02 — populate sprint picker from /api/sprints. Sort: active (latest end_at) first,
@@ -197,7 +201,9 @@
             // Phase 02: don't override persona-driven hide. If a persona section is active,
             // togglePersonaVisibility owns g9-section visibility.
             const personaActive = !document.getElementById('po-view-section')?.hidden ||
-                                  !document.getElementById('tasks-section')?.hidden;
+                                  !document.getElementById('tasks-section')?.hidden ||
+                                  !document.getElementById('engineering-section')?.hidden ||
+                                  !document.getElementById('admin-section')?.hidden;
             if (!personaActive) g9Section.style.display = '';
             const attrTileCard = document.getElementById('attribution-tile')?.closest('.card');
             if (attrTileCard) attrTileCard.style.display = role === 'project' ? 'none' : '';
@@ -1315,7 +1321,9 @@
             // before any early-return branch (project/engineer return early).
             // Phase 02: skip when persona section is active (PO View / Tasks own visibility).
             const personaActive = !document.getElementById('po-view-section')?.hidden ||
-                                  !document.getElementById('tasks-section')?.hidden;
+                                  !document.getElementById('tasks-section')?.hidden ||
+                                  !document.getElementById('engineering-section')?.hidden ||
+                                  !document.getElementById('admin-section')?.hidden;
             const orgOnlyIDs = ['mix-leaderboard-card', 'org-rework-card'];
             orgOnlyIDs.forEach(id => {
                 const el = document.getElementById(id);
@@ -1691,8 +1699,10 @@
         (function earlyHashApply() {
             const h = window.location.hash || '';
             let persona = null;
-            if (h === '#po-view-section') persona = 'po';
-            else if (h === '#tasks-section') persona = 'tasks';
+            if (h.startsWith('#po-view-section')) persona = 'po';
+            else if (h.startsWith('#tasks-section')) persona = 'tasks';
+            else if (h.startsWith('#engineering-section')) persona = 'engineering';
+            else if (h.startsWith('#admin-section')) persona = 'admin';
             try { togglePersonaVisibility(persona); } catch(_) {}
             if (persona) {
                 document.querySelectorAll('.nav-item').forEach(n => {
@@ -1740,6 +1750,12 @@
             } else if (h.startsWith('#tasks-section')) {
                 persona = 'tasks';
                 sub = h.slice('#tasks-section'.length).replace(/^\//, '');
+            } else if (h.startsWith('#engineering-section')) {
+                persona = 'engineering';
+                sub = h.slice('#engineering-section'.length).replace(/^\//, '');
+            } else if (h.startsWith('#admin-section')) {
+                persona = 'admin';
+                sub = h.slice('#admin-section'.length).replace(/^\//, '');
             }
             showPersonaSection(persona);
             if (persona) {
@@ -1748,6 +1764,8 @@
                 });
                 if (persona === 'po' && sub) setPOSubTab(sub);
                 if (persona === 'tasks' && sub) setTasksSubTab(sub);
+                if (persona === 'engineering' && sub) setEngSubTab(sub);
+                if (persona === 'admin' && sub) setAdminSubTab(sub);
             }
         }
 
@@ -1781,8 +1799,12 @@
         function togglePersonaVisibility(persona) {
             const poSec = document.getElementById('po-view-section');
             const tasksSec = document.getElementById('tasks-section');
+            const engSec = document.getElementById('engineering-section');
+            const adminSec = document.getElementById('admin-section');
             if (poSec) poSec.hidden = persona !== 'po';
             if (tasksSec) tasksSec.hidden = persona !== 'tasks';
+            if (engSec) engSec.hidden = persona !== 'engineering';
+            if (adminSec) adminSec.hidden = persona !== 'admin';
 
             const defaultIDs = ['kpi-strip', 'g9-section', 'quality', 'agents', 'runs',
                                 'mix-leaderboard-card', 'org-rework-card'];
@@ -1801,6 +1823,8 @@
             togglePersonaVisibility(persona);
             if (persona === 'po') loadPOView();
             if (persona === 'tasks') loadTasksView();
+            if (persona === 'engineering') loadEngineeringView();
+            if (persona === 'admin') loadAdminView();
         }
 
         function setPOSubTab(name) {
@@ -1815,6 +1839,20 @@
                 t.classList.toggle('active', t.getAttribute('data-tview') === name));
             document.querySelectorAll('#tasks-section .persona-pane').forEach(p =>
                 p.hidden = p.getAttribute('data-tview-pane') !== name);
+        }
+
+        function setEngSubTab(name) {
+            document.querySelectorAll('#engineering-section .persona-tab').forEach(t =>
+                t.classList.toggle('active', t.getAttribute('data-eview') === name));
+            document.querySelectorAll('#engineering-section .persona-pane').forEach(p =>
+                p.hidden = p.getAttribute('data-eview-pane') !== name);
+        }
+
+        function setAdminSubTab(name) {
+            document.querySelectorAll('#admin-section .persona-tab').forEach(t =>
+                t.classList.toggle('active', t.getAttribute('data-aview') === name));
+            document.querySelectorAll('#admin-section .persona-pane').forEach(p =>
+                p.hidden = p.getAttribute('data-aview-pane') !== name);
         }
 
         // ---- Phase 02 PO View loaders ----
@@ -2098,4 +2136,370 @@
                     </rect>`;
             }).join('');
             gantt.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${bars}</svg>`;
+        }
+
+        // ---- Phase 03 Engineering View loaders ----
+        const engCharts = {
+            compare: null, autonomy: null, funnel: null, cache: null,
+            cpt: null, modelMix: null, sessionEnd: null, duration: null,
+        };
+        function destroyEng(key) {
+            if (engCharts[key]) { engCharts[key].destroy(); engCharts[key] = null; }
+        }
+
+        async function loadEngineeringView() {
+            await loadEngAgentList();
+            renderEngCompare();
+            renderEngModelMix();
+            renderEngAutonomy();
+            renderEngFunnel();
+            renderEngCache();
+            renderEngCostPerTask();
+            renderEngSessionEnd();
+            renderEngDuration();
+        }
+
+        // Populate the agent compare picker from /api/agents.
+        async function loadEngAgentList() {
+            const a = document.getElementById('eng-compare-a');
+            const b = document.getElementById('eng-compare-b');
+            if (!a || !b) return;
+            try {
+                const res = await fetch('/api/agents');
+                const data = await res.json();
+                const agents = (data || []).map(r => r.AgentName || r.agent_name || r.name).filter(Boolean);
+                if (agents.length === 0) {
+                    a.innerHTML = '<option value="">(no agents)</option>';
+                    b.innerHTML = '<option value="">(no agents)</option>';
+                    return;
+                }
+                const opts = agents.map(n => `<option value="${n}">${n}</option>`).join('');
+                a.innerHTML = opts;
+                b.innerHTML = opts;
+                // Default: first vs last so the bar chart isn't degenerate.
+                a.value = agents[0];
+                b.value = agents[agents.length - 1] || agents[0];
+                a.onchange = renderEngCompare;
+                b.onchange = renderEngCompare;
+            } catch (err) { console.warn('eng-agent-list:', err); }
+        }
+
+        // ENG-1: Agent compare bar chart (5 metrics × 2 agents).
+        async function renderEngCompare() {
+            const canvas = document.getElementById('eng-compare-canvas');
+            const empty = document.getElementById('eng-compare-empty');
+            const sub = document.getElementById('eng-compare-sub');
+            if (!canvas) return;
+            const a = document.getElementById('eng-compare-a')?.value;
+            const b = document.getElementById('eng-compare-b')?.value;
+            if (!a || !b) { empty.hidden = false; return; }
+            try {
+                const res = await fetch(`/api/agents/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+                const data = await res.json();
+                if (!data || !data.a || !data.b) { empty.hidden = false; return; }
+                empty.hidden = true;
+                if (sub) sub.textContent = `${data.a.agent_name} vs ${data.b.agent_name}`;
+                destroyEng('compare');
+                const labels = ['Avg Cost/Run', 'Success %', 'Autonomy %', 'Cache %', 'Avg Dur (m)'];
+                const vals = (p) => [
+                    p.avg_cost_per_run, p.success_rate, p.autonomy_pct,
+                    p.cache_eff_pct, p.avg_duration_sec / 60,
+                ];
+                engCharts.compare = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: data.a.agent_name, data: vals(data.a), backgroundColor: 'rgba(99,102,241,0.65)' },
+                            { label: data.b.agent_name, data: vals(data.b), backgroundColor: 'rgba(34,197,94,0.65)' },
+                        ],
+                    },
+                    options: { responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                        scales: { x: { ticks: { color: '#cbd5e1' } }, y: { ticks: { color: '#cbd5e1' } } } },
+                });
+            } catch (err) { console.warn('eng-compare:', err); empty.hidden = false; }
+        }
+
+        // ENG-2: Autonomy gauge — line chart over time.
+        async function renderEngAutonomy() {
+            const canvas = document.getElementById('eng-autonomy-canvas');
+            const empty = document.getElementById('eng-autonomy-empty');
+            if (!canvas) return;
+            try {
+                const res = await fetch('/api/autonomy?days=14');
+                const data = await res.json();
+                if (!data || data.length === 0) { empty.hidden = false; return; }
+                empty.hidden = true;
+                destroyEng('autonomy');
+                engCharts.autonomy = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => d.day),
+                        datasets: [{
+                            label: 'Autonomy %',
+                            data: data.map(d => d.autonomy_pct),
+                            borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)',
+                            tension: 0.3, fill: true,
+                        }],
+                    },
+                    options: { responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                        scales: { x: { ticks: { color: '#cbd5e1' } },
+                                  y: { min: 0, max: 100, ticks: { color: '#cbd5e1' } } } },
+                });
+            } catch (err) { console.warn('eng-autonomy:', err); empty.hidden = false; }
+        }
+
+        // ENG-3: Approval funnel — horizontal bar.
+        async function renderEngFunnel() {
+            const canvas = document.getElementById('eng-funnel-canvas');
+            const empty = document.getElementById('eng-funnel-empty');
+            if (!canvas) return;
+            try {
+                const res = await fetch('/api/approvals/funnel');
+                const data = await res.json();
+                if (!data || data.length === 0) { empty.hidden = false; return; }
+                empty.hidden = true;
+                destroyEng('funnel');
+                engCharts.funnel = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(s => s.step_type),
+                        datasets: [{ label: 'Events', data: data.map(s => s.count),
+                            backgroundColor: 'rgba(245,158,11,0.7)' }],
+                    },
+                    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { ticks: { color: '#cbd5e1' } }, y: { ticks: { color: '#cbd5e1' } } } },
+                });
+            } catch (err) { console.warn('eng-funnel:', err); empty.hidden = false; }
+        }
+
+        // ENG-4: Cache efficiency — daily line.
+        async function renderEngCache() {
+            const canvas = document.getElementById('eng-cache-canvas');
+            const empty = document.getElementById('eng-cache-empty');
+            if (!canvas) return;
+            try {
+                const res = await fetch('/api/cache-efficiency?days=14');
+                const data = await res.json();
+                if (!data || data.length === 0) { empty.hidden = false; return; }
+                empty.hidden = true;
+                destroyEng('cache');
+                engCharts.cache = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => d.day),
+                        datasets: [{
+                            label: 'Cache hit %',
+                            data: data.map(d => d.pct),
+                            borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,0.15)',
+                            tension: 0.3, fill: true,
+                        }],
+                    },
+                    options: { responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                        scales: { x: { ticks: { color: '#cbd5e1' } },
+                                  y: { min: 0, max: 100, ticks: { color: '#cbd5e1' } } } },
+                });
+            } catch (err) { console.warn('eng-cache:', err); empty.hidden = false; }
+        }
+
+        // ENG-5: Cost per task — daily line.
+        async function renderEngCostPerTask() {
+            const canvas = document.getElementById('eng-cpt-canvas');
+            const empty = document.getElementById('eng-cpt-empty');
+            if (!canvas) return;
+            try {
+                const res = await fetch('/api/cost-per-task?days=28');
+                const data = await res.json();
+                if (!data || data.length === 0) { empty.hidden = false; return; }
+                empty.hidden = true;
+                destroyEng('cpt');
+                engCharts.cpt = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => d.day),
+                        datasets: [{
+                            label: '$ per task',
+                            data: data.map(d => d.cost_per_task),
+                            borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)',
+                            tension: 0.3, fill: true,
+                        }],
+                    },
+                    options: { responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                        scales: { x: { ticks: { color: '#cbd5e1' } },
+                                  y: { ticks: { color: '#cbd5e1', callback: v => '$' + v.toFixed(2) } } } },
+                });
+            } catch (err) { console.warn('eng-cpt:', err); empty.hidden = false; }
+        }
+
+        // ENG-6: Model mix donut.
+        async function renderEngModelMix() {
+            const canvas = document.getElementById('eng-model-mix-canvas');
+            const empty = document.getElementById('eng-model-mix-empty');
+            if (!canvas) return;
+            try {
+                const res = await fetch('/api/model-mix?days=28');
+                const data = await res.json();
+                if (!data || data.length === 0) { empty.hidden = false; return; }
+                empty.hidden = true;
+                destroyEng('modelMix');
+                const palette = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#84cc16', '#94a3b8'];
+                engCharts.modelMix = new Chart(canvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.map(r => r.model),
+                        datasets: [{
+                            data: data.map(r => r.cost),
+                            backgroundColor: data.map((_, i) => palette[i % palette.length]),
+                        }],
+                    },
+                    options: { responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 11 } } },
+                            tooltip: { callbacks: { label: ctx => {
+                                const r = data[ctx.dataIndex];
+                                return `${r.model}: $${r.cost.toFixed(2)} · ${r.runs} runs`;
+                            } } },
+                        } },
+                });
+            } catch (err) { console.warn('eng-model-mix:', err); empty.hidden = false; }
+        }
+
+        // ENG-7: Session end reasons — stacked area (one dataset per reason).
+        async function renderEngSessionEnd() {
+            const canvas = document.getElementById('eng-session-end-canvas');
+            const empty = document.getElementById('eng-session-end-empty');
+            if (!canvas) return;
+            try {
+                const res = await fetch('/api/session-end-reasons?days=28');
+                const data = await res.json();
+                if (!data || data.length === 0) { empty.hidden = false; return; }
+                empty.hidden = true;
+                // Pivot by (day, reason).
+                const days = Array.from(new Set(data.map(d => d.day))).sort();
+                const reasons = Array.from(new Set(data.map(d => d.reason)));
+                const palette = ['#22c55e', '#ef4444', '#f59e0b', '#6366f1', '#94a3b8'];
+                const reasonColor = {};
+                reasons.forEach((r, i) => reasonColor[r] = palette[i % palette.length]);
+                const datasets = reasons.map(r => ({
+                    label: r,
+                    data: days.map(d => {
+                        const row = data.find(x => x.day === d && x.reason === r);
+                        return row ? row.count : 0;
+                    }),
+                    backgroundColor: reasonColor[r],
+                    borderColor: reasonColor[r],
+                    fill: true, stack: 'reasons',
+                }));
+                destroyEng('sessionEnd');
+                engCharts.sessionEnd = new Chart(canvas, {
+                    type: 'bar',
+                    data: { labels: days, datasets },
+                    options: { responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                        scales: { x: { stacked: true, ticks: { color: '#cbd5e1' } },
+                                  y: { stacked: true, ticks: { color: '#cbd5e1' } } } },
+                });
+            } catch (err) { console.warn('eng-session-end:', err); empty.hidden = false; }
+        }
+
+        // ENG-8: Duration histogram — bar chart from server-bucketed data.
+        async function renderEngDuration() {
+            const canvas = document.getElementById('eng-duration-canvas');
+            const empty = document.getElementById('eng-duration-empty');
+            if (!canvas) return;
+            try {
+                const res = await fetch('/api/duration-histogram?days=28');
+                const data = await res.json();
+                if (!data || data.length === 0) { empty.hidden = false; return; }
+                empty.hidden = true;
+                destroyEng('duration');
+                engCharts.duration = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: data.map(b => b.label),
+                        datasets: [{ label: 'Runs', data: data.map(b => b.count),
+                            backgroundColor: 'rgba(168,85,247,0.7)' }],
+                    },
+                    options: { responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { ticks: { color: '#cbd5e1' } }, y: { ticks: { color: '#cbd5e1' } } } },
+                });
+            } catch (err) { console.warn('eng-duration:', err); empty.hidden = false; }
+        }
+
+        // ---- Phase 03 Admin View loaders ----
+        async function loadAdminView() {
+            renderAdminWorkstations();
+            renderAdminRepos();
+        }
+
+        // ADM-1: Workstation × engineer matrix table.
+        async function renderAdminWorkstations() {
+            const tbody = document.querySelector('#admin-ws-table tbody');
+            if (!tbody) return;
+            try {
+                const res = await fetch('/api/workstations?days=28');
+                const rows = await res.json();
+                if (!rows || rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No workstations in window.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.map(r => `
+                    <tr>
+                        <td><code>${escapeHtml(r.workstation_id || '')}</code></td>
+                        <td>${escapeHtml(r.engineer_name || '')}</td>
+                        <td>${r.run_count}</td>
+                        <td>${(r.last_seen || '').slice(0, 16).replace('T', ' ')}</td>
+                        <td>${r.is_anomaly ? '<span class="anomaly-badge">⚠ NEW</span>' : ''}</td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.warn('admin-ws:', err); }
+        }
+
+        // ADM-2: Repo leaderboard with sparkline.
+        async function renderAdminRepos() {
+            const tbody = document.querySelector('#admin-repos-table tbody');
+            if (!tbody) return;
+            try {
+                const res = await fetch('/api/repos?days=28');
+                const rows = await res.json();
+                if (!rows || rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No repos in window.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.map(r => `
+                    <tr>
+                        <td><code>${escapeHtml(shortRepo(r.repo))}</code></td>
+                        <td>${r.runs}</td>
+                        <td>$${r.cost.toFixed(2)}</td>
+                        <td>${r.success_rate.toFixed(0)}%</td>
+                        <td>${renderRepoSpark(r.spark || [])}</td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.warn('admin-repos:', err); }
+        }
+
+        function shortRepo(s) {
+            if (!s) return '';
+            // Trim long git URLs / paths to last 2 segments.
+            const m = s.match(/[^\/:]+\/[^\/:]+(?:\.git)?$/);
+            return m ? m[0].replace(/\.git$/, '') : s.length > 40 ? '…' + s.slice(-40) : s;
+        }
+
+        function renderRepoSpark(values) {
+            if (!values || values.length === 0) return '';
+            const max = Math.max(...values, 0.0001);
+            const W = 120, H = 28;
+            const step = W / Math.max(values.length - 1, 1);
+            const pts = values.map((v, i) => `${(i * step).toFixed(1)},${(H - (v / max) * H).toFixed(1)}`).join(' ');
+            return `<svg class="repo-spark" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="#6366f1" stroke-width="1.5" points="${pts}"/></svg>`;
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }

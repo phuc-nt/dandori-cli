@@ -129,6 +129,13 @@ func newDashboardMux(store *db.LocalDB, jiraBaseURL string) *http.ServeMux {
 	// attribution timeline, task lifecycle, lead-time distribution).
 	server.RegisterPORoutes(mux, store)
 
+	// Phase 03 Engineering View endpoints (agent compare, autonomy, funnel,
+	// cache eff, cost per task, model mix, session end, duration histogram).
+	server.RegisterEngRoutes(mux, store)
+
+	// Phase 03 Admin View endpoints (workstation matrix, repo leaderboard).
+	server.RegisterAdminRoutes(mux, store)
+
 	return mux
 }
 

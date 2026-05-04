@@ -44,6 +44,21 @@
                     </svg>
                     Tasks
                 </a>
+                <!-- Phase 03 — Engineering View. Hosts Agents / Autonomy / Cache / Session-health sub-tabs. -->
+                <a class="nav-item" href="#engineering-section" data-persona="engineering">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Engineering
+                </a>
+                <!-- Phase 03 — Admin View. Workstations + Repos. -->
+                <a class="nav-item" href="#admin-section" data-persona="admin">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 14a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM7 8h.01M7 16h.01"/>
+                    </svg>
+                    Admin
+                </a>
                 <a class="nav-item" href="#agents">
                     <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -430,6 +445,151 @@
                         </div>
                         <div id="tasks-lifecycle-gantt" class="task-gantt"></div>
                         <div class="empty-state" id="tasks-lifecycle-empty" hidden>Select a PBI from the Sprint Board.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 03 — Engineering View section (Agents / Autonomy / Cache / Session-health sub-tabs). -->
+            <section id="engineering-section" class="persona-section fade-in" hidden>
+                <div class="persona-tabs" role="tablist" aria-label="Engineering View sub-tabs">
+                    <button class="persona-tab active" data-eview="agents"
+                            onclick="setEngSubTab('agents')">Agents</button>
+                    <button class="persona-tab" data-eview="autonomy"
+                            onclick="setEngSubTab('autonomy')">Autonomy</button>
+                    <button class="persona-tab" data-eview="cache"
+                            onclick="setEngSubTab('cache')">Cache &amp; Cost</button>
+                    <button class="persona-tab" data-eview="health"
+                            onclick="setEngSubTab('health')">Session Health</button>
+                </div>
+
+                <!-- Agents sub-tab: ENG-1 agent compare + ENG-6 model mix donut. -->
+                <div class="persona-pane" data-eview-pane="agents">
+                    <div class="grid-2col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Agent Compare</h3>
+                                <span class="card-sub" id="eng-compare-sub">Pick two agents</span>
+                            </div>
+                            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                                <select id="eng-compare-a" class="filter-select" style="min-width:140px;"></select>
+                                <span style="align-self:center;color:var(--text-muted);font-weight:600;">vs</span>
+                                <select id="eng-compare-b" class="filter-select" style="min-width:140px;"></select>
+                            </div>
+                            <div class="chart-frame"><canvas id="eng-compare-canvas"></canvas></div>
+                            <div class="empty-state" id="eng-compare-empty" hidden>Pick two agents to compare.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Model Mix</h3>
+                                <span class="card-sub">Last 28 days · runs &amp; cost</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="eng-model-mix-canvas"></canvas></div>
+                            <div class="empty-state" id="eng-model-mix-empty" hidden>No runs in window.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Autonomy sub-tab: ENG-2 autonomy gauge + ENG-3 approval funnel. -->
+                <div class="persona-pane" data-eview-pane="autonomy" hidden>
+                    <div class="grid-2col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Autonomy Trend</h3>
+                                <span class="card-sub" id="eng-autonomy-sub">Last 14 days · all engineers</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="eng-autonomy-canvas"></canvas></div>
+                            <div class="empty-state" id="eng-autonomy-empty" hidden>No runs in window.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Approval Funnel</h3>
+                                <span class="card-sub">All approval events</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="eng-funnel-canvas"></canvas></div>
+                            <div class="empty-state" id="eng-funnel-empty" hidden>No approval events recorded yet.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cache & Cost sub-tab: ENG-4 cache eff + ENG-5 cost-per-task. -->
+                <div class="persona-pane" data-eview-pane="cache" hidden>
+                    <div class="grid-2col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Cache Efficiency</h3>
+                                <span class="card-sub">Daily cache hit rate</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="eng-cache-canvas"></canvas></div>
+                            <div class="empty-state" id="eng-cache-empty" hidden>No token data in window.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Cost per Task</h3>
+                                <span class="card-sub">Cost ÷ distinct PBI per day</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="eng-cpt-canvas"></canvas></div>
+                            <div class="empty-state" id="eng-cpt-empty" hidden>No tasks in window.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Health sub-tab: ENG-7 session-end + ENG-8 duration histogram. -->
+                <div class="persona-pane" data-eview-pane="health" hidden>
+                    <div class="grid-2col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Session End Reasons</h3>
+                                <span class="card-sub">Stacked daily counts</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="eng-session-end-canvas"></canvas></div>
+                            <div class="empty-state" id="eng-session-end-empty" hidden>No sessions in window.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Run Duration Histogram</h3>
+                                <span class="card-sub">IQR-binned · capped at p99</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="eng-duration-canvas"></canvas></div>
+                            <div class="empty-state" id="eng-duration-empty" hidden>No runs in window.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 03 — Admin View section (Workstations + Repos sub-tabs). -->
+            <section id="admin-section" class="persona-section fade-in" hidden>
+                <div class="persona-tabs" role="tablist" aria-label="Admin View sub-tabs">
+                    <button class="persona-tab active" data-aview="workstations"
+                            onclick="setAdminSubTab('workstations')">Workstations</button>
+                    <button class="persona-tab" data-aview="repos"
+                            onclick="setAdminSubTab('repos')">Repos</button>
+                </div>
+                <div class="persona-pane" data-aview-pane="workstations">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Workstation Matrix</h3>
+                            <span class="card-sub">Workstation × engineer · last 28 days · ⚠ flags new pairs</span>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table id="admin-ws-table">
+                                <thead><tr><th>Workstation</th><th>Engineer</th><th>Runs</th><th>Last Seen</th><th></th></tr></thead>
+                                <tbody><tr><td colspan="5" class="empty-state">Loading…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="persona-pane" data-aview-pane="repos" hidden>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Repo Leaderboard</h3>
+                            <span class="card-sub">Top 20 by cost · last 28 days · 14-day spark</span>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table id="admin-repos-table">
+                                <thead><tr><th>Repo</th><th>Runs</th><th>Cost</th><th>Success</th><th>14-day Spark</th></tr></thead>
+                                <tbody><tr><td colspan="5" class="empty-state">Loading…</td></tr></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
