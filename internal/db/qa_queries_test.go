@@ -104,16 +104,34 @@ func TestCommitMsgDistribution_AlwaysFourBuckets(t *testing.T) {
 	}
 }
 
-func TestBugHotspots_RegressionProxy(t *testing.T) {
+func TestBugHotspots_CountsBuglinkRowsByRepoWeek(t *testing.T) {
 	d := newEmptyLocalDB(t)
 	if err := d.Migrate(); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	now := time.Now().UTC()
-	// q1 has lint regression → counted; q2 has tests regression → counted; q3 clean → not counted.
-	seedQARun(t, d, "q1", "P-1", "a", now, 3, 0, 50, 50, 0)
-	seedQARun(t, d, "q2", "P-1", "a", now, 0, -2, 50, 50, 0)
-	seedQARun(t, d, "q3", "P-1", "a", now, 0, 0, 50, 50, 0)
+	// Three runs in the same week + repo. Lint/test deltas are irrelevant
+	// post-v10 — only buglinks rows feed the count.
+	seedQARun(t, d, "r1", "P-1", "a", now, 0, 0, 50, 50, 0)
+	seedQARun(t, d, "r2", "P-1", "a", now, 0, 0, 50, 50, 0)
+	seedQARun(t, d, "r3", "P-1", "a", now, 0, 0, 50, 50, 0)
+
+	// r1 → linked from BUG-1
+	if err := d.InsertBuglink("BUG-1", "r1", "test", "test"); err != nil {
+		t.Fatalf("insert buglink BUG-1: %v", err)
+	}
+	// r2 → linked from BUG-2 AND BUG-3 (two distinct bugs, same offending run)
+	if err := d.InsertBuglink("BUG-2", "r2", "test", "test"); err != nil {
+		t.Fatalf("insert buglink BUG-2: %v", err)
+	}
+	if err := d.InsertBuglink("BUG-3", "r2", "test", "test"); err != nil {
+		t.Fatalf("insert buglink BUG-3: %v", err)
+	}
+	// r3 → no buglink → must NOT show up.
+	// BUG-1 also linked twice to r1 (idempotent — INSERT OR IGNORE drops dup)
+	if err := d.InsertBuglink("BUG-1", "r1", "dup", "test"); err != nil {
+		t.Fatalf("insert dup buglink: %v", err)
+	}
 
 	cells, err := d.BugHotspots(8)
 	if err != nil {
@@ -123,8 +141,9 @@ func TestBugHotspots_RegressionProxy(t *testing.T) {
 	for _, c := range cells {
 		total += c.Count
 	}
-	if total != 2 {
-		t.Errorf("regression count = %d, want 2", total)
+	// 3 distinct bug keys (BUG-1, BUG-2, BUG-3); r3 contributes 0; dup ignored.
+	if total != 3 {
+		t.Errorf("hotspot count = %d, want 3 (cells=%+v)", total, cells)
 	}
 }
 

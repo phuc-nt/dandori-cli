@@ -46,6 +46,24 @@ func (l *LocalDB) FindRunByPrefix(prefix string) (string, error) {
 	return matches[0], nil
 }
 
+// InsertBuglink records a (bug, run) pairing in the buglinks table.
+// linkedBy is the actor (typically "task-done-hook"); reason is free text
+// captured from the Jira link or hook context. Idempotent via the
+// UNIQUE(jira_bug_key, run_id) constraint — re-runs are silent no-ops.
+func (l *LocalDB) InsertBuglink(bugKey, runID, reason, linkedBy string) error {
+	if linkedBy == "" {
+		linkedBy = "task-done-hook"
+	}
+	_, err := l.Exec(`
+		INSERT OR IGNORE INTO buglinks (jira_bug_key, run_id, reason, linked_by)
+		VALUES (?, ?, ?, ?)
+	`, bugKey, runID, reason, linkedBy)
+	if err != nil {
+		return fmt.Errorf("insert buglink: %w", err)
+	}
+	return nil
+}
+
 // BugEventExists returns true when a bug.filed event has already been recorded
 // for the given Jira bug key. Used to dedupe across poller cycles.
 func (l *LocalDB) BugEventExists(bugKey string) (bool, error) {

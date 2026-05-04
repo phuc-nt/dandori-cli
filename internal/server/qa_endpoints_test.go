@@ -89,11 +89,18 @@ func TestQA_CommitMsg_Returns4Buckets(t *testing.T) {
 	}
 }
 
-func TestQA_BugHotspots_RegressionsOnly(t *testing.T) {
+func TestQA_BugHotspots_CountsBuglinks(t *testing.T) {
 	mux, store := newQAMux(t)
-	seedQA(t, store, "r1", "P-1", 5, 0, 70, 60, 1.0)  // lint regression
-	seedQA(t, store, "r2", "P-1", 0, -2, 70, 60, 1.0) // tests regression
-	seedQA(t, store, "r3", "P-1", 0, 0, 70, 90, 1.0)  // clean
+	seedQA(t, store, "r1", "P-1", 0, 0, 70, 60, 1.0)
+	seedQA(t, store, "r2", "P-1", 0, 0, 70, 60, 1.0)
+	seedQA(t, store, "r3", "P-1", 0, 0, 70, 90, 1.0)
+	// Only r1 and r2 are linked from bugs; r3 has no buglink.
+	if err := store.InsertBuglink("BUG-1", "r1", "test", "test"); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+	if err := store.InsertBuglink("BUG-2", "r2", "test", "test"); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
 
 	w := doGET(t, mux, "/api/bug-hotspots?weeks=8")
 	if w.Code != 200 {
@@ -108,7 +115,7 @@ func TestQA_BugHotspots_RegressionsOnly(t *testing.T) {
 		total += c.Count
 	}
 	if total != 2 {
-		t.Errorf("regressions = %d, want 2", total)
+		t.Errorf("buglink count = %d, want 2", total)
 	}
 }
 

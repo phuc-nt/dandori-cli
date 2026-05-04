@@ -146,15 +146,24 @@ func (l *LocalDB) CommitMsgDistribution() ([]CommitMsgBucket, error) {
 	return out, nil
 }
 
-// BugHotspotCell is one (repo, week) cell flagged by lint or test regressions.
+// BugHotspotCell is one (repo, week) cell counted from real Jira buglinks.
 type BugHotspotCell struct {
 	Repo  string `json:"repo"`
 	Week  string `json:"week"`
-	Count int    `json:"count"` // # runs with lint_delta>0 or tests_delta<0 in that week
+	Count int    `json:"count"` // # distinct bugs whose offending run lives in this (repo, week)
 }
 
-// BugHotspots returns weekly regression counts grouped by repo (git_remote/cwd).
-// "Regression" proxy = lint_errors increased OR tests passing decreased.
+// BugHotspots returns weekly bug-link counts grouped by repo (git_remote/cwd).
+// One cell per (repo, week) where the count is the number of distinct Jira
+// bugs whose linked offending run started in that week and lives in that repo.
+//
+// Source of truth is the buglinks table (fed by the task-done hook in
+// cmd/task.go). The week is bucketed against the offending run's started_at
+// because that's the moment the regression entered the codebase, regardless
+// of when the bug was filed.
+//
+// Pre v10 this was a regression proxy (lint_delta>0 OR tests_delta<0) which
+// was noisy — see plan §02 / phase-02.
 func (l *LocalDB) BugHotspots(weeks int) ([]BugHotspotCell, error) {
 	if weeks <= 0 {
 		weeks = 8
@@ -164,11 +173,10 @@ func (l *LocalDB) BugHotspots(weeks int) ([]BugHotspotCell, error) {
 		SELECT
 			COALESCE(NULLIF(r.git_remote, ''), r.cwd) AS repo,
 			date(r.started_at, 'weekday 0', '-6 days') AS week,
-			COUNT(*) AS c
-		FROM runs r
-		JOIN quality_metrics qm ON qm.run_id = r.id
+			COUNT(DISTINCT bl.jira_bug_key) AS c
+		FROM buglinks bl
+		JOIN runs r ON r.id = bl.run_id
 		WHERE r.started_at >= ?
-		  AND (qm.lint_delta > 0 OR qm.tests_delta < 0)
 		  AND COALESCE(NULLIF(r.git_remote, ''), r.cwd) IS NOT NULL
 		GROUP BY repo, week
 		ORDER BY week ASC, repo ASC

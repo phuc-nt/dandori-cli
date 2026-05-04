@@ -131,11 +131,43 @@ func runTaskDone(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("✓ %s marked as Done\n", issueKey)
 
+	// Buglinks hook: when the task being closed is itself a Bug, walk its
+	// "is caused by" links and record one buglinks row per (bug, run).
+	// Non-fatal — a hook failure must not block the manual transition.
+	if dbPath, err := config.DBPath(); err == nil {
+		if localDB, openErr := db.Open(dbPath); openErr == nil {
+			if migErr := localDB.Migrate(); migErr == nil {
+				resolver := bugLinkResolverAdapter{db: localDB}
+				if n, err := jira.RecordOnTaskDone(client, localDB, resolver, issueKey); err != nil {
+					fmt.Printf("Warning: buglinks hook failed: %v\n", err)
+				} else if n > 0 {
+					fmt.Printf("✓ recorded %d buglink(s) for %s\n", n, issueKey)
+				}
+			}
+			localDB.Close()
+		}
+	}
+
 	// Add comment
 	comment := "✅ *Task completed*\n\nManually marked as done."
 	client.AddComment(issueKey, comment)
 
 	return nil
+}
+
+// bugLinkResolverAdapter adapts *db.LocalDB to jira.BugLinkResolver for
+// the task-done hook. Mirrors the poller's bugLinkDBResolver — kept
+// here so cmd/ doesn't reach into internal/jira's unexported types.
+type bugLinkResolverAdapter struct{ db *db.LocalDB }
+
+func (r bugLinkResolverAdapter) LatestRunForIssue(issueKey string) (string, error) {
+	return r.db.LatestRunIDForIssue(issueKey)
+}
+func (r bugLinkResolverAdapter) FindRunByPrefix(prefix string) (string, error) {
+	return r.db.FindRunByPrefix(prefix)
+}
+func (r bugLinkResolverAdapter) BugEventExists(bugKey string) (bool, error) {
+	return r.db.BugEventExists(bugKey)
 }
 
 func runTaskInfo(cmd *cobra.Command, args []string) error {

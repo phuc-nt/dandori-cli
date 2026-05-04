@@ -321,6 +321,39 @@ func SeedCrossProject(d *db.LocalDB) error {
 		}
 	}
 
+	// Seed buglinks so the QA › Bug Hotspots widget has real (bug, run) data.
+	// Each project gets 4 buglinks rows referring to its three regressing
+	// runs (rIdx==3 of each sprint). One run is double-linked to two bug
+	// keys to exercise the COUNT(DISTINCT jira_bug_key) path. Total: 12 rows.
+	bugSeq := 0
+	for pIdx, p := range projects {
+		for sIdx := range sprints {
+			runID := fmt.Sprintf("cross-%s-%s-%02d", p.key, sprints[sIdx], 4) // rIdx==3 → 04
+			bugSeq++
+			bugKey := fmt.Sprintf("%s-BUG-%d", p.key, bugSeq)
+			reason := fmt.Sprintf("seed cross-project bug hotspot (proj=%s sprint=%s)", p.key, sprints[sIdx])
+			if _, err := tx.Exec(`
+				INSERT OR IGNORE INTO buglinks (jira_bug_key, run_id, reason, linked_by)
+				VALUES (?, ?, ?, 'seed-cross')
+			`, bugKey, runID, reason); err != nil {
+				return fmt.Errorf("insert buglink %s: %w", bugKey, err)
+			}
+			// First sprint of each project: link a second bug to the same run
+			// so the hotspot cell counts >1 bug.
+			if sIdx == 0 {
+				bugSeq++
+				bugKey2 := fmt.Sprintf("%s-BUG-%d", p.key, bugSeq)
+				if _, err := tx.Exec(`
+					INSERT OR IGNORE INTO buglinks (jira_bug_key, run_id, reason, linked_by)
+					VALUES (?, ?, 'seed: second bug for same run', 'seed-cross')
+				`, bugKey2, runID); err != nil {
+					return fmt.Errorf("insert second buglink %s: %w", bugKey2, err)
+				}
+				_ = pIdx
+			}
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit cross: %w", err)
 	}
@@ -333,6 +366,7 @@ func ResetDB(d *db.LocalDB) error {
 	stmts := []string{
 		`DELETE FROM quality_metrics`,
 		`DELETE FROM events`,
+		`DELETE FROM buglinks`,
 		`DELETE FROM task_attribution`,
 		`DELETE FROM runs`,
 	}

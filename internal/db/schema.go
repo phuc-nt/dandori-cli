@@ -1,6 +1,6 @@
 package db
 
-const SchemaVersion = 9
+const SchemaVersion = 10
 
 const SchemaSQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -143,6 +143,20 @@ CREATE TABLE IF NOT EXISTS alerts_acked (
 CREATE INDEX IF NOT EXISTS idx_runs_sprint_started ON runs(jira_sprint_id, started_at);
 CREATE INDEX IF NOT EXISTS idx_runs_dept_started ON runs(department, started_at);
 CREATE INDEX IF NOT EXISTS idx_runs_remote_started ON runs(git_remote, started_at);
+
+CREATE TABLE IF NOT EXISTS buglinks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    jira_bug_key TEXT NOT NULL,
+    run_id TEXT NOT NULL REFERENCES runs(id),
+    reason TEXT,
+    linked_at TEXT NOT NULL DEFAULT (datetime('now')),
+    linked_by TEXT NOT NULL DEFAULT 'task-done-hook',
+    UNIQUE(jira_bug_key, run_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_buglinks_run    ON buglinks(run_id);
+CREATE INDEX IF NOT EXISTS idx_buglinks_linked ON buglinks(linked_at);
+CREATE INDEX IF NOT EXISTS idx_buglinks_bug    ON buglinks(jira_bug_key);
 `
 
 // Migration from v1 to v2: add quality_metrics table
