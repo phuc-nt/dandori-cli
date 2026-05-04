@@ -59,6 +59,20 @@
                     </svg>
                     Admin
                 </a>
+                <!-- Phase 04 — QA View. Quality timeline + bug hotspots + rework. -->
+                <a class="nav-item" href="#qa-section" data-persona="qa">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                    </svg>
+                    QA
+                </a>
+                <!-- Phase 04 — Audit View. Event stream + compliance log. -->
+                <a class="nav-item" href="#audit-section" data-persona="audit">
+                    <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Audit
+                </a>
                 <a class="nav-item" href="#agents">
                     <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -588,6 +602,134 @@
                             <table id="admin-repos-table">
                                 <thead><tr><th>Repo</th><th>Runs</th><th>Cost</th><th>Success</th><th>14-day Spark</th></tr></thead>
                                 <tbody><tr><td colspan="5" class="empty-state">Loading…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 04 — QA View section (Timeline + Hotspots + Rework sub-tabs). -->
+            <section id="qa-section" class="persona-section fade-in" hidden>
+                <div class="persona-tabs" role="tablist" aria-label="QA View sub-tabs">
+                    <button class="persona-tab active" data-qview="timeline"
+                            onclick="setQASubTab('timeline')">Quality Timeline</button>
+                    <button class="persona-tab" data-qview="hotspots"
+                            onclick="setQASubTab('hotspots')">Bug Hotspots</button>
+                    <button class="persona-tab" data-qview="rework"
+                            onclick="setQASubTab('rework')">Rework &amp; Intervention</button>
+                </div>
+                <div class="persona-pane" data-qview-pane="timeline">
+                    <div class="card-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Quality Timeline</h3>
+                                <span class="card-sub">Lint Δ + tests Δ + commit-msg quality · weekly · last 12 weeks</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="qa-timeline-canvas"></canvas></div>
+                            <div class="empty-state" id="qa-timeline-empty" hidden>No quality metrics yet.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Cost vs Quality</h3>
+                                <span class="card-sub">Per-run scatter · color = status · click point → run drawer</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="qa-scatter-canvas"></canvas></div>
+                            <div class="empty-state" id="qa-scatter-empty" hidden>No scored runs yet.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Commit Message Quality</h3>
+                                <span class="card-sub">Distribution by quartile (0-100)</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="qa-commit-canvas"></canvas></div>
+                            <div class="empty-state" id="qa-commit-empty" hidden>No commit-msg scores.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="persona-pane" data-qview-pane="hotspots" hidden>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Bug Hotspots</h3>
+                            <span class="card-sub">Repo × week · cells = runs with lint Δ&gt;0 OR tests Δ&lt;0 (regression proxy)</span>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table id="qa-hotspots-table">
+                                <thead><tr><th>Repo</th></tr></thead>
+                                <tbody><tr><td class="empty-state">Loading…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="persona-pane" data-qview-pane="rework" hidden>
+                    <div class="card-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Rework Root Cause</h3>
+                                <span class="card-sub">Buckets: test_fail · lint_fail · human_reject · timeout · other</span>
+                            </div>
+                            <div class="chart-frame"><canvas id="qa-rework-canvas"></canvas></div>
+                            <div class="empty-state" id="qa-rework-empty" hidden>No rework data.</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Intervention Heatmap</h3>
+                                <span class="card-sub">Engineer × hour-of-day · last 28 days · runs with human_intervention_count &gt; 0</span>
+                            </div>
+                            <div style="overflow-x:auto;">
+                                <table id="qa-intervention-table">
+                                    <thead><tr><th>Engineer</th></tr></thead>
+                                    <tbody><tr><td class="empty-state">Loading…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Phase 04 — Audit View section (Events + Compliance sub-tabs). -->
+            <section id="audit-section" class="persona-section fade-in" hidden>
+                <div class="persona-tabs" role="tablist" aria-label="Audit View sub-tabs">
+                    <button class="persona-tab active" data-auview="events"
+                            onclick="setAuditSubTab('events')">Event Stream</button>
+                    <button class="persona-tab" data-auview="compliance"
+                            onclick="setAuditSubTab('compliance')">Compliance Log</button>
+                </div>
+                <div class="persona-pane" data-auview-pane="events">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Event Stream</h3>
+                            <span class="card-sub">Latest events · type filter (prefix) · run filter · 50/page</span>
+                        </div>
+                        <div style="display:flex; gap:8px; padding:8px 12px; flex-wrap:wrap;">
+                            <input type="text" id="audit-events-filter-type" placeholder="event_type prefix (e.g. approval)"
+                                   style="padding:4px 8px; font-size:12px; min-width:200px;" oninput="reloadEventStream()">
+                            <input type="text" id="audit-events-filter-run" placeholder="run_id"
+                                   style="padding:4px 8px; font-size:12px; min-width:200px;" oninput="reloadEventStream()">
+                            <button onclick="reloadEventStream()" style="padding:4px 12px; font-size:12px;">Refresh</button>
+                        </div>
+                        <div style="overflow-x:auto; max-height:560px; overflow-y:auto;">
+                            <table id="audit-events-table">
+                                <thead><tr><th>ID</th><th>Time</th><th>Run</th><th>Layer</th><th>Type</th><th>Data</th></tr></thead>
+                                <tbody><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="persona-pane" data-auview-pane="compliance" hidden>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Compliance Log (hash-chained)</h3>
+                            <span class="card-sub">SHA-256 chain · click <em>Verify</em> to replay and detect tampering</span>
+                        </div>
+                        <div style="display:flex; gap:8px; padding:8px 12px; align-items:center; flex-wrap:wrap;">
+                            <button id="audit-verify-btn" onclick="verifyAuditChain()"
+                                    style="padding:4px 12px; font-size:12px;">Verify Chain</button>
+                            <span id="audit-verify-result" style="font-size:12px;"></span>
+                        </div>
+                        <div style="overflow-x:auto; max-height:560px; overflow-y:auto;">
+                            <table id="audit-log-table">
+                                <thead><tr><th>ID</th><th>Time</th><th>Actor</th><th>Action</th><th>Entity</th><th>Hash</th></tr></thead>
+                                <tbody><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
                             </table>
                         </div>
                     </div>

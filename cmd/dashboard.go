@@ -136,6 +136,13 @@ func newDashboardMux(store *db.LocalDB, jiraBaseURL string) *http.ServeMux {
 	// Phase 03 Admin View endpoints (workstation matrix, repo leaderboard).
 	server.RegisterAdminRoutes(mux, store)
 
+	// Phase 04 QA View endpoints (quality timeline, cost-quality scatter,
+	// commit-msg distribution, bug hotspots, rework causes, intervention heatmap).
+	server.RegisterQARoutes(mux, store)
+
+	// Phase 04 Audit View endpoints (event stream, audit log, hash-chain verify).
+	server.RegisterAuditRoutes(mux, store)
+
 	return mux
 }
 

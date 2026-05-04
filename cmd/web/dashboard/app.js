@@ -149,10 +149,14 @@
             const tasksOpen = !document.getElementById('tasks-section')?.hidden;
             const engOpen = !document.getElementById('engineering-section')?.hidden;
             const adminOpen = !document.getElementById('admin-section')?.hidden;
+            const qaOpen = !document.getElementById('qa-section')?.hidden;
+            const auditOpen = !document.getElementById('audit-section')?.hidden;
             if (poOpen) loadPOView();
             if (tasksOpen) loadTasksView();
             if (engOpen) loadEngineeringView();
             if (adminOpen) loadAdminView();
+            if (qaOpen) loadQAView();
+            if (auditOpen) loadAuditView();
         }
 
         // Phase 02 — populate sprint picker from /api/sprints. Sort: active (latest end_at) first,
@@ -203,7 +207,9 @@
             const personaActive = !document.getElementById('po-view-section')?.hidden ||
                                   !document.getElementById('tasks-section')?.hidden ||
                                   !document.getElementById('engineering-section')?.hidden ||
-                                  !document.getElementById('admin-section')?.hidden;
+                                  !document.getElementById('admin-section')?.hidden ||
+                                  !document.getElementById('qa-section')?.hidden ||
+                                  !document.getElementById('audit-section')?.hidden;
             if (!personaActive) g9Section.style.display = '';
             const attrTileCard = document.getElementById('attribution-tile')?.closest('.card');
             if (attrTileCard) attrTileCard.style.display = role === 'project' ? 'none' : '';
@@ -1323,7 +1329,9 @@
             const personaActive = !document.getElementById('po-view-section')?.hidden ||
                                   !document.getElementById('tasks-section')?.hidden ||
                                   !document.getElementById('engineering-section')?.hidden ||
-                                  !document.getElementById('admin-section')?.hidden;
+                                  !document.getElementById('admin-section')?.hidden ||
+                                  !document.getElementById('qa-section')?.hidden ||
+                                  !document.getElementById('audit-section')?.hidden;
             const orgOnlyIDs = ['mix-leaderboard-card', 'org-rework-card'];
             orgOnlyIDs.forEach(id => {
                 const el = document.getElementById(id);
@@ -1703,6 +1711,8 @@
             else if (h.startsWith('#tasks-section')) persona = 'tasks';
             else if (h.startsWith('#engineering-section')) persona = 'engineering';
             else if (h.startsWith('#admin-section')) persona = 'admin';
+            else if (h.startsWith('#qa-section')) persona = 'qa';
+            else if (h.startsWith('#audit-section')) persona = 'audit';
             try { togglePersonaVisibility(persona); } catch(_) {}
             if (persona) {
                 document.querySelectorAll('.nav-item').forEach(n => {
@@ -1756,6 +1766,12 @@
             } else if (h.startsWith('#admin-section')) {
                 persona = 'admin';
                 sub = h.slice('#admin-section'.length).replace(/^\//, '');
+            } else if (h.startsWith('#qa-section')) {
+                persona = 'qa';
+                sub = h.slice('#qa-section'.length).replace(/^\//, '');
+            } else if (h.startsWith('#audit-section')) {
+                persona = 'audit';
+                sub = h.slice('#audit-section'.length).replace(/^\//, '');
             }
             showPersonaSection(persona);
             if (persona) {
@@ -1766,6 +1782,8 @@
                 if (persona === 'tasks' && sub) setTasksSubTab(sub);
                 if (persona === 'engineering' && sub) setEngSubTab(sub);
                 if (persona === 'admin' && sub) setAdminSubTab(sub);
+                if (persona === 'qa' && sub) setQASubTab(sub);
+                if (persona === 'audit' && sub) setAuditSubTab(sub);
             }
         }
 
@@ -1801,10 +1819,14 @@
             const tasksSec = document.getElementById('tasks-section');
             const engSec = document.getElementById('engineering-section');
             const adminSec = document.getElementById('admin-section');
+            const qaSec = document.getElementById('qa-section');
+            const auditSec = document.getElementById('audit-section');
             if (poSec) poSec.hidden = persona !== 'po';
             if (tasksSec) tasksSec.hidden = persona !== 'tasks';
             if (engSec) engSec.hidden = persona !== 'engineering';
             if (adminSec) adminSec.hidden = persona !== 'admin';
+            if (qaSec) qaSec.hidden = persona !== 'qa';
+            if (auditSec) auditSec.hidden = persona !== 'audit';
 
             const defaultIDs = ['kpi-strip', 'g9-section', 'quality', 'agents', 'runs',
                                 'mix-leaderboard-card', 'org-rework-card'];
@@ -1825,6 +1847,8 @@
             if (persona === 'tasks') loadTasksView();
             if (persona === 'engineering') loadEngineeringView();
             if (persona === 'admin') loadAdminView();
+            if (persona === 'qa') loadQAView();
+            if (persona === 'audit') loadAuditView();
         }
 
         function setPOSubTab(name) {
@@ -1853,6 +1877,20 @@
                 t.classList.toggle('active', t.getAttribute('data-aview') === name));
             document.querySelectorAll('#admin-section .persona-pane').forEach(p =>
                 p.hidden = p.getAttribute('data-aview-pane') !== name);
+        }
+
+        function setQASubTab(name) {
+            document.querySelectorAll('#qa-section .persona-tab').forEach(t =>
+                t.classList.toggle('active', t.getAttribute('data-qview') === name));
+            document.querySelectorAll('#qa-section .persona-pane').forEach(p =>
+                p.hidden = p.getAttribute('data-qview-pane') !== name);
+        }
+
+        function setAuditSubTab(name) {
+            document.querySelectorAll('#audit-section .persona-tab').forEach(t =>
+                t.classList.toggle('active', t.getAttribute('data-auview') === name));
+            document.querySelectorAll('#audit-section .persona-pane').forEach(p =>
+                p.hidden = p.getAttribute('data-auview-pane') !== name);
         }
 
         // ---- Phase 02 PO View loaders ----
@@ -2502,4 +2540,302 @@
 
         function escapeHtml(s) {
             return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        // ===== Phase 04 — QA + Audit views =====
+        const qaCharts = { timeline: null, scatter: null, commit: null, rework: null };
+        function destroyQA(key) {
+            if (qaCharts[key]) { qaCharts[key].destroy(); qaCharts[key] = null; }
+        }
+
+        async function loadQAView() {
+            renderQATimeline();
+            renderQAScatter();
+            renderQACommitMsg();
+            renderQABugHotspots();
+            renderQARework();
+            renderQAIntervention();
+        }
+
+        async function renderQATimeline() {
+            const canvas = document.getElementById('qa-timeline-canvas');
+            const empty = document.getElementById('qa-timeline-empty');
+            if (!canvas) return;
+            const res = await fetch('/api/quality/timeline?weeks=12');
+            const data = await res.json();
+            destroyQA('timeline');
+            if (!Array.isArray(data) || data.length === 0) {
+                if (empty) empty.hidden = false;
+                canvas.style.display = 'none';
+                return;
+            }
+            if (empty) empty.hidden = true;
+            canvas.style.display = '';
+            // Group by project, build line per metric per project (collapsed: aggregate by week if single project).
+            const byProject = {};
+            data.forEach(p => {
+                if (!byProject[p.project]) byProject[p.project] = [];
+                byProject[p.project].push(p);
+            });
+            const allWeeks = [...new Set(data.map(p => p.week))].sort();
+            const palette = chartColors;
+            const datasets = [];
+            let pi = 0;
+            Object.keys(byProject).forEach(proj => {
+                const rows = byProject[proj];
+                const lookup = Object.fromEntries(rows.map(r => [r.week, r]));
+                const lintColor = palette[pi % palette.length];
+                const testColor = palette[(pi + 2) % palette.length];
+                datasets.push({
+                    label: `${proj} · lint Δ`,
+                    data: allWeeks.map(w => (lookup[w]?.lint_delta ?? null)),
+                    borderColor: lintColor, tension: 0.25, spanGaps: true,
+                });
+                datasets.push({
+                    label: `${proj} · tests Δ`,
+                    data: allWeeks.map(w => (lookup[w]?.tests_delta ?? null)),
+                    borderColor: testColor, borderDash: [4, 3], tension: 0.25, spanGaps: true,
+                });
+                pi++;
+            });
+            qaCharts.timeline = new Chart(canvas, {
+                type: 'line',
+                data: { labels: allWeeks, datasets },
+                options: { responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { font: { size: 10 } } } },
+                    scales: { y: { beginAtZero: false } } },
+            });
+        }
+
+        async function renderQAScatter() {
+            const canvas = document.getElementById('qa-scatter-canvas');
+            const empty = document.getElementById('qa-scatter-empty');
+            if (!canvas) return;
+            const res = await fetch('/api/quality/scatter?limit=2000');
+            const data = await res.json();
+            destroyQA('scatter');
+            if (!Array.isArray(data) || data.length === 0) {
+                if (empty) empty.hidden = false;
+                canvas.style.display = 'none';
+                return;
+            }
+            if (empty) empty.hidden = true;
+            canvas.style.display = '';
+            const ok = [], bad = [];
+            data.forEach(p => {
+                const pt = { x: p.cost, y: p.quality, run_id: p.run_id };
+                if (p.status === 'failed' || p.status === 'error') bad.push(pt);
+                else ok.push(pt);
+            });
+            qaCharts.scatter = new Chart(canvas, {
+                type: 'scatter',
+                data: { datasets: [
+                    { label: 'success', data: ok, backgroundColor: 'rgba(34,197,94,0.55)' },
+                    { label: 'failed',  data: bad, backgroundColor: 'rgba(239,68,68,0.65)' },
+                ] },
+                options: { responsive: true, maintainAspectRatio: false,
+                    plugins: { tooltip: { callbacks: { label: ctx => `run ${ctx.raw.run_id} · $${ctx.parsed.x.toFixed(2)} · q=${ctx.parsed.y.toFixed(1)}` } } },
+                    scales: { x: { title: { display: true, text: 'Cost ($)' } },
+                              y: { title: { display: true, text: 'Quality Score' } } } },
+            });
+        }
+
+        async function renderQACommitMsg() {
+            const canvas = document.getElementById('qa-commit-canvas');
+            const empty = document.getElementById('qa-commit-empty');
+            if (!canvas) return;
+            const res = await fetch('/api/quality/commit-msg');
+            const data = await res.json();
+            destroyQA('commit');
+            const total = (data || []).reduce((s, b) => s + (b.count || 0), 0);
+            if (!total) {
+                if (empty) empty.hidden = false;
+                canvas.style.display = 'none';
+                return;
+            }
+            if (empty) empty.hidden = true;
+            canvas.style.display = '';
+            const labels = data.map(b => b.bucket);
+            const counts = data.map(b => b.count);
+            qaCharts.commit = new Chart(canvas, {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'runs', data: counts,
+                    backgroundColor: ['#ef4444', '#f97316', '#eab308', '#22c55e'] }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } } },
+            });
+        }
+
+        async function renderQABugHotspots() {
+            const tbl = document.getElementById('qa-hotspots-table');
+            if (!tbl) return;
+            const res = await fetch('/api/bug-hotspots?weeks=8');
+            const data = await res.json();
+            const tbody = tbl.querySelector('tbody');
+            const thead = tbl.querySelector('thead tr');
+            if (!Array.isArray(data) || data.length === 0) {
+                thead.innerHTML = '<th>Repo</th>';
+                tbody.innerHTML = '<tr><td class="empty-state">No regressions in window.</td></tr>';
+                return;
+            }
+            const repos = [...new Set(data.map(c => c.repo))].sort();
+            const weeks = [...new Set(data.map(c => c.week))].sort();
+            const grid = {};
+            data.forEach(c => { grid[`${c.repo}|${c.week}`] = c.count; });
+            thead.innerHTML = '<th>Repo</th>' + weeks.map(w => `<th>${w.slice(5)}</th>`).join('');
+            tbody.innerHTML = repos.map(r => {
+                const cells = weeks.map(w => {
+                    const v = grid[`${r}|${w}`] || 0;
+                    return `<td><span class="heat-cell ${heatBucket(v)}">${v || ''}</span></td>`;
+                }).join('');
+                return `<tr><td>${escapeHtml(shortRepo(r))}</td>${cells}</tr>`;
+            }).join('');
+        }
+
+        async function renderQARework() {
+            const canvas = document.getElementById('qa-rework-canvas');
+            const empty = document.getElementById('qa-rework-empty');
+            if (!canvas) return;
+            const res = await fetch('/api/rework/causes');
+            const data = await res.json();
+            destroyQA('rework');
+            const total = (data || []).reduce((s, c) => s + (c.count || 0), 0);
+            if (!total) {
+                if (empty) empty.hidden = false;
+                canvas.style.display = 'none';
+                return;
+            }
+            if (empty) empty.hidden = true;
+            canvas.style.display = '';
+            const labels = data.map(c => c.cause);
+            const counts = data.map(c => c.count);
+            const palette = ['#ef4444', '#f97316', '#eab308', '#6366f1', '#94a3b8'];
+            qaCharts.rework = new Chart(canvas, {
+                type: 'doughnut',
+                data: { labels, datasets: [{ data: counts, backgroundColor: palette.slice(0, labels.length) }] },
+                options: { responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } },
+            });
+        }
+
+        async function renderQAIntervention() {
+            const tbl = document.getElementById('qa-intervention-table');
+            if (!tbl) return;
+            const res = await fetch('/api/intervention/heatmap?days=28');
+            const data = await res.json();
+            const tbody = tbl.querySelector('tbody');
+            const thead = tbl.querySelector('thead tr');
+            if (!Array.isArray(data) || data.length === 0) {
+                thead.innerHTML = '<th>Engineer</th>';
+                tbody.innerHTML = '<tr><td class="empty-state">No interventions in window.</td></tr>';
+                return;
+            }
+            const engineers = [...new Set(data.map(c => c.engineer))].sort();
+            const grid = {};
+            data.forEach(c => { grid[`${c.engineer}|${c.hour}`] = c.count; });
+            const hours = [];
+            for (let h = 0; h < 24; h++) hours.push(h);
+            thead.innerHTML = '<th>Engineer</th>' + hours.map(h => `<th>${h}</th>`).join('');
+            tbody.innerHTML = engineers.map(e => {
+                const cells = hours.map(h => {
+                    const v = grid[`${e}|${h}`] || 0;
+                    return `<td><span class="heat-cell ${heatBucket(v)}">${v || ''}</span></td>`;
+                }).join('');
+                return `<tr><td>${escapeHtml(e)}</td>${cells}</tr>`;
+            }).join('');
+        }
+
+        function heatBucket(v) {
+            if (v <= 0) return 'heat-0';
+            if (v < 2) return 'heat-1';
+            if (v < 5) return 'heat-2';
+            if (v < 10) return 'heat-3';
+            return 'heat-4';
+        }
+
+        // ----- Audit View -----
+        async function loadAuditView() {
+            reloadEventStream();
+            loadAuditLog();
+        }
+
+        async function reloadEventStream() {
+            const tbl = document.getElementById('audit-events-table');
+            if (!tbl) return;
+            const tbody = tbl.querySelector('tbody');
+            const typeF = document.getElementById('audit-events-filter-type')?.value?.trim() || '';
+            const runF = document.getElementById('audit-events-filter-run')?.value?.trim() || '';
+            const params = new URLSearchParams();
+            params.set('limit', '50');
+            if (typeF) params.set('type', typeF);
+            if (runF) params.set('run', runF);
+            const res = await fetch('/api/events?' + params.toString());
+            const data = await res.json();
+            if (!Array.isArray(data) || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No events match.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(e => `
+                <tr>
+                    <td>${e.id}</td>
+                    <td>${escapeHtml(e.ts)}</td>
+                    <td>${escapeHtml(e.run_id || '')}</td>
+                    <td>${e.layer}</td>
+                    <td>${escapeHtml(e.event_type)}</td>
+                    <td title="${escapeHtml(e.data || '')}">${escapeHtml(truncate(e.data || '', 80))}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadAuditLog() {
+            const tbl = document.getElementById('audit-log-table');
+            if (!tbl) return;
+            const tbody = tbl.querySelector('tbody');
+            const res = await fetch('/api/audit-log?limit=200');
+            const data = await res.json();
+            if (!Array.isArray(data) || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No audit entries.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(r => `
+                <tr>
+                    <td>${r.id}</td>
+                    <td>${escapeHtml(r.ts)}</td>
+                    <td>${escapeHtml(r.actor)}</td>
+                    <td>${escapeHtml(r.action)}</td>
+                    <td>${escapeHtml(r.entity_type)}${r.entity_id ? ':' + escapeHtml(r.entity_id) : ''}</td>
+                    <td title="${escapeHtml(r.curr_hash || '')}">${escapeHtml((r.curr_hash || '').slice(0, 12))}…</td>
+                </tr>
+            `).join('');
+        }
+
+        async function verifyAuditChain() {
+            const out = document.getElementById('audit-verify-result');
+            const btn = document.getElementById('audit-verify-btn');
+            if (!out || !btn) return;
+            btn.disabled = true;
+            out.textContent = 'Verifying…';
+            out.className = '';
+            try {
+                const res = await fetch('/api/audit-log/verify', { method: 'POST' });
+                const r = await res.json();
+                if (r.valid) {
+                    out.textContent = `✓ Chain valid (${r.entries} entries)`;
+                    out.className = 'audit-ok';
+                } else {
+                    out.textContent = `✗ Broken at entry #${r.broken_at} (idx ${r.broken_index}) — ${r.reason}`;
+                    out.className = 'audit-fail';
+                }
+            } catch (e) {
+                out.textContent = '✗ Verify failed: ' + e.message;
+                out.className = 'audit-fail';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function truncate(s, n) {
+            if (!s) return '';
+            if (s.length <= n) return s;
+            return s.slice(0, n - 1) + '…';
         }
