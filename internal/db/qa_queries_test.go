@@ -128,16 +128,17 @@ func TestBugHotspots_RegressionProxy(t *testing.T) {
 	}
 }
 
-func TestReworkCauses_BucketsJSONReasons(t *testing.T) {
+func TestReworkCauses_GroupsByEnumKeys(t *testing.T) {
 	d := newEmptyLocalDB(t)
 	if err := d.Migrate(); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
+	// Post v8→v9: session_outcomes is map[RunOutcomeReason]int.
 	_, err := d.Exec(`
 		INSERT INTO task_attribution (jira_issue_key, session_count, total_lines_final,
 			lines_attributed_agent, lines_attributed_human, session_outcomes, jira_done_at)
-		VALUES ('P-1', 3, 100, 80, 20,
-			'[{"run_id":"r1","outcome":"failed","reason":"test failure"},{"run_id":"r2","outcome":"failed","reason":"lint violation"},{"run_id":"r3","outcome":"failed","reason":"timeout"}]',
+		VALUES ('P-1', 4, 100, 80, 20,
+			'{"test_fail":2,"lint_fail":1,"timeout":1}',
 			datetime('now'))
 	`)
 	if err != nil {
@@ -147,15 +148,44 @@ func TestReworkCauses_BucketsJSONReasons(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReworkCauses: %v", err)
 	}
-	if len(got) != 5 {
-		t.Fatalf("want 5 buckets, got %d", len(got))
+	// Always 9 buckets, in canonical ReasonOrder.
+	if len(got) != len(ReasonOrder) {
+		t.Fatalf("want %d buckets, got %d", len(ReasonOrder), len(got))
 	}
 	byCause := map[string]int{}
 	for _, c := range got {
 		byCause[c.Cause] = c.Count
 	}
-	if byCause["test_fail"] != 1 || byCause["lint_fail"] != 1 || byCause["timeout"] != 1 {
+	if byCause["test_fail"] != 2 || byCause["lint_fail"] != 1 || byCause["timeout"] != 1 {
 		t.Errorf("buckets wrong: %+v", byCause)
+	}
+}
+
+func TestReworkCauses_UnknownKeysFallToOther(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	_, err := d.Exec(`
+		INSERT INTO task_attribution (jira_issue_key, session_count, total_lines_final,
+			lines_attributed_agent, lines_attributed_human, session_outcomes, jira_done_at)
+		VALUES ('P-2', 3, 50, 50, 0,
+			'{"made_up_reason":2,"another_one":1}',
+			datetime('now'))
+	`)
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	got, err := d.ReworkCauses()
+	if err != nil {
+		t.Fatalf("ReworkCauses: %v", err)
+	}
+	byCause := map[string]int{}
+	for _, c := range got {
+		byCause[c.Cause] = c.Count
+	}
+	if byCause["other"] != 3 {
+		t.Errorf("unknown keys should fold to 'other': got %+v", byCause)
 	}
 }
 

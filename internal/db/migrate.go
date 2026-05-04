@@ -66,6 +66,15 @@ func (l *LocalDB) Migrate() error {
 		if _, err := l.Exec(MigrationV7ToV8); err != nil {
 			return fmt.Errorf("migrate v7 to v8: %w", err)
 		}
+		currentVersion = 8
+	}
+	if currentVersion == 8 {
+		if err := MigrateV8ToV9Data(l); err != nil {
+			return fmt.Errorf("migrate v8 to v9 (data): %w", err)
+		}
+		if _, err := l.Exec(MigrationV8ToV9); err != nil {
+			return fmt.Errorf("migrate v8 to v9 (version): %w", err)
+		}
 	}
 
 	return nil

@@ -143,9 +143,11 @@ func aggregateSessionStats(d *db.LocalDB, sessions []sessionRecord) aggregated {
 		agg.TotalHumanMsg += s.HumanMessages
 		agg.TotalIntervention += s.Interventions
 		agg.TotalApproval += s.Approvals
-		if s.SessionEndReason != "" {
-			agg.Outcomes[s.SessionEndReason]++
-		}
+		// Use the typed enum classifier so dashboard widgets can group by
+		// canonical reasons (test_fail / lint_fail / etc.) when events
+		// indicate a finer cause than the wrapper's session_end_reason.
+		reason := d.ClassifyRunOutcome(s.RunID)
+		agg.Outcomes[string(reason)]++
 		if s.JiraDoneAt != "" && s.JiraDoneAt > agg.JiraDoneAt {
 			agg.JiraDoneAt = s.JiraDoneAt
 		}

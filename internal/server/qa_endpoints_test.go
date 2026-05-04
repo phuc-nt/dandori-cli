@@ -112,7 +112,7 @@ func TestQA_BugHotspots_RegressionsOnly(t *testing.T) {
 	}
 }
 
-func TestQA_ReworkCauses_FixedFiveBuckets(t *testing.T) {
+func TestQA_ReworkCauses_FixedNineBuckets(t *testing.T) {
 	mux, _ := newQAMux(t)
 	w := doGET(t, mux, "/api/rework/causes")
 	if w.Code != 200 {
@@ -122,8 +122,8 @@ func TestQA_ReworkCauses_FixedFiveBuckets(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(got) != 5 {
-		t.Errorf("want 5 buckets, got %d", len(got))
+	if len(got) != len(db.ReasonOrder) {
+		t.Errorf("want %d buckets, got %d", len(db.ReasonOrder), len(got))
 	}
 }
 

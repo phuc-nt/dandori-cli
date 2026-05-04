@@ -7,7 +7,6 @@ package db
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
 )
 
@@ -195,17 +194,20 @@ type ReworkCause struct {
 	Count int    `json:"count"`
 }
 
-// ReworkCauses parses task_attribution.session_outcomes JSON and buckets reasons.
-// Plan §7: bucket into test_fail / lint_fail / human_reject / timeout / other.
+// ReworkCauses sums task_attribution.session_outcomes across all rows and
+// returns one ReworkCause per RunOutcomeReason (in canonical ReasonOrder),
+// padded with zeros. Post v8→v9 migration the JSON is map[enum]int — no
+// string-match bucketing needed.
+//
+// Unknown keys (data written before migration finished, or malformed JSON)
+// fold into ReasonOther so the dashboard never loses a count.
 func (l *LocalDB) ReworkCauses() ([]ReworkCause, error) {
 	rows, err := l.Query(`SELECT COALESCE(session_outcomes, '') FROM task_attribution`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	counts := map[string]int{
-		"test_fail": 0, "lint_fail": 0, "human_reject": 0, "timeout": 0, "other": 0,
-	}
+	counts := map[RunOutcomeReason]int{}
 	for rows.Next() {
 		var raw string
 		if err := rows.Scan(&raw); err != nil {
@@ -214,42 +216,35 @@ func (l *LocalDB) ReworkCauses() ([]ReworkCause, error) {
 		if raw == "" {
 			continue
 		}
-		var arr []map[string]any
-		if err := json.Unmarshal([]byte(raw), &arr); err != nil {
+		var m map[string]int
+		if err := json.Unmarshal([]byte(raw), &m); err != nil {
+			counts[ReasonOther]++
 			continue
 		}
-		for _, item := range arr {
-			reason, _ := item["reason"].(string)
-			counts[bucketReworkReason(reason)]++
+		for k, v := range m {
+			counts[normalizeReasonKey(k)] += v
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	order := []string{"test_fail", "lint_fail", "human_reject", "timeout", "other"}
-	out := make([]ReworkCause, 0, len(order))
-	for _, k := range order {
-		out = append(out, ReworkCause{Cause: k, Count: counts[k]})
+	out := make([]ReworkCause, 0, len(ReasonOrder))
+	for _, k := range ReasonOrder {
+		out = append(out, ReworkCause{Cause: string(k), Count: counts[k]})
 	}
 	return out, nil
 }
 
-func bucketReworkReason(reason string) string {
-	r := strings.ToLower(reason)
-	switch {
-	case strings.Contains(r, "test"):
-		return "test_fail"
-	case strings.Contains(r, "lint"):
-		return "lint_fail"
-	case strings.Contains(r, "reject") || strings.Contains(r, "human"):
-		return "human_reject"
-	case strings.Contains(r, "timeout") || strings.Contains(r, "timed out"):
-		return "timeout"
-	case r == "":
-		return "other"
-	default:
-		return "other"
+// normalizeReasonKey accepts a stored JSON key and returns a canonical enum
+// value. Anything not in the enum becomes ReasonOther.
+func normalizeReasonKey(k string) RunOutcomeReason {
+	r := RunOutcomeReason(k)
+	for _, v := range ReasonOrder {
+		if r == v {
+			return r
+		}
 	}
+	return ReasonOther
 }
 
 // InterventionCell is one (engineer, hour) cell of the intervention heatmap.

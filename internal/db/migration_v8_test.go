@@ -72,9 +72,6 @@ func TestMigration_V8_FreshInstallSchemaVersion(t *testing.T) {
 	if v != SchemaVersion {
 		t.Errorf("schema version = %d, want %d", v, SchemaVersion)
 	}
-	if v != 8 {
-		t.Errorf("schema version = %d, want 8 (Phase 01 baseline)", v)
-	}
 
 	// alerts_acked is in fresh-install SchemaSQL (not just migration path)
 	var found int

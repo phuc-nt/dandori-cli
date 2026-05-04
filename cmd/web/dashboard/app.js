@@ -2707,12 +2707,23 @@
             }
             if (empty) empty.hidden = true;
             canvas.style.display = '';
-            const labels = data.map(c => c.cause);
-            const counts = data.map(c => c.count);
-            const palette = ['#ef4444', '#f97316', '#eab308', '#6366f1', '#94a3b8'];
+            // Hide zero-count buckets so the donut isn't dominated by empty
+            // categories (the 9-bucket enum exposes many we'll rarely fill).
+            const filtered = (data || []).filter(c => (c.count || 0) > 0);
+            const labels = filtered.map(c => c.cause);
+            const counts = filtered.map(c => c.count);
+            // 9-bucket palette aligned to RunOutcomeReason canonical order:
+            // test_fail, lint_fail, human_reject, timeout, policy_violation,
+            // error, user_interrupted, agent_finished, other.
+            const palette = {
+                test_fail: '#ef4444', lint_fail: '#f97316', human_reject: '#eab308',
+                timeout: '#6366f1', policy_violation: '#a855f7', error: '#dc2626',
+                user_interrupted: '#0ea5e9', agent_finished: '#22c55e', other: '#94a3b8',
+            };
+            const colors = labels.map(l => palette[l] || '#94a3b8');
             qaCharts.rework = new Chart(canvas, {
                 type: 'doughnut',
-                data: { labels, datasets: [{ data: counts, backgroundColor: palette.slice(0, labels.length) }] },
+                data: { labels, datasets: [{ data: counts, backgroundColor: colors }] },
                 options: { responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } },
             });

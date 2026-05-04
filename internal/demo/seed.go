@@ -8,6 +8,7 @@
 package demo
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -293,6 +294,33 @@ func SeedCrossProject(d *db.LocalDB) error {
 		}
 	}
 
+	// Seed task_attribution so the QA › Rework widget has data. One row per
+	// project, with session_outcomes keyed by RunOutcomeReason enum values
+	// (post v8→v9 migration shape). Counts chosen so all 4 finer buckets
+	// appear in the donut.
+	for pIdx, p := range projects {
+		key := fmt.Sprintf("%s-%d", p.key, 1) // first issue of each project
+		// Distribute counts so each project lights a different reason.
+		outcomes := map[string]int{
+			string(db.ReasonTestFail):    1 + pIdx,
+			string(db.ReasonLintFail):    1,
+			string(db.ReasonHumanReject): pIdx,
+			string(db.ReasonTimeout):     1,
+		}
+		outJSON, _ := json.Marshal(outcomes)
+		doneAt := start.Add(time.Duration((pIdx+1)*14*24) * time.Hour).Format(time.RFC3339)
+		if _, err := tx.Exec(`
+			INSERT INTO task_attribution (
+				jira_issue_key, session_count, total_lines_final,
+				lines_attributed_agent, lines_attributed_human,
+				session_outcomes, jira_done_at
+			) VALUES (?, ?, 200, 160, 40, ?, ?)
+			ON CONFLICT(jira_issue_key) DO NOTHING
+		`, key, 4, string(outJSON), doneAt); err != nil {
+			return fmt.Errorf("insert cross attribution %s: %w", key, err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit cross: %w", err)
 	}
@@ -305,6 +333,7 @@ func ResetDB(d *db.LocalDB) error {
 	stmts := []string{
 		`DELETE FROM quality_metrics`,
 		`DELETE FROM events`,
+		`DELETE FROM task_attribution`,
 		`DELETE FROM runs`,
 	}
 	for _, s := range stmts {
