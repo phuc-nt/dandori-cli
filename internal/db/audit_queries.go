@@ -13,7 +13,9 @@ package db
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -242,10 +244,13 @@ func (l *LocalDB) VerifyAuditChainWithAnchors(limit int) (*AuditVerifyResult, er
 		var hash string
 		row := l.QueryRow(`SELECT COALESCE(curr_hash,'') FROM audit_log WHERE id = ?`, a.LastAuditID)
 		if err := row.Scan(&hash); err != nil {
-			res.Valid = false
-			res.BrokenAt = a.LastAuditID
-			res.Reason = fmt.Sprintf("anchor mismatch: audit_log row %d (anchored at %s) is missing", a.LastAuditID, a.AnchoredAt)
-			return res, nil
+			if errors.Is(err, sql.ErrNoRows) {
+				res.Valid = false
+				res.BrokenAt = a.LastAuditID
+				res.Reason = fmt.Sprintf("anchor mismatch: audit_log row %d (anchored at %s) is missing", a.LastAuditID, a.AnchoredAt)
+				return res, nil
+			}
+			return nil, fmt.Errorf("verify with anchors: scan row %d: %w", a.LastAuditID, err)
 		}
 		if !strings.EqualFold(strings.TrimSpace(hash), strings.TrimSpace(a.LastCurrHash)) {
 			res.Valid = false

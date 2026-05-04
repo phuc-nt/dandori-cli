@@ -28,11 +28,15 @@ var dashboardCmd = &cobra.Command{
 	RunE:  runDashboard,
 }
 
-var dashboardPort int
+var (
+	dashboardPort int
+	dashboardBind string
+)
 
 func init() {
 	rootCmd.AddCommand(dashboardCmd)
 	dashboardCmd.Flags().IntVarP(&dashboardPort, "port", "p", 8088, "Port to serve dashboard")
+	dashboardCmd.Flags().StringVar(&dashboardBind, "bind", "127.0.0.1", "Bind address (default: loopback only). Use 0.0.0.0 to expose on LAN — only do this if you trust the network.")
 }
 
 // extractProjectKey extracts the Jira project key prefix from an issue key.
@@ -163,8 +167,11 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 
 	mux := newDashboardMux(store, jiraBaseURL)
 
-	addr := fmt.Sprintf(":%d", dashboardPort)
+	addr := fmt.Sprintf("%s:%d", dashboardBind, dashboardPort)
 	url := fmt.Sprintf("http://localhost:%d", dashboardPort)
+	if dashboardBind != "127.0.0.1" && dashboardBind != "localhost" {
+		fmt.Printf("⚠ Dashboard bound to %s — exposed beyond loopback. Audit log + cost data has no auth.\n", addr)
+	}
 
 	fmt.Printf("Starting dashboard at %s\n", url)
 	fmt.Println("Press Ctrl+C to stop")

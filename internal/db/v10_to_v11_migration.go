@@ -18,7 +18,7 @@ package db
 //   - anchored_at         : when the anchor was taken (RFC3339)
 //   - last_audit_id       : audit_log.id at the tip when anchored
 //   - last_curr_hash      : audit_log.curr_hash at that tip
-//   - confluence_page_id  : '' if no external anchor was made (offline)
+//   - confluence_page_id  : ” if no external anchor was made (offline)
 //   - confluence_version  : Confluence page version after upsert (0 if local-only)
 //   - status              : 'anchored' (pushed) or 'local-only' (no Confluence)
 //   - UNIQUE(last_audit_id) — one anchor per audit tip; idempotent re-runs

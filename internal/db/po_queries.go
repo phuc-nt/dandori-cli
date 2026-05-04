@@ -63,13 +63,13 @@ func (f POFilter) applyFilter(q string, args []any) (string, []any) {
 
 // SprintInfo is one row in /api/sprints output.
 type SprintInfo struct {
-	ID          string  `json:"id"`
-	ProjectKey  string  `json:"project_key"`
-	RunCount    int     `json:"run_count"`
-	StartedAt   string  `json:"started_at"`   // earliest run in this sprint
-	EndedAt     string  `json:"ended_at"`     // latest run in this sprint
-	TotalCost   float64 `json:"total_cost"`
-	IssueCount  int     `json:"issue_count"`  // distinct jira_issue_key
+	ID         string  `json:"id"`
+	ProjectKey string  `json:"project_key"`
+	RunCount   int     `json:"run_count"`
+	StartedAt  string  `json:"started_at"` // earliest run in this sprint
+	EndedAt    string  `json:"ended_at"`   // latest run in this sprint
+	TotalCost  float64 `json:"total_cost"`
+	IssueCount int     `json:"issue_count"` // distinct jira_issue_key
 }
 
 // ListSprints returns one entry per distinct jira_sprint_id, oldest run last.

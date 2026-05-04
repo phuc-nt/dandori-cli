@@ -2,7 +2,7 @@
 
 > CLI outer harness cho mô hình **PO/PDM + QA + AI agent** vận hành dự án phần mềm. Wrap Claude Code, track mọi run, tích hợp Jira + Confluence, dashboard 3-level analytics.
 
-**Current**: v0.9.0 · 789 unit test funcs (~906 test runs) · 26 packages · vision coverage ~97%
+**Current**: v0.10.5 · 25 packages green under `go test ./...` · vision coverage ~98% (Phase 05 closed)
 
 ---
 
@@ -15,6 +15,7 @@
 | Gặp lỗi / troubleshoot | [03-faq.md](03-faq.md) |
 | Hiểu giá trị 4 release gần nhất (v0.5.0 → v0.8.0) | [04-release-summary-v0.5.0-to-v0.8.0.md](04-release-summary-v0.5.0-to-v0.8.0.md) |
 | Vision · giá trị enterprise scale · gap còn lại | [06-vision-and-roadmap.md](06-vision-and-roadmap.md) |
+| Kiến trúc hệ thống (overview) | [07-system-architecture.md](07-system-architecture.md) |
 | Lịch sử thay đổi chi tiết | [../CHANGELOG.md](../CHANGELOG.md) |
 
 ## Cho stakeholder (lead · sponsor · audit)
@@ -30,7 +31,8 @@
 |---|---|
 | Quy trình release (tag → goreleaser → Homebrew tap) | [05-release-setup.md](05-release-setup.md) |
 | Devlog từng release (v0.5.0 → v0.8.0) | [devlog/](devlog/) |
-| Architecture + 8 phase implementation | [../../plans/260418-1301-dandori-cli/plan.md](../../plans/260418-1301-dandori-cli/plan.md) |
+| Architecture overview (CLI · 3-layer · data flow) | [07-system-architecture.md](07-system-architecture.md) |
+| 8 phase implementation gốc | [../../plans/260418-1301-dandori-cli/plan.md](../../plans/260418-1301-dandori-cli/plan.md) |
 | Convention code Go + thiết kế nguyên tắc | [../CLAUDE.md](../CLAUDE.md) |
 
 ## Reference (deep-dive theo feature)

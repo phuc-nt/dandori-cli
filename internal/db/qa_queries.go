@@ -12,12 +12,12 @@ import (
 
 // QualityTimelinePoint is one weekly aggregate per project.
 type QualityTimelinePoint struct {
-	Week           string  `json:"week"`            // ISO week start (YYYY-MM-DD, Monday)
-	Project        string  `json:"project"`         // jira project key (CLITEST1, ...)
-	LintDelta      float64 `json:"lint_delta"`      // avg per-run lint_delta
-	TestsDelta     float64 `json:"tests_delta"`     // avg per-run tests_delta
-	CommitMsgQual  float64 `json:"commit_msg_qual"` // avg commit_msg_quality
-	Runs           int     `json:"runs"`
+	Week          string  `json:"week"`            // ISO week start (YYYY-MM-DD, Monday)
+	Project       string  `json:"project"`         // jira project key (CLITEST1, ...)
+	LintDelta     float64 `json:"lint_delta"`      // avg per-run lint_delta
+	TestsDelta    float64 `json:"tests_delta"`     // avg per-run tests_delta
+	CommitMsgQual float64 `json:"commit_msg_qual"` // avg commit_msg_quality
+	Runs          int     `json:"runs"`
 }
 
 // QualityTimeline returns weekly avg deltas + commit msg quality for one project.

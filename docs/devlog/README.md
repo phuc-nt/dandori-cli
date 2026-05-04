@@ -11,12 +11,14 @@ Chỉ giữ devlog **per-release** từ v0.5.0 trở đi. Chi tiết phase-level
 | 2026-05-01 | [v0.7.0](2026-05-01-v0.7.0-release.md) | G9 dashboard GA — 3-level surface, DORA scorecard, attribution composite, mobile-responsive |
 | 2026-05-01 | [v0.8.0](2026-05-01-v0.8.0-release.md) | G10 dashboard expansion — KPI strip, alerts banner, sparklines, leaderboard, rework tile |
 | 2026-05-02 | [v0.9.0](2026-05-02-v0.9.0-release.md) | UX overhaul — full init wizard, explicit subcommands, verify gate opt-in, watch daemon |
+| 2026-05-03 | [v0.9.1](../../CHANGELOG.md) | Polish — `dandori doctor` health check, doc sweep, goreleaser server-tag fix |
+| 2026-05-05 | [v0.10.5](2026-05-05-v0.10.5-release.md) | Phase 05 close — Dashboard v2 (5 persona views) + audit chain external anchor + buglinks + cross-project demo seed + release-readiness fixes |
 
 ## Stats (current)
 
-- **789 unit test functions** (~906 test runs) across 26 packages
-- **Vision coverage**: ~97% của outer-harness pillars
-- **Released cadence**: 5 release trong 2 tuần (Apr 18 → May 2)
+- **25 packages green** under `go test ./...`
+- **Vision coverage**: ~98% of outer-harness pillars (Phase 05 closed)
+- **Release cadence**: 6 releases in ~2.5 weeks (Apr 30 → May 5)
 
 ## Cách viết devlog mới
 

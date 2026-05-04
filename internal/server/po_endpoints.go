@@ -153,17 +153,17 @@ func handleCostByDepartment(store *db.LocalDB) http.HandlerFunc {
 
 // CostProjection is the response payload for /api/cost/projection.
 type CostProjection struct {
-	History          []db.DailyCost `json:"history"`           // last 14d daily totals (oldest → newest)
-	Slope            float64        `json:"slope"`             // $/day
-	Intercept        float64        `json:"intercept"`         // $ on day 0 (oldest)
-	StdDev           float64        `json:"std_dev"`           // residual σ
-	ProjectedEOM     float64        `json:"projected_eom"`     // projected total spend through end of current calendar month
-	DaysToEOM        int            `json:"days_to_eom"`       // days remaining in month (incl. today)
-	Spent            float64        `json:"spent"`             // sum of history (last 14d actual)
-	DataSufficient   bool           `json:"data_sufficient"`   // true if ≥7 non-zero history days
-	ConfidenceLow    float64        `json:"confidence_low"`    // EOM projection - 1σ * sqrt(daysToEOM)
-	ConfidenceHigh   float64        `json:"confidence_high"`   // EOM projection + 1σ * sqrt(daysToEOM)
-	DisclaimerNote   string         `json:"disclaimer_note"`
+	History        []db.DailyCost `json:"history"`         // last 14d daily totals (oldest → newest)
+	Slope          float64        `json:"slope"`           // $/day
+	Intercept      float64        `json:"intercept"`       // $ on day 0 (oldest)
+	StdDev         float64        `json:"std_dev"`         // residual σ
+	ProjectedEOM   float64        `json:"projected_eom"`   // projected total spend through end of current calendar month
+	DaysToEOM      int            `json:"days_to_eom"`     // days remaining in month (incl. today)
+	Spent          float64        `json:"spent"`           // sum of history (last 14d actual)
+	DataSufficient bool           `json:"data_sufficient"` // true if ≥7 non-zero history days
+	ConfidenceLow  float64        `json:"confidence_low"`  // EOM projection - 1σ * sqrt(daysToEOM)
+	ConfidenceHigh float64        `json:"confidence_high"` // EOM projection + 1σ * sqrt(daysToEOM)
+	DisclaimerNote string         `json:"disclaimer_note"`
 }
 
 func handleCostProjection(store *db.LocalDB) http.HandlerFunc {

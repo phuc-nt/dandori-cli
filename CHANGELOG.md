@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.5] — 2026-05-05
+
+Phase 05 closeout — Dashboard v2 (5 persona views) + audit chain external anchor + cross-project demo seed. Code review found 2 release blockers; both fixed below.
+
+### Added
+
+- **Dashboard v2** — 5 persona views (PO, QA, Engineering, Admin, Audit) with Velocity/Cost/Attribution/Sprint Board/Task Lifecycle/8 engineering widgets/workstation+repo admin/event stream + hash-chained compliance log. Alert center, KPI strip, DORA traffic light, run drawer, mobile responsive. ES6 module split per persona.
+- **Audit chain external anchor** — `audit_anchors` table + `dandori audit anchor` (records tip locally, optionally upserts witness page on Confluence) + `dandori audit verify --with-anchor` (cross-checks chain against anchors; flips INVALID with `anchor mismatch:` reason on rebuild attack). Migration v10→v11.
+- **Buglinks task-done hook** — replaces legacy bug-hotspot regression proxy with `buglinks` table fed when QA closes a bug. Drives QA View "bug hotspots" widget with real attribution instead of name heuristic.
+- **Typed `RunOutcomeReason` enum** — replaces string-match bucketing across QA queries; reduces drift between display labels and SQL filters.
+- **Cross-project demo seed** — `dandori demo --variant cross-project` seeds 3 projects × 3 sprints × 12 runs each + 4 deterministic audit_log entries, so demos have real chain to anchor and verify. `--reset` extended to wipe `audit_anchors` + `audit_log`.
+- **`--bind` flag on `dandori dashboard`** — defaults to `127.0.0.1` (loopback). Use `--bind 0.0.0.0` to expose on LAN, with explicit warning printed (audit log + cost data has no auth yet).
+
+### Fixed
+
+- **Dashboard binding** (security) — pre-fix bound to `:port` (all interfaces) by default. Anyone on the LAN could read PII (engineer names, Jira keys, costs, audit log) with no auth. Now defaults to loopback; opt-in to expose with warning.
+- **`VerifyAuditChainWithAnchors` error classification** — pre-fix treated every `Scan` error as "row missing → tamper". A locked DB or driver error became a false-positive tamper alert. Now distinguishes `sql.ErrNoRows` (real tamper) from other errors (returns the error to caller).
+- **gofmt** — 6 files in `internal/db/` and `internal/server/po_endpoints.go` had stale formatting; ran `gofmt -w`.
+
+### Tests
+
+All 25 packages green. `go vet` clean, `gofmt` clean.
+
 ## [0.9.1] — 2026-05-03
 
 Polish on top of v0.9.0 — adds `dandori doctor` for ongoing health checks and sweeps stale legacy mentions from docs.

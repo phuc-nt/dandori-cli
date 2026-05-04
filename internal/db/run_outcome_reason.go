@@ -17,11 +17,11 @@ const (
 
 	// Finer buckets derived from events table (Phase 04 dashboard wanted
 	// these but the wrapper never wrote them — see ClassifyRunOutcome).
-	ReasonTestFail         RunOutcomeReason = "test_fail"
-	ReasonLintFail         RunOutcomeReason = "lint_fail"
-	ReasonHumanReject      RunOutcomeReason = "human_reject"
-	ReasonTimeout          RunOutcomeReason = "timeout"
-	ReasonPolicyViolation  RunOutcomeReason = "policy_violation"
+	ReasonTestFail        RunOutcomeReason = "test_fail"
+	ReasonLintFail        RunOutcomeReason = "lint_fail"
+	ReasonHumanReject     RunOutcomeReason = "human_reject"
+	ReasonTimeout         RunOutcomeReason = "timeout"
+	ReasonPolicyViolation RunOutcomeReason = "policy_violation"
 
 	ReasonOther RunOutcomeReason = "other"
 )

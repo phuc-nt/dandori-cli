@@ -26,9 +26,9 @@ type AgentMetricPack struct {
 	Runs             int     `json:"runs"`
 	TotalCost        float64 `json:"total_cost"`
 	AvgCostPerRun    float64 `json:"avg_cost_per_run"`
-	SuccessRate      float64 `json:"success_rate"`     // status='done' / total
-	AutonomyPct      float64 `json:"autonomy_pct"`     // 100 - human_approval_count / runs (capped 0..100)
-	CacheEffPct      float64 `json:"cache_eff_pct"`    // cache_read / (input+cache_read)
+	SuccessRate      float64 `json:"success_rate"`      // status='done' / total
+	AutonomyPct      float64 `json:"autonomy_pct"`      // 100 - human_approval_count / runs (capped 0..100)
+	CacheEffPct      float64 `json:"cache_eff_pct"`     // cache_read / (input+cache_read)
 	InterventionRate float64 `json:"intervention_rate"` // human_approval_count / runs
 	AvgDurationSec   float64 `json:"avg_duration_sec"`
 	LinesAuthored    int     `json:"lines_authored"` // sum of agent_lines_added (if column exists, else 0)
@@ -155,10 +155,10 @@ func (l *LocalDB) ApprovalFunnel() ([]FunnelStep, error) {
 
 // CacheEffPoint is one daily cache-efficiency reading.
 type CacheEffPoint struct {
-	Day     string  `json:"day"`
-	Pct     float64 `json:"pct"`
-	Cached  int64   `json:"cached_tokens"`
-	Total   int64   `json:"total_tokens"`
+	Day    string  `json:"day"`
+	Pct    float64 `json:"pct"`
+	Cached int64   `json:"cached_tokens"`
+	Total  int64   `json:"total_tokens"`
 }
 
 // CacheEfficiencyTimeline returns daily cache hit rate for the last N days.
@@ -198,9 +198,9 @@ func (l *LocalDB) CacheEfficiencyTimeline(days int) ([]CacheEffPoint, error) {
 
 // CostPerTaskPoint is daily cost-per-distinct-PBI.
 type CostPerTaskPoint struct {
-	Day        string  `json:"day"`
-	Tasks      int     `json:"tasks"`
-	Cost       float64 `json:"cost"`
+	Day         string  `json:"day"`
+	Tasks       int     `json:"tasks"`
+	Cost        float64 `json:"cost"`
 	CostPerTask float64 `json:"cost_per_task"`
 }
 
@@ -320,10 +320,10 @@ func (l *LocalDB) SessionEndReasons(days int) ([]SessionEndPoint, error) {
 
 // DurationBucket is one bin in the duration histogram.
 type DurationBucket struct {
-	Label    string  `json:"label"`
-	MinSec   float64 `json:"min_sec"`
-	MaxSec   float64 `json:"max_sec"`
-	Count    int     `json:"count"`
+	Label  string  `json:"label"`
+	MinSec float64 `json:"min_sec"`
+	MaxSec float64 `json:"max_sec"`
+	Count  int     `json:"count"`
 }
 
 // DurationHistogram fetches all durations, computes IQR-based bucket width
