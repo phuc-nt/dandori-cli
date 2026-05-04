@@ -1025,5 +1025,22 @@
 
     <script>const JIRA_BASE_URL = '{{JIRA_BASE_URL}}';</script>
     <script src="/static/app.js"></script>
+    <!-- Phase 05/Step 03: QA + Audit widgets are now ES6 modules.
+         Expose entry points on window so app.js callers and inline
+         onclick="..." handlers (Refresh / Verify) keep working. -->
+    <script type="module">
+        import { loadQAView } from '/static/widgets/qa.js';
+        import { loadAuditView, reloadEventStream, verifyAuditChain } from '/static/widgets/audit.js';
+        window.loadQAView = loadQAView;
+        window.loadAuditView = loadAuditView;
+        window.reloadEventStream = reloadEventStream;
+        window.verifyAuditChain = verifyAuditChain;
+        // Module scripts are always deferred — app.js's initial loadAll()
+        // (classic script) may have already fired before these globals
+        // existed and skipped the QA/Audit loaders via the optional-chain
+        // guards. Re-trigger here for whichever persona is currently open.
+        if (!document.getElementById('qa-section')?.hidden)    loadQAView();
+        if (!document.getElementById('audit-section')?.hidden) loadAuditView();
+    </script>
 </body>
 </html>
