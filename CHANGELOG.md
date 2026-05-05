@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.6] — 2026-05-05
+
+Bug debt cleanup — 9 issues deferred from the v0.10.5 release-readiness review, shipped together as a focused patch. No API changes; no migrations.
+
+### Fixed
+
+- **`AppendAuditEntry` race** — wrapped SELECT-then-INSERT in an explicit transaction. Latent today (only seed calls it) but the contract is now safe for runner/poller call sites planned in v0.11.
+- **Buglinks insert counter** — `task_done_hook.RecordOnTaskDone` previously incremented `inserted` per traversal, not per actual insert. Plumbed `RowsAffected` through `InsertBuglink` so the counter now matches reality.
+- **Audit anchor upsert** — `runAuditAnchor` could leave a local row with no `confluence_page_id` if the page was created in a separate run. `InsertAuditAnchor` now uses `ON CONFLICT(last_audit_id) DO UPDATE` to fill in the page id on the next anchor run.
+- **Audit anchor parse** — `fmt.Sscanf` errors in `parseAuditAnchorRows` were silently dropped, producing rows with id=0. Now captured and the malformed row skipped with an error trace.
+- **Audit hash compare** — replaced `strings.EqualFold` with `==` on hex hash compare in `VerifyAuditChain` (hex output is deterministic case; case-insensitive compare was misleading).
+- **Dashboard widget hardening** — added `safeFetch` + `renderWidgetError` helpers in `shared.js`. All 8 fetch sites in `qa.js` and `audit.js` wrapped — a 500 from any endpoint now renders an inline error instead of crashing the View.
+- **Audit widget XSS surface** — `e.id`, `e.layer`, `r.id` interpolated unescaped (relied on numeric typing). Now escaped unconditionally via `escapeHtml`.
+- **`daysRemaining` DST/leap edge** — used wall-clock subtraction divided by 24h, off-by-one on DST transition days. Now subtracts midnight-to-midnight in the configured timezone.
+- **Demo seed dead code** — removed `_ = pIdx` workaround; dropped the unused loop variable.
+
+### Refactored
+
+- Removed `lowerASCIIHook` / `containsHook` helpers in `task_done_hook.go` — replaced with `strings.Contains(strings.ToLower(t), "bug")` (YAGNI; matches repo convention).
+
+### Tests
+
+- New: `TestAppendAuditEntry_ConcurrentNoDupes`, `TestInsertAuditAnchor_UpsertUpdatesConfluencePageID`.
+- 25/25 packages green. `go vet` clean. `gofmt` clean.
+
+### Known limitations (documented, not fixed)
+
+- No CSRF on `POST /api/audit-log/verify`. Read-only endpoint, low blast radius. Dashboard binds to loopback by default since v0.10.5.
+- Anchor model only protects rows ≤ `last_audit_id` at anchor time. Rows added after the latest anchor are unpinned until the next anchor runs.
+- Confluence upsert is best-effort under network errors. If `UpdatePage` fails after `SearchPages` succeeded, no local anchor is recorded; user must re-run.
+
 ## [0.10.5] — 2026-05-05
 
 Phase 05 closeout — Dashboard v2 (5 persona views) + audit chain external anchor + cross-project demo seed. Code review found 2 release blockers; both fixed below.
