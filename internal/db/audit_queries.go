@@ -181,9 +181,10 @@ func (l *LocalDB) VerifyAuditChain(limit int) (*AuditVerifyResult, error) {
 			res.Reason = "prev_hash does not match previous curr_hash"
 			return res, rows.Err()
 		}
-		// Recompute curr_hash.
+		// Recompute curr_hash. computeAuditHash always returns lowercase hex;
+		// both sides are owned here so == is sufficient and stricter than EqualFold.
 		expected := computeAuditHash(r.PrevHash, r.Actor, r.Action, r.EntityType, r.EntityID, r.Details, r.Timestamp)
-		if !strings.EqualFold(strings.TrimSpace(r.CurrHash), expected) {
+		if r.CurrHash != expected {
 			res.Valid = false
 			res.BrokenAt = r.ID
 			res.BrokenIndex = idx
@@ -273,15 +274,36 @@ func truncHash(h string) string {
 }
 
 // AppendAuditEntry inserts a new audit_log row computing the proper hash
-// linkage. Useful for tests + admin actions.
+// linkage. Wrapped in a transaction so concurrent callers cannot read the
+// same prev_hash and produce duplicate chain links. MaxOpenConns=1 on the
+// connection pool (see local.go) already serializes writers at the DB level,
+// but the explicit transaction makes the atomicity guarantee explicit and
+// safe for future call sites that may open a second connection.
 func (l *LocalDB) AppendAuditEntry(actor, action, entityType, entityID, details, ts string) error {
+	tx, err := l.db.Begin()
+	if err != nil {
+		return fmt.Errorf("append audit entry: begin tx: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	var prev string
-	row := l.QueryRow(`SELECT COALESCE(curr_hash,'') FROM audit_log ORDER BY id DESC LIMIT 1`)
+	row := tx.QueryRow(`SELECT COALESCE(curr_hash,'') FROM audit_log ORDER BY id DESC LIMIT 1`)
 	_ = row.Scan(&prev)
+
 	curr := computeAuditHash(prev, actor, action, entityType, entityID, details, ts)
-	_, err := l.Exec(`
+	if _, err = tx.Exec(`
 		INSERT INTO audit_log (prev_hash, curr_hash, actor, action, entity_type, entity_id, details, ts)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, prev, curr, actor, action, entityType, entityID, details, ts)
-	return err
+	`, prev, curr, actor, action, entityType, entityID, details, ts); err != nil {
+		return fmt.Errorf("append audit entry: insert: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("append audit entry: commit: %w", err)
+	}
+	return nil
 }

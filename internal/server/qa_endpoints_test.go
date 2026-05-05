@@ -95,10 +95,10 @@ func TestQA_BugHotspots_CountsBuglinks(t *testing.T) {
 	seedQA(t, store, "r2", "P-1", 0, 0, 70, 60, 1.0)
 	seedQA(t, store, "r3", "P-1", 0, 0, 70, 90, 1.0)
 	// Only r1 and r2 are linked from bugs; r3 has no buglink.
-	if err := store.InsertBuglink("BUG-1", "r1", "test", "test"); err != nil {
+	if _, err := store.InsertBuglink("BUG-1", "r1", "test", "test"); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
-	if err := store.InsertBuglink("BUG-2", "r2", "test", "test"); err != nil {
+	if _, err := store.InsertBuglink("BUG-2", "r2", "test", "test"); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
 

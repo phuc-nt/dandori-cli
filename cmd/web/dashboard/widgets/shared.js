@@ -5,6 +5,33 @@
 // shell imports from us, never the other way around. Keep this file
 // helper-only (no DOM mutation, no fetches, no global state).
 
+// safeFetch wraps fetch with res.ok check and try/catch so widgets never
+// receive an unhandled rejection on 4xx/5xx or network failure.
+// Returns { data, error } — callers check error before using data.
+export async function safeFetch(url, opts) {
+    try {
+        const res = await fetch(url, opts);
+        if (!res.ok) {
+            return { data: null, error: `HTTP ${res.status}: ${res.statusText}` };
+        }
+        const data = await res.json();
+        return { data, error: null };
+    } catch (e) {
+        return { data: null, error: e.message || String(e) };
+    }
+}
+
+// renderWidgetError shows an inline error banner inside a widget container
+// (identified by id). Falls back to console.error when no element found.
+export function renderWidgetError(elementId, message) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.innerHTML = `<p class="widget-error">Error loading data: ${escapeHtml(message)}</p>`;
+        return;
+    }
+    console.error(`[widget:${elementId}] ${message}`);
+}
+
 export const chartColors = [
     '#6366f1', '#22c55e', '#f59e0b', '#ef4444',
     '#ec4899', '#8b5cf6', '#14b8a6', '#f97316',

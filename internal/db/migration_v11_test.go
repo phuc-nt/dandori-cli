@@ -66,7 +66,7 @@ func TestMigrationV11_InsertAuditAnchorUniqueConstraint(t *testing.T) {
 	if _, err := d.InsertAuditAnchor(42, "deadbeef", "PAGE-1", 1, "anchored"); err != nil {
 		t.Fatalf("first insert: %v", err)
 	}
-	// Re-anchor same tip — INSERT OR IGNORE means no error, no second row.
+	// Re-anchor same tip — ON CONFLICT DO UPDATE means no error, no second row.
 	if _, err := d.InsertAuditAnchor(42, "deadbeef", "PAGE-1", 2, "anchored"); err != nil {
 		t.Fatalf("dup insert: %v", err)
 	}

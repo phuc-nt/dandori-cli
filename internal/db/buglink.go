@@ -50,18 +50,20 @@ func (l *LocalDB) FindRunByPrefix(prefix string) (string, error) {
 // linkedBy is the actor (typically "task-done-hook"); reason is free text
 // captured from the Jira link or hook context. Idempotent via the
 // UNIQUE(jira_bug_key, run_id) constraint — re-runs are silent no-ops.
-func (l *LocalDB) InsertBuglink(bugKey, runID, reason, linkedBy string) error {
+// Returns (1, nil) when the row was inserted, (0, nil) when it already existed.
+func (l *LocalDB) InsertBuglink(bugKey, runID, reason, linkedBy string) (int64, error) {
 	if linkedBy == "" {
 		linkedBy = "task-done-hook"
 	}
-	_, err := l.Exec(`
+	res, err := l.Exec(`
 		INSERT OR IGNORE INTO buglinks (jira_bug_key, run_id, reason, linked_by)
 		VALUES (?, ?, ?, ?)
 	`, bugKey, runID, reason, linkedBy)
 	if err != nil {
-		return fmt.Errorf("insert buglink: %w", err)
+		return 0, fmt.Errorf("insert buglink: %w", err)
 	}
-	return nil
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 // BugEventExists returns true when a bug.filed event has already been recorded

@@ -326,7 +326,7 @@ func SeedCrossProject(d *db.LocalDB) error {
 	// runs (rIdx==3 of each sprint). One run is double-linked to two bug
 	// keys to exercise the COUNT(DISTINCT jira_bug_key) path. Total: 12 rows.
 	bugSeq := 0
-	for pIdx, p := range projects {
+	for _, p := range projects {
 		for sIdx := range sprints {
 			runID := fmt.Sprintf("cross-%s-%s-%02d", p.key, sprints[sIdx], 4) // rIdx==3 → 04
 			bugSeq++
@@ -349,7 +349,6 @@ func SeedCrossProject(d *db.LocalDB) error {
 				`, bugKey2, runID); err != nil {
 					return fmt.Errorf("insert second buglink %s: %w", bugKey2, err)
 				}
-				_ = pIdx
 			}
 		}
 	}

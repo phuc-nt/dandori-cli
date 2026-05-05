@@ -26,12 +26,12 @@ type fakeStore struct {
 	err   error
 }
 
-func (f *fakeStore) InsertBuglink(bug, run, reason, by string) error {
+func (f *fakeStore) InsertBuglink(bug, run, reason, by string) (int64, error) {
 	if f.err != nil {
-		return f.err
+		return 0, f.err
 	}
 	f.calls = append(f.calls, struct{ bug, run, reason, by string }{bug, run, reason, by})
-	return nil
+	return 1, nil
 }
 
 // fakeHookResolver: minimal BugLinkResolver — only the methods the hook

@@ -169,7 +169,10 @@ func parseAuditAnchorRows(body string) []AuditAnchorRow {
 			continue
 		}
 		var id int64
-		fmt.Sscanf(cells[1], "%d", &id)
+		if _, err := fmt.Sscanf(cells[1], "%d", &id); err != nil {
+			// Skip rows where last_audit_id can't be parsed (hand-edited garbage).
+			continue
+		}
 		out = append(out, AuditAnchorRow{
 			AnchoredAt:   html.UnescapeString(cells[0]),
 			LastAuditID:  id,

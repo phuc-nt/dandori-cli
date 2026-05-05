@@ -2,6 +2,7 @@ package db
 
 import (
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -134,5 +135,77 @@ func TestInsertAuditAnchor_RecordsConfluenceMetadata(t *testing.T) {
 	}
 	if a.ConfluencePageID != "PAGE-99" || a.ConfluenceVersion != 7 || a.Status != "anchored" {
 		t.Errorf("metadata not stored, got %+v", a)
+	}
+}
+
+// TestAppendAuditEntry_ConcurrentNoDupes verifies Bug 3 fix: two goroutines
+// calling AppendAuditEntry simultaneously must produce a valid, gap-free chain
+// (no two rows share the same prev_hash). With MaxOpenConns=1 on the pool
+// and an explicit transaction, writers are serialized.
+func TestAppendAuditEntry_ConcurrentNoDupes(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	const goroutines = 2
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			ts := time.Date(2026, 5, 1, 12, idx, 0, 0, time.UTC).Format(time.RFC3339)
+			if err := d.AppendAuditEntry("bot", "create", "run", "r"+string(rune('A'+idx)), "details", ts); err != nil {
+				t.Errorf("goroutine %d: %v", idx, err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	// Verify the chain: no gaps, no duplicate prev_hash links.
+	res, err := d.VerifyAuditChain(0)
+	if err != nil {
+		t.Fatalf("VerifyAuditChain: %v", err)
+	}
+	if !res.Valid {
+		t.Errorf("chain invalid after concurrent appends: %s", res.Reason)
+	}
+	if res.Entries != goroutines {
+		t.Errorf("expected %d entries, got %d", goroutines, res.Entries)
+	}
+}
+
+// TestInsertAuditAnchor_UpsertUpdatesConfluencePageID verifies Bug 6 fix:
+// calling InsertAuditAnchor twice with the same last_audit_id must update the
+// confluence_page_id and status on the existing row (upgrade local-only → anchored).
+func TestInsertAuditAnchor_UpsertUpdatesConfluencePageID(t *testing.T) {
+	d := freshAuditDB(t)
+	id, hash, _ := d.LatestAuditTip()
+
+	// First call: local-only (no Confluence page yet).
+	if _, err := d.InsertAuditAnchor(id, hash, "", 0, "local-only"); err != nil {
+		t.Fatalf("first insert: %v", err)
+	}
+
+	// Second call with same last_audit_id: Confluence write succeeded afterward.
+	if _, err := d.InsertAuditAnchor(id, hash, "PAGE-42", 3, "anchored"); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	// Exactly one row must exist; its confluence_page_id must be updated.
+	var count int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM audit_anchors WHERE last_audit_id = ?`, id).Scan(&count); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 row, got %d", count)
+	}
+
+	a, err := d.LatestAuditAnchor()
+	if err != nil || a == nil {
+		t.Fatalf("LatestAuditAnchor: %v anchor=%v", err, a)
+	}
+	if a.ConfluencePageID != "PAGE-42" || a.Status != "anchored" {
+		t.Errorf("upsert did not update row: page_id=%q status=%q", a.ConfluencePageID, a.Status)
 	}
 }

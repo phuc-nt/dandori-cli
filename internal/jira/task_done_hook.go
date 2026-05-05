@@ -1,9 +1,12 @@
 package jira
 
+import "strings"
+
 // BugLinkStore is the storage half the task-done hook needs: persist one
 // row per (bug, run) pair. Implemented by *db.LocalDB.InsertBuglink.
+// Returns (1, nil) on real insert, (0, nil) when the row already existed.
 type BugLinkStore interface {
-	InsertBuglink(bugKey, runID, reason, linkedBy string) error
+	InsertBuglink(bugKey, runID, reason, linkedBy string) (int64, error)
 }
 
 // TaskDoneIssueFetcher loads a Jira issue (with links populated) by key.
@@ -48,10 +51,11 @@ func RecordOnTaskDone(fetcher TaskDoneIssueFetcher, store BugLinkStore, resolver
 			continue
 		}
 		reason := "task-done: jira link from " + bug.Key + " (" + taskKey + ")"
-		if err := store.InsertBuglink(bug.Key, runID, reason, "task-done-hook"); err != nil {
+		n, err := store.InsertBuglink(bug.Key, runID, reason, "task-done-hook")
+		if err != nil {
 			return inserted, err
 		}
-		inserted++
+		inserted += int(n)
 	}
 	for _, prefix := range ParseDescriptionTags(bug.Description) {
 		runID, err := resolver.FindRunByPrefix(prefix)
@@ -62,10 +66,11 @@ func RecordOnTaskDone(fetcher TaskDoneIssueFetcher, store BugLinkStore, resolver
 			continue
 		}
 		reason := "task-done: caused_by tag in " + bug.Key
-		if err := store.InsertBuglink(bug.Key, runID, reason, "task-done-hook"); err != nil {
+		n, err := store.InsertBuglink(bug.Key, runID, reason, "task-done-hook")
+		if err != nil {
 			return inserted, err
 		}
-		inserted++
+		inserted += int(n)
 	}
 	return inserted, nil
 }
@@ -74,36 +79,5 @@ func RecordOnTaskDone(fetcher TaskDoneIssueFetcher, store BugLinkStore, resolver
 // instances customize the name ("Defect", "Production Bug") — we match
 // any type that contains "bug" so the hook is forgiving.
 func isBugType(issueType string) bool {
-	t := lowerASCIIHook(issueType)
-	return containsHook(t, "bug")
-}
-
-// lowerASCIIHook / containsHook: small ASCII-only helpers. Inlined
-// instead of importing strings to keep the package's import footprint
-// stable (matches the convention in run_outcome_reason.go).
-func lowerASCIIHook(s string) string {
-	b := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		b[i] = c
-	}
-	return string(b)
-}
-
-func containsHook(s, substr string) bool {
-	if len(substr) == 0 {
-		return true
-	}
-	if len(substr) > len(s) {
-		return false
-	}
-	for i := 0; i+len(substr) <= len(s); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(strings.ToLower(issueType), "bug")
 }

@@ -197,8 +197,11 @@ func handleCostProjection(store *db.LocalDB) http.HandlerFunc {
 			resp.StdDev = sigma
 
 			now := time.Now().UTC()
-			eom := time.Date(now.Year(), now.Month()+1, 0, 23, 59, 59, 0, time.UTC)
-			daysRemaining := int(eom.Sub(now).Hours()/24) + 1
+			// Use clean midnight boundaries so DST-shifted hours don't bias the count.
+			// tomorrow midnight — today midnight gives an exact integer day count.
+			todayMidnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+			eomMidnight := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+			daysRemaining := int(eomMidnight.Sub(todayMidnight).Hours() / 24)
 			if daysRemaining < 0 {
 				daysRemaining = 0
 			}

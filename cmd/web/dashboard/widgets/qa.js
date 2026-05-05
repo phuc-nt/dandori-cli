@@ -4,7 +4,7 @@
 // (lines 2545–2765 prior to this split). Chart.js is read off `window.Chart`
 // because index.html loads it as a UMD <script> before this module runs.
 
-import { chartColors, escapeHtml, heatBucket, shortRepo } from './shared.js';
+import { chartColors, escapeHtml, heatBucket, shortRepo, safeFetch } from './shared.js';
 
 const Chart = window.Chart;
 
@@ -32,8 +32,12 @@ export async function renderQATimeline() {
     const canvas = document.getElementById('qa-timeline-canvas');
     const empty = document.getElementById('qa-timeline-empty');
     if (!canvas) return;
-    const res = await fetch('/api/quality/timeline?weeks=12');
-    const data = await res.json();
+    const { data, error } = await safeFetch('/api/quality/timeline?weeks=12');
+    if (error) {
+        canvas.style.display = 'none';
+        if (empty) { empty.hidden = false; empty.textContent = error; }
+        return;
+    }
     destroyQA('timeline');
     if (!Array.isArray(data) || data.length === 0) {
         if (empty) empty.hidden = false;
@@ -83,8 +87,12 @@ export async function renderQAScatter() {
     const canvas = document.getElementById('qa-scatter-canvas');
     const empty = document.getElementById('qa-scatter-empty');
     if (!canvas) return;
-    const res = await fetch('/api/quality/scatter?limit=2000');
-    const data = await res.json();
+    const { data, error } = await safeFetch('/api/quality/scatter?limit=2000');
+    if (error) {
+        canvas.style.display = 'none';
+        if (empty) { empty.hidden = false; empty.textContent = error; }
+        return;
+    }
     destroyQA('scatter');
     if (!Array.isArray(data) || data.length === 0) {
         if (empty) empty.hidden = false;
@@ -122,8 +130,12 @@ export async function renderQACommitMsg() {
     const canvas = document.getElementById('qa-commit-canvas');
     const empty = document.getElementById('qa-commit-empty');
     if (!canvas) return;
-    const res = await fetch('/api/quality/commit-msg');
-    const data = await res.json();
+    const { data, error } = await safeFetch('/api/quality/commit-msg');
+    if (error) {
+        canvas.style.display = 'none';
+        if (empty) { empty.hidden = false; empty.textContent = error; }
+        return;
+    }
     destroyQA('commit');
     const total = (data || []).reduce((s, b) => s + (b.count || 0), 0);
     if (!total) {
@@ -151,8 +163,12 @@ export async function renderQACommitMsg() {
 export async function renderQABugHotspots() {
     const tbl = document.getElementById('qa-hotspots-table');
     if (!tbl) return;
-    const res = await fetch('/api/bug-hotspots?weeks=8');
-    const data = await res.json();
+    const { data, error } = await safeFetch('/api/bug-hotspots?weeks=8');
+    if (error) {
+        const tbody = tbl.querySelector('tbody');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="2" class="empty-state">${escapeHtml(error)}</td></tr>`;
+        return;
+    }
     const tbody = tbl.querySelector('tbody');
     const thead = tbl.querySelector('thead tr');
     if (!Array.isArray(data) || data.length === 0) {
@@ -178,8 +194,12 @@ export async function renderQARework() {
     const canvas = document.getElementById('qa-rework-canvas');
     const empty = document.getElementById('qa-rework-empty');
     if (!canvas) return;
-    const res = await fetch('/api/rework/causes');
-    const data = await res.json();
+    const { data, error } = await safeFetch('/api/rework/causes');
+    if (error) {
+        canvas.style.display = 'none';
+        if (empty) { empty.hidden = false; empty.textContent = error; }
+        return;
+    }
     destroyQA('rework');
     const total = (data || []).reduce((s, c) => s + (c.count || 0), 0);
     if (!total) {
@@ -211,8 +231,12 @@ export async function renderQARework() {
 export async function renderQAIntervention() {
     const tbl = document.getElementById('qa-intervention-table');
     if (!tbl) return;
-    const res = await fetch('/api/intervention/heatmap?days=28');
-    const data = await res.json();
+    const { data, error } = await safeFetch('/api/intervention/heatmap?days=28');
+    if (error) {
+        const tbody = tbl.querySelector('tbody');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="2" class="empty-state">${escapeHtml(error)}</td></tr>`;
+        return;
+    }
     const tbody = tbl.querySelector('tbody');
     const thead = tbl.querySelector('thead tr');
     if (!Array.isArray(data) || data.length === 0) {

@@ -75,11 +75,11 @@ func TestMigrationV10_InsertBuglinkUniqueConstraint(t *testing.T) {
 	`); err != nil {
 		t.Fatalf("seed run: %v", err)
 	}
-	if err := d.InsertBuglink("BUG-1", "run-x", "first", "test"); err != nil {
+	if _, err := d.InsertBuglink("BUG-1", "run-x", "first", "test"); err != nil {
 		t.Fatalf("insert 1: %v", err)
 	}
 	// Second insert with same (bug_key, run_id) is silently ignored.
-	if err := d.InsertBuglink("BUG-1", "run-x", "second", "test"); err != nil {
+	if _, err := d.InsertBuglink("BUG-1", "run-x", "second", "test"); err != nil {
 		t.Fatalf("insert 2: %v", err)
 	}
 	var n int

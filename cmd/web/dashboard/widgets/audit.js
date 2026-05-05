@@ -2,7 +2,7 @@
 // Behavior matches the original closure-scoped versions (app.js
 // 2767–2852 prior to this split).
 
-import { escapeHtml, truncate } from './shared.js';
+import { escapeHtml, truncate, safeFetch } from './shared.js';
 
 export async function loadAuditView() {
     reloadEventStream();
@@ -19,18 +19,23 @@ export async function reloadEventStream() {
     params.set('limit', '50');
     if (typeF) params.set('type', typeF);
     if (runF) params.set('run', runF);
-    const res = await fetch('/api/events?' + params.toString());
-    const data = await res.json();
+    const { data, error } = await safeFetch('/api/events?' + params.toString());
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(error)}</td></tr>`;
+        return;
+    }
     if (!Array.isArray(data) || data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No events match.</td></tr>';
         return;
     }
+    // e.id and e.layer are escaped unconditionally — backend typing is trusted
+    // today but defensive escaping closes a future XSS gap (Bug 9).
     tbody.innerHTML = data.map(e => `
         <tr>
-            <td>${e.id}</td>
+            <td>${escapeHtml(e.id)}</td>
             <td>${escapeHtml(e.ts)}</td>
             <td>${escapeHtml(e.run_id || '')}</td>
-            <td>${e.layer}</td>
+            <td>${escapeHtml(e.layer)}</td>
             <td>${escapeHtml(e.event_type)}</td>
             <td title="${escapeHtml(e.data || '')}">${escapeHtml(truncate(e.data || '', 80))}</td>
         </tr>
@@ -41,15 +46,19 @@ export async function loadAuditLog() {
     const tbl = document.getElementById('audit-log-table');
     if (!tbl) return;
     const tbody = tbl.querySelector('tbody');
-    const res = await fetch('/api/audit-log?limit=200');
-    const data = await res.json();
+    const { data, error } = await safeFetch('/api/audit-log?limit=200');
+    if (error) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(error)}</td></tr>`;
+        return;
+    }
     if (!Array.isArray(data) || data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No audit entries.</td></tr>';
         return;
     }
+    // r.id escaped unconditionally (Bug 9 — defensive against future string slots).
     tbody.innerHTML = data.map(r => `
         <tr>
-            <td>${r.id}</td>
+            <td>${escapeHtml(r.id)}</td>
             <td>${escapeHtml(r.ts)}</td>
             <td>${escapeHtml(r.actor)}</td>
             <td>${escapeHtml(r.action)}</td>

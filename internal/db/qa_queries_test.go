@@ -117,19 +117,19 @@ func TestBugHotspots_CountsBuglinkRowsByRepoWeek(t *testing.T) {
 	seedQARun(t, d, "r3", "P-1", "a", now, 0, 0, 50, 50, 0)
 
 	// r1 → linked from BUG-1
-	if err := d.InsertBuglink("BUG-1", "r1", "test", "test"); err != nil {
+	if _, err := d.InsertBuglink("BUG-1", "r1", "test", "test"); err != nil {
 		t.Fatalf("insert buglink BUG-1: %v", err)
 	}
 	// r2 → linked from BUG-2 AND BUG-3 (two distinct bugs, same offending run)
-	if err := d.InsertBuglink("BUG-2", "r2", "test", "test"); err != nil {
+	if _, err := d.InsertBuglink("BUG-2", "r2", "test", "test"); err != nil {
 		t.Fatalf("insert buglink BUG-2: %v", err)
 	}
-	if err := d.InsertBuglink("BUG-3", "r2", "test", "test"); err != nil {
+	if _, err := d.InsertBuglink("BUG-3", "r2", "test", "test"); err != nil {
 		t.Fatalf("insert buglink BUG-3: %v", err)
 	}
 	// r3 → no buglink → must NOT show up.
 	// BUG-1 also linked twice to r1 (idempotent — INSERT OR IGNORE drops dup)
-	if err := d.InsertBuglink("BUG-1", "r1", "dup", "test"); err != nil {
+	if _, err := d.InsertBuglink("BUG-1", "r1", "dup", "test"); err != nil {
 		t.Fatalf("insert dup buglink: %v", err)
 	}
 

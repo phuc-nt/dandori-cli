@@ -91,17 +91,22 @@ func (l *LocalDB) ListAuditAnchors(limit int) ([]AuditAnchor, error) {
 }
 
 // InsertAuditAnchor records a new anchor. Idempotent on (last_audit_id):
-// re-anchoring the same tip is a silent no-op via INSERT OR IGNORE — the
-// caller can detect this via RowsAffected if it cares. confluencePageID
-// is empty when status='local-only' (no external record was made).
+// if a row already exists for the same last_audit_id, its confluence_page_id,
+// confluence_version, and status are updated — this upgrades a local-only row
+// to anchored when a Confluence write succeeds after a prior local-only record.
+// confluencePageID is empty when status='local-only' (no external record was made).
 func (l *LocalDB) InsertAuditAnchor(lastAuditID int64, lastCurrHash, confluencePageID string, confluenceVersion int, status string) (int64, error) {
 	if status == "" {
 		status = "local-only"
 	}
 	res, err := l.Exec(`
-		INSERT OR IGNORE INTO audit_anchors
+		INSERT INTO audit_anchors
 		    (last_audit_id, last_curr_hash, confluence_page_id, confluence_version, status)
 		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(last_audit_id) DO UPDATE SET
+		    confluence_page_id  = excluded.confluence_page_id,
+		    confluence_version  = excluded.confluence_version,
+		    status              = excluded.status
 	`, lastAuditID, lastCurrHash, confluencePageID, confluenceVersion, status)
 	if err != nil {
 		return 0, fmt.Errorf("insert audit anchor: %w", err)
