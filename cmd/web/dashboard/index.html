@@ -558,6 +558,16 @@
                     </div>
                 </div>
 
+                <!-- v0.11 Phase 03 — Week-over-week trend line chart (3 series). -->
+                <div class="card" style="margin-top:16px;" data-eview-pane="cache">
+                    <div class="card-header">
+                        <h3 class="card-title">Week-over-Week Trends</h3>
+                        <span class="card-sub" id="eng-trend-sub">Success rate · cost/run · rework rate · last 12 weeks</span>
+                    </div>
+                    <div class="chart-frame"><canvas id="eng-trend-canvas"></canvas></div>
+                    <div class="empty-state" id="eng-trend-empty" hidden>No trend data yet — run a few agent tasks to build history.</div>
+                </div>
+
                 <!-- Session Health sub-tab: ENG-7 session-end + ENG-8 duration histogram. -->
                 <div class="persona-pane" data-eview-pane="health" hidden>
                     <div class="grid-2col">
