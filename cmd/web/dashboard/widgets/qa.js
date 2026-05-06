@@ -194,7 +194,14 @@ export async function renderQARework() {
     const canvas = document.getElementById('qa-rework-canvas');
     const empty = document.getElementById('qa-rework-empty');
     if (!canvas) return;
-    const { data, error } = await safeFetch('/api/rework/causes');
+
+    // Fetch causes + RCA enrichment in parallel (v0.11 Phase 02).
+    // RCA fetch is best-effort: tooltip degrades gracefully on failure.
+    const [{ data, error }, { data: rcaData }] = await Promise.all([
+        safeFetch('/api/rework/causes'),
+        safeFetch('/api/rca/breakdown?since=28d'),
+    ]);
+
     if (error) {
         canvas.style.display = 'none';
         if (empty) { empty.hidden = false; empty.textContent = error; }
@@ -218,12 +225,37 @@ export async function renderQARework() {
         user_interrupted: '#0ea5e9', agent_finished: '#22c55e', other: '#94a3b8',
     };
     const colors = labels.map(l => palette[l] || '#94a3b8');
+
+    // Build cause → RCA enrichment map for tooltip (Phase 02).
+    const rcaMap = {};
+    if (Array.isArray(rcaData)) {
+        rcaData.forEach(r => { rcaMap[r.cause] = r; });
+    }
+
     qaCharts.rework = new Chart(canvas, {
         type: 'doughnut',
         data: { labels, datasets: [{ data: counts, backgroundColor: colors }] },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } },
+            plugins: {
+                legend: { position: 'right', labels: { font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        afterLabel(ctx) {
+                            const cause = ctx.label;
+                            const rca = rcaMap[cause];
+                            if (!rca) return '';
+                            const lines = [];
+                            if (rca.top_agent) lines.push(`top agent: ${rca.top_agent}`);
+                            if (rca.wow_delta !== 0) {
+                                const arrow = rca.wow_delta > 0 ? '↑' : '↓';
+                                lines.push(`WoW: ${arrow} ${Math.abs(rca.wow_delta).toFixed(1)}pp`);
+                            }
+                            return lines.join(' · ');
+                        },
+                    },
+                },
+            },
         },
     });
 }

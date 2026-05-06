@@ -147,6 +147,9 @@ func newDashboardMux(store *db.LocalDB, jiraBaseURL string) *http.ServeMux {
 	// v0.11 Phase 01 — agent × task-type affinity matrix.
 	server.RegisterAffinityRoutes(mux, store)
 
+	// v0.11 Phase 02 — structured RCA breakdown.
+	server.RegisterRcaRoutes(mux, store)
+
 	// Phase 04 Audit View endpoints (event stream, audit log, hash-chain verify).
 	server.RegisterAuditRoutes(mux, store)
 
