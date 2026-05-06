@@ -39,9 +39,9 @@ func TestGetAgentTaskAffinity_SingleAgentSingleType(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	insertAffinityRun(t, d, "r1", "alpha", "FEAT-1", 0, now)   // success
-	insertAffinityRun(t, d, "r2", "alpha", "FEAT-2", 0, now)   // success
-	insertAffinityRun(t, d, "r3", "alpha", "FEAT-3", 1, now)   // failure
+	insertAffinityRun(t, d, "r1", "alpha", "FEAT-1", 0, now) // success
+	insertAffinityRun(t, d, "r2", "alpha", "FEAT-2", 0, now) // success
+	insertAffinityRun(t, d, "r3", "alpha", "FEAT-3", 1, now) // failure
 
 	cells, err := d.GetAgentTaskAffinity(now.AddDate(0, 0, -1))
 	if err != nil {

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-05-06
+
+Solo-engineer self-measurement gaps. 3 questions a solo developer running `dandori` locally couldn't answer before — now they can. All-local: SQLite only, no Postgres, no team server, no schema migration.
+
+### Added
+
+- **Agent × Task affinity matrix** — answers "Which model gives best success rate for which task type?". New CLI `dandori analytics agents --by-task-type` outputs a matrix (rows=agents, cols=task types, cells=success% + run count). New endpoint `GET /api/analytics/agent-task-affinity?since=28d`. New dashboard heatmap on Engineering → Agents pane. Empty cells (combinations never tried) render dim. Task type derived at query time from Jira issuetype + key prefix; no `task_type` column added to `runs`.
+- **Structured RCA breakdown** — answers "Where should I focus my fixes?". New CLI `dandori analytics rca --since 28d` outputs ranked table: cause, count, % of rework, top affected agent, top affected task type, week-over-week delta. New endpoint `GET /api/rca/breakdown`. QA dashboard rework doughnut now shows top affected agent + recent trend arrow on hover.
+- **Week-over-week trend analytics** — answers "Am I getting better?". New CLI `dandori analytics trend --metric success-rate --window 7d --since 90d` outputs sparkline + slope label ("improving 3pp/week"). 3 metrics supported: `success-rate`, `cost-per-run`, `rework-rate`. New endpoints `GET /api/trends/success-rate`, `/api/trends/cost-per-run`, `/api/trends/rework-rate`. New line chart on Engineering → Cache & Cost with all 3 series + slope sub-label.
+
+### Tests
+
+- 27 new tests across `internal/db/` (query layer) and `internal/server/` (smoke). 25/25 packages green. `go vet` clean. `gofmt` clean.
+
+### Notes
+
+- All-local: no Postgres dependency, no schema migration, no team server required. Solo engineer running `dandori dashboard` on loopback gets the full feature set.
+- Empty-state handling: every new widget renders a "no data yet" placeholder on a fresh DB instead of erroring. Run `dandori demo --variant cross-project` to seed.
+- Deferred to v0.12: RCA "recommended action" column (rule-based suggestions); cost-per-merged-task (requires Jira Done filter); `scope_creep` rework cause enum.
+
+### Known limitations
+
+- SQLite `strftime('%Y-%W')` uses Sunday-start weeks while Go's `ISOWeek()` uses Monday-start. May cause one-extra cosmetic gap point in trend charts crossing a Sun/Mon boundary. Tracked for v0.11.1.
+
 ## [0.10.6] — 2026-05-05
 
 Bug debt cleanup — 9 issues deferred from the v0.10.5 release-readiness review, shipped together as a focused patch. No API changes; no migrations.

@@ -64,9 +64,9 @@ func (l *LocalDB) GetRcaBreakdown(since time.Time) ([]RcaRow, error) {
 
 	// Aggregate: cause → {total, agentCount map, typeCount map} for current + prior.
 	type aggrBucket struct {
-		total      int
-		agentCnt   map[string]int
-		typeCnt    map[string]int
+		total    int
+		agentCnt map[string]int
+		typeCnt  map[string]int
 	}
 	newBucket := func() *aggrBucket {
 		return &aggrBucket{agentCnt: map[string]int{}, typeCnt: map[string]int{}}

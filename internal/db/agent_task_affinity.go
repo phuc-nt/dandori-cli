@@ -87,8 +87,8 @@ func (l *LocalDB) GetAgentTaskAffinity(since time.Time) ([]AffinityCell, error) 
 
 	// Aggregate: map[(agent, task_type)] → {total, success}
 	type bucket struct{ total, success int }
-	agg := map[string]*bucket{}        // key = "agent\x00task_type"
-	cache := map[string]string{}       // issueKey → taskType
+	agg := map[string]*bucket{}  // key = "agent\x00task_type"
+	cache := map[string]string{} // issueKey → taskType
 
 	for rows.Next() {
 		var r rawAffinityRow

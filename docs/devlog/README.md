@@ -14,12 +14,13 @@ Chỉ giữ devlog **per-release** từ v0.5.0 trở đi. Chi tiết phase-level
 | 2026-05-03 | [v0.9.1](../../CHANGELOG.md) | Polish — `dandori doctor` health check, doc sweep, goreleaser server-tag fix |
 | 2026-05-05 | [v0.10.5](2026-05-05-v0.10.5-release.md) | Phase 05 close — Dashboard v2 (5 persona views) + audit chain external anchor + buglinks + cross-project demo seed + release-readiness fixes |
 | 2026-05-05 | [v0.10.6](2026-05-05-v0.10.6-bug-debt.md) | Bug debt cleanup — 9 deferred items from v0.10.5 review (race fix, counter fix, widget hardening, XSS escape, DST edge) |
+| 2026-05-06 | [v0.11.0](2026-05-06-v0.11.0-solo-engineer-gaps.md) | Solo-engineer self-measurement — agent×task affinity matrix + structured RCA breakdown + week-over-week trend analytics |
 
 ## Stats (current)
 
 - **25 packages green** under `go test ./...`
 - **Vision coverage**: ~98% of outer-harness pillars (Phase 05 closed)
-- **Release cadence**: 7 releases in ~2.5 weeks (Apr 30 → May 5)
+- **Release cadence**: 8 releases in ~2.5 weeks (Apr 30 → May 6)
 
 ## Cách viết devlog mới
 
