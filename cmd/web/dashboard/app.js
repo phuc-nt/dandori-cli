@@ -2195,6 +2195,10 @@
             renderEngCostPerTask();
             renderEngSessionEnd();
             renderEngDuration();
+            // v0.11 Phase 01 — affinity heatmap (ES6 module, may not be ready yet).
+            window.renderAgentTaskAffinity?.();
+            // v0.11 Phase 03 — trend line chart.
+            window.renderTrendChart?.();
         }
 
         // Populate the agent compare picker from /api/agents.

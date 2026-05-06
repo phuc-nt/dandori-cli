@@ -144,6 +144,9 @@ func newDashboardMux(store *db.LocalDB, jiraBaseURL string) *http.ServeMux {
 	// commit-msg distribution, bug hotspots, rework causes, intervention heatmap).
 	server.RegisterQARoutes(mux, store)
 
+	// v0.11 Phase 01 — agent × task-type affinity matrix.
+	server.RegisterAffinityRoutes(mux, store)
+
 	// Phase 04 Audit View endpoints (event stream, audit log, hash-chain verify).
 	server.RegisterAuditRoutes(mux, store)
 

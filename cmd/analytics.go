@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/phuc-nt/dandori-cli/internal/db"
 	"github.com/spf13/cobra"
@@ -81,12 +82,13 @@ Examples:
 }
 
 var (
-	analyticsGroupBy string
-	analyticsBy      string
-	analyticsCompare string
-	analyticsFormat  string
-	analyticsLimit   int
-	analyticsSince   int
+	analyticsGroupBy    string
+	analyticsBy         string
+	analyticsCompare    string
+	analyticsFormat     string
+	analyticsLimit      int
+	analyticsSince      int
+	analyticsByTaskType bool
 )
 
 func init() {
@@ -107,6 +109,8 @@ func init() {
 
 	analyticsAgentsCmd.Flags().StringVar(&analyticsCompare, "compare", "", "Compare specific agents (comma-separated)")
 	analyticsAgentsCmd.Flags().StringVar(&analyticsFormat, "format", "table", "Output format: table, json")
+	analyticsAgentsCmd.Flags().BoolVar(&analyticsByTaskType, "by-task-type", false, "Show agent × task-type affinity matrix")
+	analyticsAgentsCmd.Flags().IntVar(&analyticsSince, "since", 28, "Window in days (used with --by-task-type)")
 
 	analyticsRunsCmd.Flags().IntVar(&analyticsLimit, "limit", 20, "Number of runs to show")
 	analyticsRunsCmd.Flags().StringVar(&analyticsFormat, "format", "table", "Output format: table, json")
@@ -219,6 +223,11 @@ func runAnalyticsAgents(cmd *cobra.Command, args []string) error {
 	}
 	defer store.Close()
 
+	// --by-task-type: affinity matrix mode (v0.11 Phase 01).
+	if analyticsByTaskType {
+		return runAnalyticsAgentsByTaskType(store)
+	}
+
 	stats, err := store.GetAgentStats()
 	if err != nil {
 		return fmt.Errorf("get agent stats: %w", err)
@@ -257,6 +266,83 @@ func runAnalyticsAgents(cmd *cobra.Command, args []string) error {
 			s.AgentName, s.RunCount, s.SuccessRate, s.TotalCost, s.AvgCost, s.AvgDuration, s.TotalTokens)
 	}
 	return w.Flush()
+}
+
+// runAnalyticsAgentsByTaskType prints the agent × task-type affinity matrix.
+// Called when --by-task-type is set on the agents subcommand.
+func runAnalyticsAgentsByTaskType(store *db.LocalDB) error {
+	since := time.Now().AddDate(0, 0, -analyticsSince)
+	cells, err := store.GetAgentTaskAffinity(since)
+	if err != nil {
+		return fmt.Errorf("get affinity: %w", err)
+	}
+
+	if len(cells) == 0 {
+		fmt.Printf("No agent data in last %d days. Use 'dandori run' to record runs.\n", analyticsSince)
+		return nil
+	}
+
+	if analyticsFormat == "json" {
+		return json.NewEncoder(os.Stdout).Encode(cells)
+	}
+
+	// Build sorted unique sets of agents and task types for the matrix.
+	agentSet := map[string]struct{}{}
+	typeSet := map[string]struct{}{}
+	idx := map[string]db.AffinityCell{}
+	for _, c := range cells {
+		agentSet[c.Agent] = struct{}{}
+		typeSet[c.TaskType] = struct{}{}
+		idx[c.Agent+"\x00"+c.TaskType] = c
+	}
+	agents := sortedKeys(agentSet)
+	taskTypes := sortedKeys(typeSet)
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(w, "Agent × Task Affinity (last %d days)\n\n", analyticsSince)
+
+	// Header row.
+	fmt.Fprint(w, "AGENT")
+	for _, tt := range taskTypes {
+		fmt.Fprintf(w, "\t%s", tt)
+	}
+	fmt.Fprintln(w)
+
+	// Separator.
+	fmt.Fprint(w, "-----")
+	for range taskTypes {
+		fmt.Fprint(w, "\t-------")
+	}
+	fmt.Fprintln(w)
+
+	// Data rows.
+	for _, agent := range agents {
+		fmt.Fprint(w, agent)
+		for _, tt := range taskTypes {
+			if c, ok := idx[agent+"\x00"+tt]; ok {
+				fmt.Fprintf(w, "\t%.0f%% n=%d", c.SuccessRate, c.Runs)
+			} else {
+				fmt.Fprint(w, "\t—")
+			}
+		}
+		fmt.Fprintln(w)
+	}
+	return w.Flush()
+}
+
+// sortedKeys returns the keys of a string set in ascending order.
+func sortedKeys(m map[string]struct{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	// Simple insertion sort (small N, avoid importing sort just for this).
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && out[j-1] > out[j]; j-- {
+			out[j-1], out[j] = out[j], out[j-1]
+		}
+	}
+	return out
 }
 
 func runAnalyticsSprint(cmd *cobra.Command, args []string) error {

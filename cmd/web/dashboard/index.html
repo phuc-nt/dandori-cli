@@ -503,6 +503,17 @@
                     </div>
                 </div>
 
+                <!-- v0.11 Phase 01 — Agent × Task-Type Affinity heatmap card. -->
+                <div class="card" style="margin-top:16px;" data-eview-pane="agents">
+                    <div class="card-header">
+                        <h3 class="card-title">Agent × Task Affinity</h3>
+                        <span class="card-sub">Success rate by agent &amp; task type · last 28 days · hover cell for details</span>
+                    </div>
+                    <div id="eng-affinity-container">
+                        <p class="empty-state">Loading…</p>
+                    </div>
+                </div>
+
                 <!-- Autonomy sub-tab: ENG-2 autonomy gauge + ENG-3 approval funnel. -->
                 <div class="persona-pane" data-eview-pane="autonomy" hidden>
                     <div class="grid-2col">
@@ -1031,16 +1042,24 @@
     <script type="module">
         import { loadQAView } from '/static/widgets/qa.js';
         import { loadAuditView, reloadEventStream, verifyAuditChain } from '/static/widgets/audit.js';
+        import { renderAgentTaskAffinity } from '/static/widgets/affinity.js';
+        import { renderTrendChart } from '/static/widgets/trend.js';
         window.loadQAView = loadQAView;
         window.loadAuditView = loadAuditView;
         window.reloadEventStream = reloadEventStream;
         window.verifyAuditChain = verifyAuditChain;
+        window.renderAgentTaskAffinity = renderAgentTaskAffinity;
+        window.renderTrendChart = renderTrendChart;
         // Module scripts are always deferred — app.js's initial loadAll()
         // (classic script) may have already fired before these globals
         // existed and skipped the QA/Audit loaders via the optional-chain
         // guards. Re-trigger here for whichever persona is currently open.
         if (!document.getElementById('qa-section')?.hidden)    loadQAView();
         if (!document.getElementById('audit-section')?.hidden) loadAuditView();
+        if (!document.getElementById('engineering-section')?.hidden) {
+            renderAgentTaskAffinity();
+            renderTrendChart();
+        }
     </script>
 </body>
 </html>
