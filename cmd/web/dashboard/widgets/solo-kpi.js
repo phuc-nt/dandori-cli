@@ -32,7 +32,7 @@ const METRICS = [
     {
         id: 'solo-kpi-cost',
         label: 'Avg Cost / Run · 7d',
-        endpoint: '/api/trends/cost-per-run?days=56&window=7d',
+        endpoint: '/api/trends/cost?days=56&window=7d',
         format: v => `$${v.toFixed(3)}`,
         higherIsBetter: false,
     },
