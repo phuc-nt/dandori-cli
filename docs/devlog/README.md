@@ -16,12 +16,13 @@ Chỉ giữ devlog **per-release** từ v0.5.0 trở đi. Chi tiết phase-level
 | 2026-05-05 | [v0.10.6](2026-05-05-v0.10.6-bug-debt.md) | Bug debt cleanup — 9 deferred items from v0.10.5 review (race fix, counter fix, widget hardening, XSS escape, DST edge) |
 | 2026-05-06 | [v0.11.0](2026-05-06-v0.11.0-solo-engineer-gaps.md) | Solo-engineer self-measurement — agent×task affinity matrix + structured RCA breakdown + week-over-week trend analytics |
 | 2026-05-07 | [v0.11.1](2026-05-07-v0.11.1-onboarding-polish.md) | Solo-engineer onboarding polish — run summary line + first-run tip + Confluence optionality clarity |
+| 2026-05-07 | [v0.11.2](2026-05-07-v0.11.2-dashboard-top5-ux.md) | Dashboard top-5 UX — solo KPI hero strip + slope label elevation + inline RCA changes list |
 
 ## Stats (current)
 
 - **25 packages green** under `go test ./...`
 - **Vision coverage**: ~98% of outer-harness pillars (Phase 05 closed)
-- **Release cadence**: 9 releases in ~2.5 weeks (Apr 30 → May 7)
+- **Release cadence**: 10 releases in ~2.5 weeks (Apr 30 → May 7)
 
 ## Cách viết devlog mới
 

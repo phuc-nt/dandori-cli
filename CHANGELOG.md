@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] — 2026-05-07
+
+Dashboard UX optimization for the top-5 solo-engineer metrics. Frontend-only — no backend, no schema, no new endpoints. Surfaces information that v0.11.0 already computed but buried in sub-tabs and tooltip text.
+
+### Added
+
+- **Solo KPI hero strip** on the Engineering view landing — 3 tiles at the top showing the headline numbers a solo engineer cares about: Success Rate (7d), Rework Rate (7d), Avg Cost/Run (7d). Each tile renders current value, week-over-week delta badge (green=improving, red=declining, dim=flat — direction-aware per metric), and an inline-SVG sparkline of the last 8 weeks. Empty state per tile if data is insufficient. Stacks vertically on narrow viewports.
+- **Inline RCA "Recent Changes" list** below the QA rework doughnut — top 3 rework causes ranked by week-over-week delta with ↑/↓ badges and proportional horizontal bars. Reuses the existing `/api/rca/breakdown` fetch — no extra round-trip. Hidden if fewer than 2 weeks of data.
+
+### Changed
+
+- **Trend chart slope label promoted** from small muted card-subtitle (12px) to a prominent accent-colored span next to the chart title (14px, weight 500). The "improving 3.2pp/week" insight is now visible without hovering or scrolling. Hidden when slope cannot be computed.
+
+### Notes
+
+- Inline-SVG sparklines (no Chart.js) keep the new hero tiles light — page initial-load unaffected.
+- Existing `.hero-tile` pattern was Chart.js-canvas-based; new `.solo-kpi-tile` class is SVG-based to honor the no-extra-Chart.js constraint. Visual parity maintained.
+- Cost tile uses `/api/trends/cost` (the actual server endpoint name, not the `cost-per-run` mentioned in the planning audit).
+
 ## [0.11.1] — 2026-05-07
 
 Solo-engineer onboarding polish. Three small UX fixes addressing daily-use friction surfaced during the v0.11.0 walkthrough audit. No new features, no schema change.
