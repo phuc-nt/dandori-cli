@@ -37,13 +37,14 @@ func TestCheckConfig(t *testing.T) {
 			"Jira credentials missing",
 		},
 		{
-			"missing Confluence",
+			// Confluence is now optional — config with only Jira is valid.
+			"missing Confluence (solo mode)",
 			&config.Config{Jira: config.JiraConfig{BaseURL: "x", User: "u", Token: "t"}},
-			false,
-			"Confluence",
+			true,
+			"not configured",
 		},
 		{
-			"complete",
+			"complete with Confluence",
 			&config.Config{
 				Jira:       config.JiraConfig{BaseURL: "https://x.atlassian.net", User: "u", Token: "t"},
 				Confluence: config.ConfluenceConfig{BaseURL: "https://x.atlassian.net/wiki", SpaceKey: "Y"},
@@ -162,5 +163,45 @@ func TestCheckConfluence_SkipsWhenIncomplete(t *testing.T) {
 	}
 	if !strings.Contains(c.detail, "skipped") {
 		t.Errorf("detail = %q, want 'skipped'", c.detail)
+	}
+}
+
+// TestCheckConfluenceResult_NotConfigured verifies that absent Confluence config
+// returns skipped=true (exit code 0 — optional for solo users).
+func TestCheckConfluenceResult_NotConfigured(t *testing.T) {
+	r := checkConfluenceResult(&config.Config{})
+	if !r.skipped {
+		t.Error("expected skipped=true when Confluence not configured")
+	}
+	if r.ok == false && !r.skipped {
+		t.Error("skipped result should not count as failure")
+	}
+	if !strings.Contains(r.detail, "not configured") {
+		t.Errorf("detail = %q, want 'not configured'", r.detail)
+	}
+}
+
+// TestCheckConfluenceResult_NilConfig verifies nil config also returns skipped.
+func TestCheckConfluenceResult_NilConfig(t *testing.T) {
+	r := checkConfluenceResult(nil)
+	if !r.skipped {
+		t.Error("expected skipped=true for nil config")
+	}
+}
+
+// TestRunDoctor_NoConfluenceConfig verifies doctor exits 0 when Confluence
+// is absent (solo mode) — only Jira is required.
+func TestRunDoctor_NoConfluenceConfig(t *testing.T) {
+	// checkConfluenceResult with no Confluence config must not set ok=false.
+	r := checkConfluenceResult(&config.Config{
+		Jira: config.JiraConfig{BaseURL: "https://x.atlassian.net", User: "u", Token: "t"},
+	})
+	if !r.skipped {
+		t.Error("expected skipped for no Confluence config")
+	}
+	// The doctor exit-code loop only sets allOK=false when !ok && !skipped.
+	// Verify our result won't trigger that branch.
+	if !r.ok && !r.skipped {
+		t.Error("non-skipped failure would set allOK=false — should not happen for absent Confluence")
 	}
 }

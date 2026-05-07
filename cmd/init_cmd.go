@@ -22,6 +22,9 @@ import (
 // initUninstallShell is set by the --uninstall-shell flag.
 var initUninstallShell bool
 
+// initSkipConfluence is set by the --skip-confluence flag (C1).
+var initSkipConfluence bool
+
 var initTimeout int // hidden flag, seconds
 
 var initCmd = &cobra.Command{
@@ -37,6 +40,7 @@ tracking, or 'dandori init --uninstall-shell' to remove the v0.8 alias block.`,
 
 func init() {
 	initCmd.Flags().BoolVar(&initUninstallShell, "uninstall-shell", false, "Remove the dandori-managed alias block from your shell rc file")
+	initCmd.Flags().BoolVar(&initSkipConfluence, "skip-confluence", false, "Skip Confluence setup (useful for solo / scripted init)")
 	initCmd.Flags().IntVar(&initTimeout, "init-timeout", 10, "Connection test timeout in seconds")
 	_ = initCmd.Flags().MarkHidden("init-timeout")
 	rootCmd.AddCommand(initCmd)
@@ -216,9 +220,15 @@ func runWizard(cfg *config.Config) error {
 	}
 
 	// ── Step 7: Confluence enable ───────────────────────────────────────────
-	fmt.Print("Enable Confluence integration? [Y/n]: ")
-	confAns := readLine(reader)
-	enableConf := !strings.HasPrefix(strings.ToLower(confAns), "n")
+	// --skip-confluence bypasses the prompt entirely (C1).
+	var enableConf bool
+	if initSkipConfluence {
+		enableConf = false
+	} else {
+		fmt.Print("Enable Confluence integration? (optional — only needed if your team uses Confluence for docs/RCAs) [y/N]: ")
+		confAns := readLine(reader)
+		enableConf = strings.HasPrefix(strings.ToLower(confAns), "y")
+	}
 
 	if enableConf {
 		// ── Step 8: Confluence base URL (auto-fill from Jira on Cloud) ──────
@@ -339,4 +349,8 @@ func printNextSteps() {
 	fmt.Printf("  1. Run `dandori claude \"your prompt\"` — ad-hoc tracking without Jira context\n")
 	fmt.Printf("  2. Run `dandori task run PROJ-123` — full Jira-driven flow with context injection\n")
 	fmt.Printf("  3. View analytics: `dandori analytics all`\n")
+	fmt.Printf("\nAfter your first run:\n")
+	fmt.Printf("  dandori analytics trend --metric success-rate    # Are you improving?\n")
+	fmt.Printf("  dandori analytics rca --since 28d                # Where to focus fixes?\n")
+	fmt.Printf("  dandori analytics agents --by-task-type          # Best model per task type?\n")
 }

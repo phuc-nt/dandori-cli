@@ -180,6 +180,107 @@ func TestRunWizard_JiraConnFail_Abort(t *testing.T) {
 	}
 }
 
+// TestRunWizard_SkipConfluenceFlag verifies --skip-confluence bypasses the
+// Confluence prompt entirely and leaves Confluence config empty.
+func TestRunWizard_SkipConfluenceFlag(t *testing.T) {
+	jiraSrv := setupJiraServer(t, 200, `{"accountId":"u1","displayName":"Solo User"}`)
+	defer jiraSrv.Close()
+
+	lines := []string{
+		"http://localhost:8080", // Server URL
+		jiraSrv.URL,             // Jira base URL
+		"solo@example.com",      // Jira email
+		"token123",              // Jira API token
+		"SOLO",                  // Jira project key
+		// Jira connection test happens automatically
+		// NO Confluence prompt — initSkipConfluence=true bypasses it
+		"",  // Agent name (keep default)
+		"n", // Quality tracking
+		"n", // Watch daemon
+	}
+	stdinContent := strings.Join(lines, "\n") + "\n"
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.WriteString(stdinContent); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+	origStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = origStdin }()
+
+	// Set the skip flag.
+	origSkip := initSkipConfluence
+	initSkipConfluence = true
+	defer func() { initSkipConfluence = origSkip }()
+
+	cfg := config.DefaultConfig()
+	if err := runWizard(cfg); err != nil {
+		t.Fatalf("runWizard with --skip-confluence returned error: %v", err)
+	}
+
+	if cfg.Confluence.BaseURL != "" {
+		t.Errorf("expected empty Confluence.BaseURL, got %q", cfg.Confluence.BaseURL)
+	}
+	if cfg.Confluence.SpaceKey != "" {
+		t.Errorf("expected empty Confluence.SpaceKey, got %q", cfg.Confluence.SpaceKey)
+	}
+}
+
+// TestConfluencePromptDefaultsToNo verifies the wizard treats empty answer as "no"
+// for the Confluence enable prompt (default changed from Y to N in v0.11.1).
+func TestConfluencePromptDefaultsToNo(t *testing.T) {
+	jiraSrv := setupJiraServer(t, 200, `{"accountId":"u1","displayName":"Solo User"}`)
+	defer jiraSrv.Close()
+
+	lines := []string{
+		"",           // Server URL (keep default)
+		jiraSrv.URL,  // Jira base URL
+		"u@test.com", // Jira email
+		"tok",        // Jira token
+		"PROJ",       // project key
+		"",           // Enable Confluence? → empty = N (default no)
+		"",           // Agent name
+		"n",          // quality
+		"n",          // watch daemon
+	}
+	stdinContent := strings.Join(lines, "\n") + "\n"
+
+	r, w, _ := os.Pipe()
+	_, _ = w.WriteString(stdinContent)
+	w.Close()
+	origStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = origStdin }()
+
+	origSkip := initSkipConfluence
+	initSkipConfluence = false
+	defer func() { initSkipConfluence = origSkip }()
+
+	cfg := config.DefaultConfig()
+	if err := runWizard(cfg); err != nil {
+		t.Fatalf("runWizard returned error: %v", err)
+	}
+	// Empty answer should default to no — Confluence config stays empty.
+	if cfg.Confluence.BaseURL != "" {
+		t.Errorf("expected empty Confluence.BaseURL (default N), got %q", cfg.Confluence.BaseURL)
+	}
+}
+
+// TestSkipConfluenceFlagRegistered verifies --skip-confluence is wired to initCmd.
+func TestSkipConfluenceFlagRegistered(t *testing.T) {
+	out, err := executeCommand(rootCmd, "init", "--help")
+	if err != nil {
+		t.Fatalf("init --help failed: %v", err)
+	}
+	if !strings.Contains(out, "skip-confluence") {
+		t.Error("init --help should list --skip-confluence flag")
+	}
+}
+
 func TestDeriveConfluenceURL(t *testing.T) {
 	tests := []struct {
 		jiraURL string

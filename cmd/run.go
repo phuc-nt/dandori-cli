@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -136,6 +137,52 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Print run summary to stderr so piped stdout from wrapped command is clean.
+	// Only suppress when --quiet / -q is set.
+	if !Quiet() {
+		printRunSummary(os.Stderr, result)
+		printFirstRunTip(os.Stderr, localDB, result.RunID)
+	}
+
 	os.Exit(result.ExitCode)
 	return nil
+}
+
+// printRunSummary writes a one-line tracking confirmation to w.
+// Format:  ✓ Run tracked (id: <id>, cost: $X.XX, duration: Ys)
+//
+//	View: http://localhost:8088
+func printRunSummary(w io.Writer, result *wrapper.Result) {
+	cost := formatRunCost(result.CostUSD)
+	dur := formatRunDuration(result.Duration)
+	fmt.Fprintf(w, "✓ Run tracked (id: %s, cost: %s, duration: %s)\n", result.RunID, cost, dur)
+	fmt.Fprintf(w, "  View: http://localhost:8088\n")
+}
+
+// printFirstRunTip prints a discovery tip when this is the user's first
+// completed run (no other rows in the runs table except the just-finished one).
+// Uses COUNT(*) WHERE id != runID — if 0, this was the first run.
+func printFirstRunTip(w io.Writer, localDB *db.LocalDB, runID string) {
+	var count int
+	row := localDB.QueryRow(`SELECT COUNT(*) FROM runs WHERE id != ?`, runID)
+	if err := row.Scan(&count); err != nil || count > 0 {
+		return
+	}
+	fmt.Fprintf(w, "  Tip: try 'dandori analytics trend' once you have ~5 runs to see your improvement curve.\n")
+}
+
+// formatRunCost formats a USD float as "$X.XX".
+func formatRunCost(usd float64) string {
+	return fmt.Sprintf("$%.2f", usd)
+}
+
+// formatRunDuration formats a duration as "Xs" or "XmYYs".
+func formatRunDuration(d time.Duration) string {
+	secs := int(d.Seconds())
+	if secs < 60 {
+		return fmt.Sprintf("%ds", secs)
+	}
+	m := secs / 60
+	s := secs % 60
+	return fmt.Sprintf("%dm%02ds", m, s)
 }

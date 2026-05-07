@@ -34,23 +34,35 @@ type check struct {
 	detail string
 }
 
+// checkResult extends check with an optional "skipped" state that doesn't
+// count as failure (used for optional integrations like Confluence).
+type checkResult struct {
+	check
+	skipped bool
+}
+
 func runDoctor(cmd *cobra.Command, args []string) error {
-	checks := []check{
-		checkConfig(cfg),
-		checkClaudeBinary(),
-		checkDB(),
-		checkJira(cfg),
-		checkConfluence(cfg),
+	results := []checkResult{
+		{check: checkConfig(cfg)},
+		{check: checkClaudeBinary()},
+		{check: checkDB()},
+		{check: checkJira(cfg)},
+		checkConfluenceResult(cfg),
 	}
 
 	allOK := true
-	for _, c := range checks {
-		mark := "✓"
-		if !c.ok {
+	for _, r := range results {
+		var mark string
+		switch {
+		case r.skipped:
+			mark = "-"
+		case r.ok:
+			mark = "✓"
+		default:
 			mark = "✗"
 			allOK = false
 		}
-		fmt.Printf("%s %s — %s\n", mark, c.name, c.detail)
+		fmt.Printf("%s %s — %s\n", mark, r.name, r.detail)
 	}
 
 	fmt.Println()
@@ -68,10 +80,10 @@ func checkConfig(cfg *config.Config) check {
 	if cfg.Jira.BaseURL == "" || cfg.Jira.User == "" || cfg.Jira.Token == "" {
 		return check{"config", false, "incomplete: Jira credentials missing — run 'dandori init'"}
 	}
-	if cfg.Confluence.BaseURL == "" || cfg.Confluence.SpaceKey == "" {
-		return check{"config", false, "incomplete: Confluence base_url or space_key missing"}
+	if cfg.Confluence.BaseURL != "" || cfg.Confluence.SpaceKey != "" {
+		return check{"config", true, "loaded with Jira + Confluence credentials"}
 	}
-	return check{"config", true, "loaded with Jira + Confluence credentials"}
+	return check{"config", true, "loaded with Jira credentials (Confluence not configured)"}
 }
 
 func checkClaudeBinary() check {
@@ -127,4 +139,21 @@ func checkConfluence(cfg *config.Config) check {
 		return check{"Confluence API", false, err.Error()}
 	}
 	return check{"Confluence API", true, fmt.Sprintf("space %q readable (%s)", cfg.Confluence.SpaceKey, name)}
+}
+
+// checkConfluenceResult distinguishes "not configured (solo mode)" from
+// "configured but unreachable". When not configured, it returns skipped=true
+// so the doctor exit code stays 0 — Confluence is optional for solo users.
+func checkConfluenceResult(cfg *config.Config) checkResult {
+	if cfg == nil || cfg.Confluence.BaseURL == "" || cfg.Confluence.SpaceKey == "" {
+		return checkResult{
+			check:   check{"Confluence API", true, "skipped (not configured — only needed for team docs)"},
+			skipped: true,
+		}
+	}
+	name, err := confluence.TestConnection(cfg.Confluence.BaseURL, cfg.Confluence.SpaceKey, cfg.Jira.User, cfg.Jira.Token)
+	if err != nil {
+		return checkResult{check: check{"Confluence API", false, err.Error()}}
+	}
+	return checkResult{check: check{"Confluence API", true, fmt.Sprintf("space %q readable (%s)", cfg.Confluence.SpaceKey, name)}}
 }
