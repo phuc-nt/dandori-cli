@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] — 2026-05-07
+
+Solo-engineer onboarding polish. Three small UX fixes addressing daily-use friction surfaced during the v0.11.0 walkthrough audit. No new features, no schema change.
+
+### Added
+
+- **Run summary line** — `dandori run` now prints a one-line summary on completion: `✓ Run tracked (id: …, cost: $…, duration: …) → http://localhost:8088`. Goes to stderr so piping/redirecting the wrapped command's stdout stays clean. Suppressed by global `--quiet` / `-q`.
+- **First-run tip** — on the very first completed run on a machine, an extra `Tip: try 'dandori analytics trend' once you have ~5 runs to see your improvement curve.` line is appended. Detected via `COUNT(*) FROM runs`. One-shot — does not show on subsequent runs.
+- **`dandori init --skip-confluence` flag** — bypass the Confluence prompt entirely for scripted/solo setup.
+
+### Changed
+
+- **`dandori init` next-steps block** — now lists the 3 v0.11 analytics commands (`trend`, `rca`, `agents --by-task-type`) with one-line descriptions, so new users discover the headline features without spelunking `--help`.
+- **Confluence prompt default** — changed from `[Y/n]` to `[y/N]` and reworded to `Enable Confluence integration? (optional — only needed if your team uses Confluence for docs/RCAs)`. Solo engineers no longer feel pushed to enable team-only integrations.
+- **`dandori doctor` Confluence probe** — distinguishes "not configured (solo mode)" from "configured but unreachable". Absent config → `Confluence: skipped (not configured — only needed for team docs)`, exit 0. Bad URL → existing `FAIL` behavior, exit 1.
+
+### Tests
+
+- 12 new tests covering run-summary formatting, first-run tip detection + one-shot behavior, doctor Confluence skip path, and init wizard flag/prompt-default. 25/25 packages green.
+
 ## [0.11.0] — 2026-05-06
 
 Solo-engineer self-measurement gaps. 3 questions a solo developer running `dandori` locally couldn't answer before — now they can. All-local: SQLite only, no Postgres, no team server, no schema migration.
