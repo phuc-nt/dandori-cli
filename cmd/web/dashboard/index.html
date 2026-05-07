@@ -465,6 +465,42 @@
 
             <!-- Phase 03 — Engineering View section (Agents / Autonomy / Cache / Session-health sub-tabs). -->
             <section id="engineering-section" class="persona-section fade-in" hidden>
+
+                <!-- v0.11.2 Fix A — Solo KPI hero strip: 3 tiles at the top of Engineering view.
+                     Rendered by widgets/solo-kpi.js via renderSoloKpiStrip(). -->
+                <div class="solo-kpi-strip" id="solo-kpi-strip" aria-label="Solo engineer KPIs">
+                    <!-- Tile 1: Success Rate -->
+                    <div class="solo-kpi-tile" id="solo-kpi-success">
+                        <div class="solo-kpi-label">Success Rate · 7d</div>
+                        <div class="solo-kpi-row">
+                            <div class="solo-kpi-value"></div>
+                            <div class="solo-kpi-delta flat"></div>
+                        </div>
+                        <svg class="solo-kpi-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true" style="color:var(--success)"></svg>
+                        <p class="solo-kpi-empty" hidden>No data yet — run more tasks to see this KPI.</p>
+                    </div>
+                    <!-- Tile 2: Rework Rate -->
+                    <div class="solo-kpi-tile" id="solo-kpi-rework">
+                        <div class="solo-kpi-label">Rework Rate · 7d</div>
+                        <div class="solo-kpi-row">
+                            <div class="solo-kpi-value"></div>
+                            <div class="solo-kpi-delta flat"></div>
+                        </div>
+                        <svg class="solo-kpi-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true" style="color:var(--error)"></svg>
+                        <p class="solo-kpi-empty" hidden>No data yet — run more tasks to see this KPI.</p>
+                    </div>
+                    <!-- Tile 3: Avg Cost / Run -->
+                    <div class="solo-kpi-tile" id="solo-kpi-cost">
+                        <div class="solo-kpi-label">Avg Cost / Run · 7d</div>
+                        <div class="solo-kpi-row">
+                            <div class="solo-kpi-value"></div>
+                            <div class="solo-kpi-delta flat"></div>
+                        </div>
+                        <svg class="solo-kpi-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true" style="color:var(--accent)"></svg>
+                        <p class="solo-kpi-empty" hidden>No data yet — run more tasks to see this KPI.</p>
+                    </div>
+                </div>
+
                 <div class="persona-tabs" role="tablist" aria-label="Engineering View sub-tabs">
                     <button class="persona-tab active" data-eview="agents"
                             onclick="setEngSubTab('agents')">Agents</button>
@@ -558,11 +594,16 @@
                     </div>
                 </div>
 
-                <!-- v0.11 Phase 03 — Week-over-week trend line chart (3 series). -->
+                <!-- v0.11 Phase 03 — Week-over-week trend line chart (3 series).
+                     v0.11.2 Fix B: slope label now shown in eng-trend-slope (accent, 14px)
+                     next to the card title instead of being buried in the card-sub fine print. -->
                 <div class="card" style="margin-top:16px;" data-eview-pane="cache">
-                    <div class="card-header">
-                        <h3 class="card-title">Week-over-Week Trends</h3>
+                    <div class="card-header" style="flex-direction:column;align-items:flex-start;gap:4px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+                            <h3 class="card-title">Week-over-Week Trends</h3>
+                        </div>
                         <span class="card-sub" id="eng-trend-sub">Success rate · cost/run · rework rate · last 12 weeks</span>
+                        <span id="eng-trend-slope" class="eng-trend-slope" hidden></span>
                     </div>
                     <div class="chart-frame"><canvas id="eng-trend-canvas"></canvas></div>
                     <div class="empty-state" id="eng-trend-empty" hidden>No trend data yet — run a few agent tasks to build history.</div>
@@ -690,6 +731,8 @@
                             </div>
                             <div class="chart-frame"><canvas id="qa-rework-canvas"></canvas></div>
                             <div class="empty-state" id="qa-rework-empty" hidden>No rework data.</div>
+                            <!-- v0.11.2 Fix C: inline WoW delta list populated by renderRCARecentChanges(). -->
+                            <div id="qa-rca-changes" class="qa-rca-changes"></div>
                         </div>
                         <div class="card">
                             <div class="card-header">
@@ -1054,12 +1097,15 @@
         import { loadAuditView, reloadEventStream, verifyAuditChain } from '/static/widgets/audit.js';
         import { renderAgentTaskAffinity } from '/static/widgets/affinity.js';
         import { renderTrendChart } from '/static/widgets/trend.js';
+        // v0.11.2 Fix A: solo KPI strip for Engineering view.
+        import { renderSoloKpiStrip } from '/static/widgets/solo-kpi.js';
         window.loadQAView = loadQAView;
         window.loadAuditView = loadAuditView;
         window.reloadEventStream = reloadEventStream;
         window.verifyAuditChain = verifyAuditChain;
         window.renderAgentTaskAffinity = renderAgentTaskAffinity;
         window.renderTrendChart = renderTrendChart;
+        window.renderSoloKpiStrip = renderSoloKpiStrip;
         // Module scripts are always deferred — app.js's initial loadAll()
         // (classic script) may have already fired before these globals
         // existed and skipped the QA/Audit loaders via the optional-chain
@@ -1067,6 +1113,7 @@
         if (!document.getElementById('qa-section')?.hidden)    loadQAView();
         if (!document.getElementById('audit-section')?.hidden) loadAuditView();
         if (!document.getElementById('engineering-section')?.hidden) {
+            renderSoloKpiStrip();
             renderAgentTaskAffinity();
             renderTrendChart();
         }

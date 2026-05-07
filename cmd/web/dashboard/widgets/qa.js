@@ -258,6 +258,61 @@ export async function renderQARework() {
             },
         },
     });
+
+    // Fix C (v0.11.2): render "Recent Changes" inline list below the doughnut.
+    // Reuses rcaData already fetched above — no second fetch.
+    renderRCARecentChanges(rcaData);
+}
+
+// renderRCARecentChanges populates the #qa-rca-changes div with top-3 causes
+// ranked by absolute WoW delta. Rework cause counts going DOWN = good (fewer
+// reworks = green ↓). UP = bad (more reworks = red ↑).
+function renderRCARecentChanges(rcaData) {
+    const container = document.getElementById('qa-rca-changes');
+    if (!container) return;
+
+    // Need at least 2 weeks of data to compute a WoW delta.
+    if (!Array.isArray(rcaData) || rcaData.length === 0) {
+        container.innerHTML = '<p class="rca-changes-empty">Need 2+ weeks of data for trend deltas.</p>';
+        return;
+    }
+
+    // Filter to entries that have a non-zero wow_delta.
+    const withDelta = rcaData.filter(r => typeof r.wow_delta === 'number' && r.wow_delta !== 0);
+    if (withDelta.length === 0) {
+        container.innerHTML = '<p class="rca-changes-empty">No week-over-week changes yet.</p>';
+        return;
+    }
+
+    // Sort by absolute delta descending, cap at 3 rows.
+    const top3 = [...withDelta]
+        .sort((a, b) => Math.abs(b.wow_delta) - Math.abs(a.wow_delta))
+        .slice(0, 3);
+
+    const maxAbs = Math.max(...top3.map(r => Math.abs(r.wow_delta)));
+
+    const rows = top3.map(r => {
+        // Rework cause counts going UP is BAD; going DOWN is GOOD.
+        const worse  = r.wow_delta > 0;
+        const arrow  = worse ? '↑' : '↓';
+        const cls    = worse ? 'rca-change-worse' : 'rca-change-better';
+        const barPct = maxAbs > 0 ? (Math.abs(r.wow_delta) / maxAbs * 100).toFixed(1) : 0;
+        const barClr = worse ? 'var(--error)' : 'var(--success)';
+        return `
+        <div class="rca-change-row">
+            <span class="rca-change-label">${escapeHtml(r.cause)}</span>
+            <span class="rca-change-count">${r.count ?? '—'}</span>
+            <span class="rca-change-delta ${cls}">${arrow} ${Math.abs(r.wow_delta).toFixed(1)}pp</span>
+            <span class="rca-change-bar-wrap">
+                <span class="rca-change-bar" style="width:${barPct}%;background:${barClr};"></span>
+            </span>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="rca-changes-header">Recent Changes (WoW)</div>
+        ${rows}
+    `;
 }
 
 export async function renderQAIntervention() {

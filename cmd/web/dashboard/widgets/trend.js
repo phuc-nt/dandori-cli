@@ -47,6 +47,10 @@ export async function renderTrendChart() {
     const canvas = document.getElementById('eng-trend-canvas');
     const empty  = document.getElementById('eng-trend-empty');
     const sub    = document.getElementById('eng-trend-sub');
+    // Fix B (v0.11.2): slope label is now emitted to eng-trend-slope (accent,
+    // 14px, weight 500) sitting in the card-header below the title.
+    // eng-trend-sub retains the static descriptor line.
+    const slopeEl = document.getElementById('eng-trend-slope');
     if (!canvas) return;
 
     const [srRes, costRes, rwRes] = await Promise.all([
@@ -88,13 +92,32 @@ export async function renderTrendChart() {
     const costN = dataPointCount(costPts);
     const rwN   = dataPointCount(rwPts);
 
+    // Fix B: emit slope to the prominent eng-trend-slope span (accent color,
+    // visible in card-header), leaving eng-trend-sub as the static descriptor.
     const slopeInfo = [
         `success: ${slopeLabel(srSlope, srN)}`,
         `cost: ${slopeLabel(costSlope, costN)}`,
         `rework: ${slopeLabel(rwSlope, rwN)}`,
     ].join(' · ');
 
-    if (sub) sub.textContent = slopeInfo;
+    // Keep the static descriptor text in eng-trend-sub only if it still holds
+    // the placeholder value (first load). After Fix B the sub element shows
+    // "Success rate · cost/run · rework rate · last 12 weeks" — don't clobber.
+    // Slope goes to the dedicated eng-trend-slope span.
+    if (slopeEl) {
+        // Only show slope span when we have at least one meaningful label.
+        const hasMeaningful = [slopeLabel(srSlope, srN), slopeLabel(costSlope, costN), slopeLabel(rwSlope, rwN)]
+            .some(l => l !== 'insufficient data');
+        if (hasMeaningful) {
+            slopeEl.textContent = slopeInfo;
+            slopeEl.hidden = false;
+        } else {
+            slopeEl.hidden = true;
+        }
+    } else if (sub) {
+        // Fallback: if the slope span doesn't exist yet, write into sub (legacy).
+        sub.textContent = slopeInfo;
+    }
 
     if (trendChartInstance) {
         trendChartInstance.destroy();
