@@ -26,14 +26,16 @@ var analyticsTrendCmd = &cobra.Command{
 	Long: `Show week-over-week trend for a metric with slope direction label.
 
 Metrics:
-  success-rate   % of runs that exited with code 0
-  cost           average cost per run (USD)
-  rework-rate    % of runs whose task had any rework event
+  success-rate     % of runs that exited with code 0
+  cost             average cost per run (USD)
+  rework-rate      % of runs whose task had any rework event
+  acceptance-rate  % of attributed lines kept as agent-authored (v0.12)
 
 Examples:
   dandori analytics trend --metric success-rate
   dandori analytics trend --metric cost --since 90d
-  dandori analytics trend --metric rework-rate --window 7d --since 90d --format json`,
+  dandori analytics trend --metric rework-rate --window 7d --since 90d --format json
+  dandori analytics trend --metric acceptance-rate --since 56d`,
 	RunE: runAnalyticsTrend,
 }
 
@@ -142,6 +144,8 @@ func metricUnit(metric string) string {
 		return "AVG COST/RUN"
 	case "rework-rate":
 		return "REWORK RATE"
+	case "acceptance-rate":
+		return "ACCEPTANCE %"
 	default:
 		return "SUCCESS RATE"
 	}

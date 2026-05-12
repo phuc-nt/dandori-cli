@@ -151,6 +151,133 @@ func TestGetTrend_Cost(t *testing.T) {
 	}
 }
 
+// ---------- GetTrend / acceptance-rate (v0.12) ----------
+
+// insertTaskAttribution writes one task_attribution row for acceptance-rate tests.
+// jiraDoneAt controls which weekly bucket the row falls into. Lines columns drive
+// the numerator/denominator of the acceptance ratio.
+func insertTaskAttribution(t *testing.T, d *LocalDB, jiraKey string, agentLines, humanLines int, jiraDoneAt time.Time) {
+	t.Helper()
+	_, err := d.Exec(`
+		INSERT INTO task_attribution
+			(jira_issue_key, session_count, total_lines_final,
+			 lines_attributed_agent, lines_attributed_human,
+			 jira_done_at, computed_at)
+		VALUES (?, 1, ?, ?, ?, ?, ?)
+	`, jiraKey, agentLines+humanLines, agentLines, humanLines,
+		jiraDoneAt.Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339))
+	if err != nil {
+		t.Fatalf("insertTaskAttribution %s: %v", jiraKey, err)
+	}
+}
+
+func TestGetTrend_AcceptanceRate_SingleWeek(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	// 80 agent / 20 human across 2 tasks → acceptance = 80%
+	insertTaskAttribution(t, d, "FEAT-1", 50, 10, now)
+	insertTaskAttribution(t, d, "FEAT-2", 30, 10, now)
+
+	pts, err := d.GetTrend("acceptance-rate", now.AddDate(0, 0, -7), 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var found *TrendPoint
+	for i := range pts {
+		if pts[i].HasData {
+			found = &pts[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("no data point found")
+	}
+	if found.RunCount != 2 {
+		t.Errorf("task count (run_count field) = %d, want 2", found.RunCount)
+	}
+	if found.Value != 80.0 {
+		t.Errorf("acceptance value = %.1f, want 80.0", found.Value)
+	}
+}
+
+func TestGetTrend_AcceptanceRate_AllAgent(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	insertTaskAttribution(t, d, "FEAT-1", 100, 0, now)
+
+	pts, err := d.GetTrend("acceptance-rate", now.AddDate(0, 0, -7), 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, p := range pts {
+		if p.HasData && p.Value != 100.0 {
+			t.Errorf("all-agent acceptance = %.1f, want 100.0", p.Value)
+		}
+	}
+}
+
+func TestGetTrend_AcceptanceRate_AllHuman(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	insertTaskAttribution(t, d, "FEAT-1", 0, 100, now)
+
+	pts, err := d.GetTrend("acceptance-rate", now.AddDate(0, 0, -7), 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, p := range pts {
+		if p.HasData && p.Value != 0.0 {
+			t.Errorf("all-human acceptance = %.1f, want 0.0", p.Value)
+		}
+	}
+}
+
+func TestGetTrend_AcceptanceRate_ZeroLineTaskExcluded(t *testing.T) {
+	// A task with zero lines on both sides must not corrupt the denominator
+	// (NULLIF guard) and must not produce a populated week with value=0.
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	insertTaskAttribution(t, d, "FEAT-empty", 0, 0, now)
+
+	pts, err := d.GetTrend("acceptance-rate", now.AddDate(0, 0, -7), 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, p := range pts {
+		if p.HasData {
+			t.Errorf("zero-line week unexpectedly populated: week=%s value=%.1f", p.WeekStart, p.Value)
+		}
+	}
+}
+
+func TestGetTrend_AcceptanceRate_EmptyDB(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	pts, err := d.GetTrend("acceptance-rate", time.Now().AddDate(0, 0, -28), 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, p := range pts {
+		if p.HasData {
+			t.Errorf("empty DB produced data point at week %s", p.WeekStart)
+		}
+	}
+}
+
 // ---------- Slope ----------
 
 func TestSlope_ImprovingTrend(t *testing.T) {

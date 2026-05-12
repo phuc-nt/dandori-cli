@@ -1,9 +1,11 @@
 // Package db — trends.go: week-over-week trend analytics (v0.11 Phase 03).
 //
-// Answers "Am I getting better?" with 3 metrics bucketed by ISO week:
-//   - success-rate : % of runs with exit_code=0
-//   - cost         : avg cost_usd per run
-//   - rework-rate  : % of runs whose task had any rework (non-success session_outcomes)
+// Answers "Am I getting better?" with 4 metrics bucketed by ISO week:
+//   - success-rate    : % of runs with exit_code=0
+//   - cost            : avg cost_usd per run
+//   - rework-rate     : % of runs whose task had any rework (non-success session_outcomes)
+//   - acceptance-rate : SUM(lines_attributed_agent) / SUM(agent+human) per week,
+//                       windowed by task_attribution.jira_done_at (v0.12)
 //
 // Gap weeks (no runs) are returned with HasData=false so the dashboard can
 // render null gaps in Chart.js instead of misleading zeros.
@@ -92,8 +94,10 @@ func (l *LocalDB) GetTrend(metric string, since time.Time, windowDays int) ([]Tr
 		return l.trendCost(since, windowDays)
 	case "rework-rate":
 		return l.trendReworkRate(since, windowDays)
+	case "acceptance-rate":
+		return l.trendAcceptanceRate(since, windowDays)
 	default:
-		return nil, fmt.Errorf("unknown metric %q: valid values are success-rate, cost, rework-rate", metric)
+		return nil, fmt.Errorf("unknown metric %q: valid values are success-rate, cost, rework-rate, acceptance-rate", metric)
 	}
 }
 
@@ -161,6 +165,38 @@ func (l *LocalDB) trendReworkRate(since time.Time, windowDays int) ([]TrendPoint
 	rows, err := l.Query(q, since.UTC().Format(time.RFC3339))
 	if err != nil {
 		return nil, fmt.Errorf("trend rework-rate query: %w", err)
+	}
+	defer rows.Close()
+	return l.gapFillTrend(rows, since, windowDays)
+}
+
+// trendAcceptanceRate returns weekly Code Acceptance Rate buckets (v0.12).
+// Acceptance = SUM(lines_attributed_agent) / SUM(agent+human), per ISO week,
+// over task_attribution rows windowed by jira_done_at.
+// Value is reported as a percentage (0–100) to match the other trend metrics.
+// Weeks where no task crossed Done — or where the only tasks recorded zero
+// total lines — return HasData=false via gapFillTrend (the SQL filters
+// zero-line rows so they cannot produce a misleading 0 in a populated week).
+func (l *LocalDB) trendAcceptanceRate(since time.Time, windowDays int) ([]TrendPoint, error) {
+	q := `
+		SELECT
+			strftime('%Y-%W', jira_done_at) AS bucket,
+			date(jira_done_at, 'weekday 1', '-6 days') AS week_start,
+			CAST(
+				1.0 * SUM(lines_attributed_agent)
+				/ NULLIF(SUM(lines_attributed_agent + lines_attributed_human), 0)
+				* 100
+			AS REAL) AS value,
+			COUNT(*) AS run_count
+		FROM task_attribution
+		WHERE jira_done_at >= ?
+		  AND (lines_attributed_agent + lines_attributed_human) > 0
+		GROUP BY bucket
+		ORDER BY bucket ASC
+	`
+	rows, err := l.Query(q, since.UTC().Format(time.RFC3339))
+	if err != nil {
+		return nil, fmt.Errorf("trend acceptance-rate query: %w", err)
 	}
 	defer rows.Close()
 	return l.gapFillTrend(rows, since, windowDays)

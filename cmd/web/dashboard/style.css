@@ -892,10 +892,11 @@
         }
         .run-drawer-events li:last-child { border-bottom: none; }
 
-        /* ---- v0.11.2 Fix A — Solo KPI strip (Engineering view top) ---- */
+        /* ---- v0.11.2 Fix A — Solo KPI strip (Engineering view top) ----
+           v0.12: grid widened to 4 cols (Trust Index added). */
         .solo-kpi-strip {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 12px;
             margin-bottom: 20px;
         }
@@ -958,6 +959,47 @@
         }
         @media (min-width: 769px) and (max-width: 900px) {
             .solo-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (min-width: 901px) and (max-width: 1200px) {
+            .solo-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        /* ---- v0.12 — Trust Index tile (band-coloured chip + breakdown) ---- */
+        .trust-band-chip {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 999px;
+            line-height: 1.4;
+            white-space: nowrap;
+        }
+        .trust-band-autonomous {
+            background: rgba(46, 204, 113, 0.15);
+            color: var(--success, #2ecc71);
+            border: 1px solid rgba(46, 204, 113, 0.4);
+        }
+        .trust-band-coown {
+            background: rgba(241, 196, 15, 0.15);
+            color: #f1c40f;
+            border: 1px solid rgba(241, 196, 15, 0.4);
+        }
+        .trust-band-copilot {
+            background: rgba(231, 76, 60, 0.15);
+            color: var(--error, #e74c3c);
+            border: 1px solid rgba(231, 76, 60, 0.4);
+        }
+        .trust-band-nodata {
+            background: rgba(127, 127, 127, 0.12);
+            color: var(--text-muted);
+            border: 1px solid rgba(127, 127, 127, 0.3);
+        }
+        .trust-breakdown {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: auto;
+            line-height: 1.5;
         }
 
         /* ---- v0.11.2 Fix B — Trend slope label (prominent, accent color) ---- */

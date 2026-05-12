@@ -153,6 +153,9 @@ func newDashboardMux(store *db.LocalDB, jiraBaseURL string) *http.ServeMux {
 	// v0.11 Phase 03 — week-over-week trend analytics.
 	server.RegisterTrendRoutes(mux, store)
 
+	// v0.12 — Trust Index composite KR.
+	server.RegisterTrustRoutes(mux, store)
+
 	// Phase 04 Audit View endpoints (event stream, audit log, hash-chain verify).
 	server.RegisterAuditRoutes(mux, store)
 

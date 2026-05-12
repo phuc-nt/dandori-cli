@@ -5,6 +5,7 @@
 //	GET /api/trends/success-rate?days=90&window=7
 //	GET /api/trends/cost?days=90&window=7
 //	GET /api/trends/rework-rate?days=90&window=7
+//	GET /api/trends/acceptance-rate?days=90&window=7   (v0.12)
 //
 // `days`   — lookback period in days (default 90, max 365).
 // `window` — bucket width in days   (default 7,  only 7 is meaningful currently).
@@ -26,6 +27,7 @@ func RegisterTrendRoutes(mux *http.ServeMux, store *db.LocalDB) {
 	mux.HandleFunc("/api/trends/success-rate", handleTrend(store, "success-rate"))
 	mux.HandleFunc("/api/trends/cost", handleTrend(store, "cost"))
 	mux.HandleFunc("/api/trends/rework-rate", handleTrend(store, "rework-rate"))
+	mux.HandleFunc("/api/trends/acceptance-rate", handleTrend(store, "acceptance-rate"))
 }
 
 func handleTrend(store *db.LocalDB, metric string) http.HandlerFunc {

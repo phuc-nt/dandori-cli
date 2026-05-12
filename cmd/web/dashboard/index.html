@@ -499,6 +499,16 @@
                         <svg class="solo-kpi-spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true" style="color:var(--accent)"></svg>
                         <p class="solo-kpi-empty" hidden>No data yet — run more tasks to see this KPI.</p>
                     </div>
+                    <!-- v0.12 — Tile 4: Trust Index composite KR. Rendered by widgets/trust.js. -->
+                    <div class="solo-kpi-tile" id="solo-kpi-trust">
+                        <div class="solo-kpi-label">Trust Index · 28d</div>
+                        <div class="solo-kpi-row">
+                            <div class="solo-kpi-value"></div>
+                            <span class="trust-band-chip trust-band-nodata">No data</span>
+                        </div>
+                        <div class="trust-breakdown"></div>
+                        <p class="solo-kpi-empty" hidden>Need ≥1 attributed task and ≥1 run in the last 28 days.</p>
+                    </div>
                 </div>
 
                 <div class="persona-tabs" role="tablist" aria-label="Engineering View sub-tabs">
@@ -1099,6 +1109,8 @@
         import { renderTrendChart } from '/static/widgets/trend.js';
         // v0.11.2 Fix A: solo KPI strip for Engineering view.
         import { renderSoloKpiStrip } from '/static/widgets/solo-kpi.js';
+        // v0.12 — Trust Index tile (4th tile on the KPI strip).
+        import { renderTrustTile } from '/static/widgets/trust.js';
         window.loadQAView = loadQAView;
         window.loadAuditView = loadAuditView;
         window.reloadEventStream = reloadEventStream;
@@ -1106,6 +1118,7 @@
         window.renderAgentTaskAffinity = renderAgentTaskAffinity;
         window.renderTrendChart = renderTrendChart;
         window.renderSoloKpiStrip = renderSoloKpiStrip;
+        window.renderTrustTile = renderTrustTile;
         // Module scripts are always deferred — app.js's initial loadAll()
         // (classic script) may have already fired before these globals
         // existed and skipped the QA/Audit loaders via the optional-chain
@@ -1114,6 +1127,7 @@
         if (!document.getElementById('audit-section')?.hidden) loadAuditView();
         if (!document.getElementById('engineering-section')?.hidden) {
             renderSoloKpiStrip();
+            renderTrustTile();
             renderAgentTaskAffinity();
             renderTrendChart();
         }
