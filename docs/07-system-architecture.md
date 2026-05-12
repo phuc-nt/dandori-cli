@@ -156,6 +156,7 @@ cmd/web/dashboard/
       ├── shared.js    helpers (escapeHtml, chartColors, ...)
       ├── qa.js        QA view renderers
       ├── audit.js     audit log + chain verify
+      ├── trust.js     Trust Index tile (v0.12): value + band chip + 3-component breakdown
       └── ...          po · tasks · engineering · admin (đang split dần)
 ```
 

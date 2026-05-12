@@ -17,12 +17,13 @@ Chỉ giữ devlog **per-release** từ v0.5.0 trở đi. Chi tiết phase-level
 | 2026-05-06 | [v0.11.0](2026-05-06-v0.11.0-solo-engineer-gaps.md) | Solo-engineer self-measurement — agent×task affinity matrix + structured RCA breakdown + week-over-week trend analytics |
 | 2026-05-07 | [v0.11.1](2026-05-07-v0.11.1-onboarding-polish.md) | Solo-engineer onboarding polish — run summary line + first-run tip + Confluence optionality clarity |
 | 2026-05-07 | [v0.11.2](2026-05-07-v0.11.2-dashboard-top5-ux.md) | Dashboard top-5 UX — solo KPI hero strip + slope label elevation + inline RCA changes list |
+| 2026-05-12 | [v0.12.0](2026-05-12-v0.12.0-trust-index.md) | Trust Index composite KR + Code Acceptance Rate trend + 12-metric DORA+SPACE+DevEx framework |
 
 ## Stats (current)
 
-- **25 packages green** under `go test ./...`
-- **Vision coverage**: ~98% of outer-harness pillars (Phase 05 closed)
-- **Release cadence**: 10 releases in ~2.5 weeks (Apr 30 → May 7)
+- **25 packages green** under `go test ./...` (918 tests + E2E)
+- **Vision coverage**: ~98% of outer-harness pillars
+- **Release cadence**: 11 releases in ~2 weeks (Apr 30 → May 12)
 
 ## Cách viết devlog mới
 

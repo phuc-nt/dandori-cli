@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-05-12
+
+Defensible-metric framework — adds the Code Acceptance Rate trend and the Trust Index composite KR (0–100 with autonomy band) so the dashboard answers "is the agent earning more authority?" not just "is it running?". Backed by the new `docs/reference/04-metric-framework.md` (12-metric DORA + SPACE + DevEx set, Goodhart-aware design, validation matrix).
+
+### Added
+
+- **Code Acceptance Rate trend** — new metric `acceptance-rate` on `/api/trends/{metric}` and `dandori analytics trend --metric acceptance-rate`. Weekly buckets of `SUM(agent_lines) / SUM(agent + human)` over `task_attribution.jira_done_at`, gap-filled. NULLIF guard excludes zero-line tasks from a populated week.
+- **Trust Index composite** — new `GET /api/metrics/trust-index?days=N` and `dandori analytics trust [--days N] [--json]`. Returns `value` 0–100, `band` (autonomous ≥ 80, co-own 60–79, copilot < 60, no-data), and the 3 component ratios. Formula per `docs/reference/04-metric-framework.md` §3:
+  `Trust = 0.40·acceptance + 0.35·(1 − ai_cfr) + 0.25·(1 − clamp(intervention, 0..1))`.
+- **Trust Index dashboard tile** — 4th tile on the Engineering view solo-KPI strip with band-coloured chip (autonomous = green, co-own = amber, copilot = red, no-data = grey) and `Acc · CFR · Intv` breakdown line. Grid widened to 4 columns ≥ 1201px; collapses to 2 at 901–1200px and to 1 below 769px.
+
+### Changed
+
+- Solo-KPI strip widened from 3 to 4 tiles with new ≤ 1200px breakpoint.
+
+### Notes
+
+- **AI-CFR is an interim proxy** in v0.12: `SUM(total_iterations > 1) / COUNT(tasks)` over `task_attribution`. True DORA-style "reverted-within-7d" CFR lands in v0.13 alongside PR/deploy event capture. Documented in framework §9.
+- **Intervention rate is runs-weighted** (Σ interventions / N runs) and can legitimately exceed 1.0. The Trust formula clamps the (1 − rate) term to [0, 1] so a noisy agent cannot drive the composite negative.
+- `HasData=false` if either `task_attribution` or `runs` is empty in the window — the band degrades to `no-data` rather than rendering a misleading 0.
+- Implementation lives in `internal/db/` (LocalDB / SQLite) to match the existing trend / KPI pattern, not in the Postgres-only `internal/analytics/` package.
+
 ## [0.11.2] — 2026-05-07
 
 Dashboard UX optimization for the top-5 solo-engineer metrics. Frontend-only — no backend, no schema, no new endpoints. Surfaces information that v0.11.0 already computed but buried in sub-tabs and tooltip text.

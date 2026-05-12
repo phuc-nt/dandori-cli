@@ -2,7 +2,7 @@
 
 [![Go](https://img.shields.io/badge/go-1.26%2B-blue)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-906%20runs%20%2B%20E2E-brightgreen)](docs/devlog/)
+[![Tests](https://img.shields.io/badge/tests-918%20runs%20%2B%20E2E-brightgreen)](docs/devlog/)
 
 Lightweight CLI outer harness for managing AI agent dev teams. Wraps agent execution, tracks runs, integrates with Jira/Confluence, and provides analytics for PO/PDM and QA.
 
@@ -22,8 +22,10 @@ See [Outer Harness](https://phuc-nt.github.io/dandori-pitch/outer-harness.html) 
 - **Jira integration** — task start/done, status transitions, completion comments
 - **Confluence integration** — auto-post run reports with metadata, files changed, git diff
 - **G9 analytics dashboard** — 3-level surface (engineer · project · org), CWD-aware landing, DORA scorecard, attribution composite, intent feed, insight engine, drilldowns, mobile-responsive
+- **Trust Index composite KR** (v0.12) — single 0–100 score + autonomy band (autonomous / co-own / copilot) from acceptance · AI-CFR · intervention; rolled out on dashboard 4-tile strip + `dandori analytics trust` CLI
+- **12-metric framework** (v0.12) — defensible DORA + SPACE + DevEx metric set with Goodhart-aware design, validation matrix; see [`docs/reference/04-metric-framework.md`](docs/reference/04-metric-framework.md)
 - **Agent assignment** — scoring algorithm (capability 40% + type 30% + history 20% + load 10%)
-- **Analytics CLI** — agent stats, cost breakdown, sprint summary
+- **Analytics CLI** — agent stats, cost breakdown, sprint summary, week-over-week trends (success · cost · rework · acceptance)
 
 ## Install
 
@@ -81,6 +83,8 @@ See [User Guide](docs/02-user-guide.md) for step-by-step use cases.
 | `dandori analytics {runs\|agents\|cost}` | Terminal analytics |
 | `dandori analytics all --since 30` | 4-block snapshot (cost · leaderboard · quality · alerts) |
 | `dandori analytics cost --by {engineer\|department}` | Group cost by engineer or department |
+| `dandori analytics trend --metric {success-rate\|cost\|rework-rate\|acceptance-rate}` | Week-over-week sparkline + slope label |
+| `dandori analytics trust [--days N]` | Trust Index composite (0–100 + autonomy band + 3 components) |
 | `dandori dashboard` | Web UI (localhost:8088) |
 | `dandori assign suggest/set` | Agent assignment |
 | `dandori status` | Recent runs summary |

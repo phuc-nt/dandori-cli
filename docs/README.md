@@ -2,7 +2,7 @@
 
 > CLI outer harness cho mô hình **PO/PDM + QA + AI agent** vận hành dự án phần mềm. Wrap Claude Code, track mọi run, tích hợp Jira + Confluence, dashboard 3-level analytics.
 
-**Current**: v0.11.2 · 25 packages green under `go test ./...` · vision coverage ~98% (Phase 05 closed) · solo-engineer self-measurement + onboarding polish + dashboard top-5 UX
+**Current**: v0.12.0 · 25 packages green under `go test ./...` (918 tests + E2E) · vision coverage ~98% · Trust Index composite KR + Code Acceptance Rate trend + 12-metric DORA+SPACE+DevEx framework
 
 ---
 
@@ -42,6 +42,7 @@
 | **G6** — DORA + Rework Rate export | [reference/01-metric-export.md](reference/01-metric-export.md) |
 | **G7** — Agent contribution attribution | [reference/02-agent-attribution.md](reference/02-agent-attribution.md) |
 | **G8** — Intent preservation (RCA via incident-report) | [reference/03-intent-preservation.md](reference/03-intent-preservation.md) |
+| **Metric framework** — 12-metric DORA+SPACE+DevEx set + Trust Index | [reference/04-metric-framework.md](reference/04-metric-framework.md) |
 
 ---
 

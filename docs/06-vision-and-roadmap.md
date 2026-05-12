@@ -186,17 +186,17 @@ dandori-cli v0.8.0 đã đóng 4/5 pillar. Còn các gap sau, mỗi cái có **v
 Theo thứ tự ưu tiên cho mục tiêu **bán enterprise scale 30k engineer**:
 
 ```
-v0.9.0  G1 multi-agent          → unblock bigtech multi-vendor
-v0.10.0 G2 context inheritance  → moat dài hạn
-v0.11.0 G5 Jira/Confluence DC   → unlock finance/health/gov segment
-v0.12.0 G3 skill library        → network-effect khi user base đủ lớn
-v0.13.0 G8 v2 spec linkage      → compliance-grade audit
-v1.0.0  Department axis + polish + stable API freeze
+v0.9.0–0.11.x  ✅ shipped     Solo-engineer KPI strip + trend sparkline + RCA inline (G10 polish)
+v0.12.0        ✅ shipped     Trust Index composite KR + Code Acceptance Rate trend + 12-metric framework
+v0.13.0        next           True DORA AI-CFR (PR/deploy/revert event capture) → re-validate Trust weights
+v0.14.0        next           G1 multi-agent → unblock bigtech multi-vendor
+v0.15.0+                      G2 context inheritance · G5 Jira/Confluence DC · G3 skill library · G8 v2 spec linkage
+v1.0.0                        Department axis + polish + stable API freeze
 ```
 
-Lý do thứ tự:
-- **G1 trước G3** vì G1 là blocker hard (mất deal); G3 là nice-to-have (network effect chậm)
-- **G2 trước G5** vì G2 là single-codebase work; G5 là branch separate (Tùng owns)
+Lý do thứ tự (cập nhật v0.12):
+- **Trust Index trước multi-agent**: cần đo "agent có xứng đáng task khó hơn không?" trước khi tăng số agent — tránh scale-up một loop kém chất lượng
+- **True CFR trước G1**: weights 0.40/0.35/0.25 hiện đặt theo framework lý thuyết; cần ≥2 tháng dữ liệu thật + revert detection để xác minh predictive trước khi multi-agent nhân loop
 - **v1.0.0 chốt** sau khi 5/5 pillar đạt 95%+ và có API stable cho tích hợp 3rd-party
 
 ---

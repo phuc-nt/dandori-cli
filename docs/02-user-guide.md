@@ -188,6 +188,16 @@ dandori analytics kpi --kpi cost --by agent --top 10     # quality-adjusted cost
 # Also surfaced as a [5] QUALITY KPI block in: dandori analytics all
 # All accept --format json for piping
 
+# Week-over-week trend sparkline (v0.11+)
+dandori analytics trend --metric success-rate            # default: success-rate, 90d window
+dandori analytics trend --metric cost --since 90
+dandori analytics trend --metric rework-rate
+dandori analytics trend --metric acceptance-rate         # v0.12: agent line acceptance % per week
+
+# Trust Index composite KR (v0.12) — single number, autonomy band, 3-component breakdown
+dandori analytics trust                                  # 28-day window, table format
+dandori analytics trust --days 56 --format json          # JSON for piping
+
 # Jira poller daemon (sprint cycle + bug-link cycle)
 dandori jira-poll                            # foreground daemon (Ctrl-C to stop)
 dandori jira-poll --once                     # single pass — useful for cron / launchd / systemd
@@ -204,6 +214,7 @@ The dashboard has:
 - Per-task cost breakdown (Jira links clickable)
 - Recent runs timeline
 - Quality KPI section: regression rate, bug rate, quality-adjusted cost — each with `--by agent | engineer | sprint` dropdown
+- **Solo-engineer KPI strip** (Engineering view): 4 tiles — Success Rate · Rework Rate · Avg Cost/Run · **Trust Index** (v0.12, with autonomy band chip + `Acc · CFR · Intv` breakdown)
 
 ### `dandori analytics kpi` — Composite Quality KPIs
 
