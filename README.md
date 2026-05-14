@@ -22,7 +22,9 @@ See [Outer Harness](https://phuc-nt.github.io/dandori-pitch/outer-harness.html) 
 - **Jira integration** — task start/done, status transitions, completion comments
 - **Confluence integration** — auto-post run reports with metadata, files changed, git diff
 - **G9 analytics dashboard** — 3-level surface (engineer · project · org), CWD-aware landing, DORA scorecard, attribution composite, intent feed, insight engine, drilldowns, mobile-responsive
-- **Trust Index composite KR** (v0.12) — single 0–100 score + autonomy band (autonomous / co-own / copilot) from acceptance · AI-CFR · intervention; rolled out on dashboard 4-tile strip + `dandori analytics trust` CLI
+- **Trust Index composite KR** (v0.12) — single 0–100 score + autonomy band (autonomous / co-own / copilot) from acceptance · AI-CFR · intervention; rolled out on dashboard 5-tile strip + `dandori analytics trust` CLI
+- **True AI-CFR** (v0.13) — Trust Index now computes AI-CFR from real GitHub PR events (reverts + reopens within 7d) via `dandori sync --github-only`; falls back to v0.12 proxy automatically when GitHub sync is unavailable
+- **PR Review Cycle Time** (v0.13) — diagnostic p50 / p75 review latency over merged PRs; new dashboard tile + `dandori analytics pr-cycle`. Used by the metric framework to disambiguate process vs capacity bottlenecks
 - **12-metric framework** (v0.12) — defensible DORA + SPACE + DevEx metric set with Goodhart-aware design, validation matrix; see [`docs/reference/04-metric-framework.md`](docs/reference/04-metric-framework.md)
 - **Agent assignment** — scoring algorithm (capability 40% + type 30% + history 20% + load 10%)
 - **Analytics CLI** — agent stats, cost breakdown, sprint summary, week-over-week trends (success · cost · rework · acceptance)
@@ -85,6 +87,8 @@ See [User Guide](docs/02-user-guide.md) for step-by-step use cases.
 | `dandori analytics cost --by {engineer\|department}` | Group cost by engineer or department |
 | `dandori analytics trend --metric {success-rate\|cost\|rework-rate\|acceptance-rate}` | Week-over-week sparkline + slope label |
 | `dandori analytics trust [--days N]` | Trust Index composite (0–100 + autonomy band + 3 components) |
+| `dandori analytics pr-cycle [--days N]` | PR Review Cycle Time (p50 / p75 review latency, diagnostic) |
+| `dandori sync --github-only` | Pull merged PRs + reviews from GitHub (feeds AI-CFR + PR Cycle Time) |
 | `dandori dashboard` | Web UI (localhost:8088) |
 | `dandori assign suggest/set` | Agent assignment |
 | `dandori status` | Recent runs summary |

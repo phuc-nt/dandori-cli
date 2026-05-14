@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-05-13
+
+Closes the v0.12 "interim proxy" gap: AI-CFR is now computed from real GitHub PR events (reverts + reopens within 7d), and a new diagnostic — PR Review Cycle Time — exposes review-latency p50/p75 so framework §8 can disambiguate "high Trust + low Deploy" between process and capacity bottlenecks. Both ship under one release because they share the same `pr_events` pipeline.
+
+### Added
+
+- **True AI-CFR** — `dandori sync --github-only` (also wired into `dandori sync`) pulls merged PRs + reviews from GitHub REST and persists to a new `pr_events` table. Trust Index now computes `ai_cfr = COUNT(DISTINCT PRs reopened_within_7d OR reverted_post_deploy) / merged_PRs`. Revert detection is via PR title regex `^Revert "<original-title>"$` (GitHub UI default). Two-pass orchestration ensures revert PRs returned ahead of their originals still resolve correctly.
+- **AI-CFR proxy fallback (retained)** — when no merged PRs are in the window (fresh install, GitHub disabled), Trust Index automatically falls back to the v0.12 proxy `SUM(total_iterations>1) / COUNT(tasks)`. `TrustComponents.CFRSource` is `"pr_events"`, `"proxy"`, or `"none"` so consumers can label appropriately. `dandori analytics trust` prints "AI CFR (proxy fallback)"; the dashboard surfaces a `proxy` badge next to the CFR component.
+- **PR Review Cycle Time** — new diagnostic metric. `GET /api/metrics/pr-cycle-time?days=N` and `dandori analytics pr-cycle [--days N] [--format json]` return `median_hours`, `p75_hours`, `merged_total`, `with_approval`, `has_data`. Computed as `(first_approval_at − submitted_at)` over PRs merged in the window, median via linear interpolation in Go. Diagnostic only — not part of Trust composite.
+- **PR Cycle dashboard tile** — 5th tile on the Engineering view solo-KPI strip with p50 value, p75 secondary, and `N / M PRs reviewed` coverage line. Grid widened to 5 columns ≥ 1501px (3 at 1201–1500, 2 at 901–1200, 1 below 769). Empty state distinguishes "no merged PRs" from "merged but none reviewed" (the meaningful solo / auto-merge signal).
+- **Schema v12** — additive `pr_events` (PRs with submitted_at, merged_at, first_approval_at, reverted_at, reopened_at) + `sync_state` (sync watermark) tables. `UPSERT ON CONFLICT(repo, pr_number)` for idempotent pulls.
+- **GitHub config block** — `github: { token, repos[], enabled }` in `dandori.yaml`. `dandori init` now prompts (skip with `--skip-github` — Trust uses the proxy in that case).
+
+### Changed
+
+- Trust Index `ai_cfr` source switches from proxy to real GitHub events when available. **Weights unchanged** (0.40/0.35/0.25) — historical scores stay comparable; only the CFR badge changes.
+- Solo-KPI strip widened from 4 to 5 tiles with new ≤ 1500px breakpoint.
+
+### Fixed
+
+- `internal/github` PR model gained a `ClosedAt *time.Time` field — required for reopen detection (`closed → open` transition + 7-day window check).
+
+### Notes
+
+- Revert detection only matches GitHub's default `Revert "..."` title. Custom-titled reverts (e.g., API-created with a custom message) will not be detected. Acceptable trade-off versus parsing PR body for revert references.
+- `dandori sync --github-only` is best-effort: GitHub API failures warn but don't abort the rest of the sync pipeline (upload + dashboard publishing still proceed).
+- 90-day backfill on first sync; subsequent syncs use a stored watermark with 1h overlap window for safety.
+
 ## [0.12.0] — 2026-05-12
 
 Defensible-metric framework — adds the Code Acceptance Rate trend and the Trust Index composite KR (0–100 with autonomy band) so the dashboard answers "is the agent earning more authority?" not just "is it running?". Backed by the new `docs/reference/04-metric-framework.md` (12-metric DORA + SPACE + DevEx set, Goodhart-aware design, validation matrix).

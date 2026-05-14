@@ -155,24 +155,38 @@ Use this when reading the dashboard to interpret combinations:
 
 | Phase | Metric | Status | Module |
 |---|---|---|---|
-| v0.12 (next) | Code Acceptance Rate | ❌ → add | extend `internal/attribution/` (uses existing `task_attribution.jira_done_at`) |
-| v0.12 (next) | **Trust Index composite** | ❌ → add | new `internal/analytics/trust.go` + dashboard tile |
-| v0.13 | PR Review Cycle Time | ❌ → add | Jira/GitHub webhook capture |
-| v0.13 | Intervention classification | ❌ → add | extend `failure_root_cause` enum |
-| v0.13 | AI-CFR (true "reverted within 7d") | ⚠️ proxy now | upgrade once PR/deploy events captured |
+| v0.12 | Code Acceptance Rate | ✅ | `internal/attribution/` (uses `task_attribution.jira_done_at`) |
+| v0.12 | **Trust Index composite** | ✅ | `internal/db/trust_index.go` + dashboard tile |
+| v0.13 | **AI-CFR (true)** — `COUNT(DISTINCT reopened_within_7d OR reverted_post_deploy) / merged_PRs` | ✅ | `internal/github/` pull sync + `pr_events` table; proxy fallback retained when GitHub sync disabled |
+| v0.13 | **PR Review Cycle Time** (diagnostic, p50/p75) | ✅ | `internal/db/pr_cycle_time.go` + `/api/metrics/pr-cycle-time` + dashboard tile |
+| v0.14+ | Intervention classification | ❌ → add | extend `failure_root_cause` enum |
 | Existing | Deployment Frequency, Rework Rate, MTTR, Cost/Run | ✅ | `internal/metric/` G6 |
-| Existing | AI-CFR (proxy: `total_iterations>1`) | ⚠️ partial | `task_attribution.total_iterations` from G7 — see note below |
+| Existing | AI-CFR (proxy fallback: `total_iterations>1`) | ✅ retained | `task_attribution.total_iterations` from G7 — auto-fallback when no merged PRs in window |
 | Existing | Human Intervention Rate | ✅ | G7 `internal/attribution/` |
 | Existing | RCA breakdown | ✅ | G8 `internal/intent/` |
 
-### Note on AI-CFR proxy (v0.12 interim)
+### Note on AI-CFR (v0.13 upgrade + proxy retained as fallback)
 
-The "true" AI-CFR per §1 is `(reopened_within_7d + reverted_post_deploy) / merged_PRs`. dandori-cli today captures **iteration count per task** (`task_attribution.total_iterations`) but not PR-level reverts or post-deploy events. For v0.12, Trust Index uses the **proxy** `SUM(total_iterations>1) / COUNT(tasks)` over the window. This:
+As of v0.13, AI-CFR is computed from real GitHub PR events captured by `dandori sync --github-only`:
 
-- ✅ Catches tasks that needed rework before being marked Done.
-- ❌ Misses bugs that escape to production and get reverted after Done.
+```
+AI-CFR = COUNT(DISTINCT PRs where reopened_within_7d OR reverted_post_deploy)
+       / COUNT(merged PRs in window)
+```
 
-The proxy understates AI-CFR (false-negative bias). When `internal/jira/` + a future PR webhook capture revert events (v0.13), the formula upgrades to the §1 definition without changing the Trust Index weights.
+- **Reopen detection**: state transition `closed → open` OR `julianday(reopened_at) − julianday(closed_at) ≤ 7`.
+- **Revert detection**: PR title matches `^Revert "<original-title>"$` (GitHub UI default). The reverted PR is the original, not the revert PR itself — keyed on title match within the same window.
+- **Dedup**: `COUNT(DISTINCT pr_id)` so a PR that is both reverted and reopened counts once.
+
+**Proxy fallback** (`cfr_source = "proxy"`): when `merged_PRs == 0` (no GitHub sync run yet, or no merges in window) the Trust Index falls back to the v0.12 proxy `SUM(total_iterations>1) / COUNT(tasks)` so the score is still computable on a fresh install. The dashboard surfaces a `proxy` badge next to the CFR component in this case; `dandori analytics trust` prints "AI CFR (proxy fallback)".
+
+Trust Index weights are **unchanged** across the upgrade — only the source of the `ai_cfr` term swaps. Historical scores remain comparable.
+
+### Note on PR Review Cycle Time (v0.13, diagnostic)
+
+`p50 / p75` of `(first_approval_at − submitted_at)` hours over PRs merged in the window. Exposed via `/api/metrics/pr-cycle-time?days=N`, `dandori analytics pr-cycle`, and a dashboard tile next to Trust Index.
+
+**Diagnostic only** — not a KR. Used to disambiguate framework §8's interpretation quadrants: high Trust + low Deploy → check Cycle Time. If review latency is hours, the bottleneck is process/release. If days, the bottleneck is reviewer capacity. Empty state (`has_data = false`) when no merged PR in the window had an approving review — the meaningful signal for solo engineers and auto-merge teams.
 
 ## Sources
 
