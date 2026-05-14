@@ -107,10 +107,14 @@ func TestTrustEndpoint_FullResponseShape(t *testing.T) {
 	if !ok {
 		t.Fatal("components is not an object")
 	}
-	for _, field := range []string{"acceptance", "ai_cfr", "intervention_rate"} {
+	for _, field := range []string{"acceptance", "ai_cfr", "intervention_rate", "cfr_source"} {
 		if _, ok := comps[field]; !ok {
 			t.Errorf("missing components.%s", field)
 		}
+	}
+	// On v12 fresh-install path with no pr_events rows, cfr falls back to proxy.
+	if comps["cfr_source"] != "proxy" {
+		t.Errorf("cfr_source = %v, want \"proxy\" (no pr_events seeded)", comps["cfr_source"])
 	}
 }
 

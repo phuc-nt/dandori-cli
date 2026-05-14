@@ -31,6 +31,7 @@ type Config struct {
 	LogLevel   string           `yaml:"log_level"`
 	Jira       JiraConfig       `yaml:"jira"`
 	Confluence ConfluenceConfig `yaml:"confluence"`
+	GitHub     GitHubConfig     `yaml:"github"`
 	Agent      AgentConfig      `yaml:"agent"`
 	Project    ProjectConfig    `yaml:"project"`
 	Sync       SyncConfig       `yaml:"sync"`
@@ -38,6 +39,16 @@ type Config struct {
 	Wrapper    WrapperConfig    `yaml:"wrapper"`
 	Verify     VerifyConfig     `yaml:"verify"`
 	Metric     MetricConfig     `yaml:"metric"`
+}
+
+// GitHubConfig drives the v0.13 pull-based PR/commit sync used to compute
+// true AI-CFR and PR Review Cycle Time. Disabled by default — when
+// Enabled=false the Trust Index falls back to the v0.12 proxy formula.
+type GitHubConfig struct {
+	Repo            string `yaml:"repo"`              // "owner/name"
+	Token           string `yaml:"token"`
+	Enabled         bool   `yaml:"enabled"`
+	PollIntervalSec int    `yaml:"poll_interval_sec"` // default 300
 }
 
 // MetricConfig drives `dandori metric export`. All fields optional; defaults
@@ -170,6 +181,10 @@ func DefaultConfig() *Config {
 			SemanticCheck: false,
 			QualityGate:   false,
 			SkipLabel:     "skip-verify",
+		},
+		GitHub: GitHubConfig{
+			Enabled:         false,
+			PollIntervalSec: 300,
 		},
 	}
 }
@@ -306,5 +321,14 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("DANDORI_LOG_LEVEL"); v != "" {
 		cfg.LogLevel = v
+	}
+	if v := os.Getenv("DANDORI_GITHUB_REPO"); v != "" {
+		cfg.GitHub.Repo = v
+	}
+	if v := os.Getenv("DANDORI_GITHUB_TOKEN"); v != "" {
+		cfg.GitHub.Token = v
+	}
+	if v := os.Getenv("DANDORI_GITHUB_ENABLED"); v != "" {
+		cfg.GitHub.Enabled = strings.EqualFold(v, "true") || v == "1"
 	}
 }

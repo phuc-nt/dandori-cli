@@ -69,9 +69,18 @@ export async function renderTrustTile() {
         const acc  = (c.acceptance ?? 0) * 100;
         const cfr  = (c.ai_cfr ?? 0) * 100;
         const intv = c.intervention_rate ?? 0;
+        // v0.13 — surface CFR source: "pr_events" = true AI-CFR from GitHub,
+        // "proxy" = v0.12 fallback (multi-iteration tasks), "none" = neither.
+        const cfrSource = c.cfr_source || 'proxy';
+        const cfrTitle = cfrSource === 'pr_events'
+            ? 'AI Change Failure Rate from GitHub PR reverts + reopens (weight 35%)'
+            : 'AI Change Failure Rate — proxy fallback from multi-iteration tasks (GitHub sync disabled or no PRs in window)';
+        const proxyBadge = cfrSource === 'proxy'
+            ? ` <span class="cfr-proxy-badge" title="${cfrTitle}">proxy</span>`
+            : '';
         breakdownEl.innerHTML =
             `<span title="Code Acceptance Rate (weight 40%)">Acc ${acc.toFixed(0)}%</span>` +
-            ` · <span title="AI Change Failure Rate proxy (weight 35%)">CFR ${cfr.toFixed(0)}%</span>` +
+            ` · <span title="${cfrTitle}">CFR ${cfr.toFixed(0)}%</span>${proxyBadge}` +
             ` · <span title="Avg human interventions per run (weight 25%)">Intv ${intv.toFixed(2)}</span>`;
     }
 }

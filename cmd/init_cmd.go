@@ -12,6 +12,7 @@ import (
 	"github.com/phuc-nt/dandori-cli/internal/config"
 	"github.com/phuc-nt/dandori-cli/internal/confluence"
 	"github.com/phuc-nt/dandori-cli/internal/db"
+	githubclient "github.com/phuc-nt/dandori-cli/internal/github"
 	"github.com/phuc-nt/dandori-cli/internal/jira"
 	"github.com/phuc-nt/dandori-cli/internal/shellrc"
 	"github.com/phuc-nt/dandori-cli/internal/util"
@@ -24,6 +25,9 @@ var initUninstallShell bool
 
 // initSkipConfluence is set by the --skip-confluence flag (C1).
 var initSkipConfluence bool
+
+// initSkipGitHub is set by the --skip-github flag (v0.13).
+var initSkipGitHub bool
 
 var initTimeout int // hidden flag, seconds
 
@@ -41,6 +45,7 @@ tracking, or 'dandori init --uninstall-shell' to remove the v0.8 alias block.`,
 func init() {
 	initCmd.Flags().BoolVar(&initUninstallShell, "uninstall-shell", false, "Remove the dandori-managed alias block from your shell rc file")
 	initCmd.Flags().BoolVar(&initSkipConfluence, "skip-confluence", false, "Skip Confluence setup (useful for solo / scripted init)")
+	initCmd.Flags().BoolVar(&initSkipGitHub, "skip-github", false, "Skip GitHub setup (true AI-CFR / PR Cycle Time disabled)")
 	initCmd.Flags().IntVar(&initTimeout, "init-timeout", 10, "Connection test timeout in seconds")
 	_ = initCmd.Flags().MarkHidden("init-timeout")
 	rootCmd.AddCommand(initCmd)
@@ -274,7 +279,49 @@ func runWizard(cfg *config.Config) error {
 		}
 	}
 
-	// ── Step 11: Agent name ─────────────────────────────────────────────────
+	// ── Steps 11a-11c: GitHub integration (v0.13) ──────────────────────────
+	// Pull-based PR/commit sync feeds true AI-CFR + PR Review Cycle Time.
+	// --skip-github bypasses entirely; when disabled, Trust Index falls back
+	// to the v0.12 proxy formula automatically.
+	if initSkipGitHub {
+		fmt.Println("Skipping GitHub setup (--skip-github). Trust Index will use the v0.12 proxy formula.")
+	} else {
+		fmt.Print("Enable GitHub integration? (optional — unlocks true AI-CFR + PR Review Cycle Time) [y/N]: ")
+		ghAns := readLine(reader)
+		if strings.HasPrefix(strings.ToLower(ghAns), "y") {
+			fmt.Print("GitHub Repo (owner/name, e.g. phuc-nt/dandori-cli): ")
+			if v := readLine(reader); v != "" {
+				cfg.GitHub.Repo = v
+			}
+
+			fmt.Print("GitHub Personal Access Token (needs `repo` scope for private): ")
+			ghToken, err := readSecret(reader)
+			if err != nil {
+				return fmt.Errorf("read GitHub token: %w", err)
+			}
+			fmt.Println()
+			if ghToken != "" {
+				cfg.GitHub.Token = ghToken
+			}
+
+			cfg.GitHub.Enabled = true
+
+			if cfg.GitHub.Repo != "" && cfg.GitHub.Token != "" {
+				fmt.Print("Testing GitHub connection... ")
+				msg, connErr := githubclient.TestConnection(cfg.GitHub.Repo, cfg.GitHub.Token)
+				if connErr != nil {
+					fmt.Printf("✗ FAILED: %v\n", connErr)
+					if !askSaveAnyway(reader) {
+						return fmt.Errorf("init aborted by user after GitHub connection failure")
+					}
+				} else {
+					fmt.Printf("✓ %s\n", msg)
+				}
+			}
+		}
+	}
+
+	// ── Step 12: Agent name ─────────────────────────────────────────────────
 	fmt.Printf("Agent Name [%s]: ", cfg.Agent.Name)
 	if v := readLine(reader); v != "" {
 		cfg.Agent.Name = v

@@ -53,6 +53,39 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Sync.IntervalSec != 300 {
 		t.Errorf("expected sync interval 300, got %d", cfg.Sync.IntervalSec)
 	}
+	if cfg.GitHub.Enabled {
+		t.Error("expected GitHub disabled by default")
+	}
+	if cfg.GitHub.PollIntervalSec != 300 {
+		t.Errorf("expected GitHub poll interval 300, got %d", cfg.GitHub.PollIntervalSec)
+	}
+}
+
+func TestEnvOverrides_GitHub(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := DefaultConfig()
+	if err := Save(cfg, path); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+
+	os.Setenv("DANDORI_GITHUB_REPO", "owner/repo")
+	os.Setenv("DANDORI_GITHUB_TOKEN", "ghp_xxx")
+	os.Setenv("DANDORI_GITHUB_ENABLED", "true")
+	defer func() {
+		os.Unsetenv("DANDORI_GITHUB_REPO")
+		os.Unsetenv("DANDORI_GITHUB_TOKEN")
+		os.Unsetenv("DANDORI_GITHUB_ENABLED")
+	}()
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if loaded.GitHub.Repo != "owner/repo" || loaded.GitHub.Token != "ghp_xxx" || !loaded.GitHub.Enabled {
+		t.Errorf("github env overrides failed: %+v", loaded.GitHub)
+	}
 }
 
 func TestLoadSave(t *testing.T) {

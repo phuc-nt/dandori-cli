@@ -60,6 +60,7 @@ func TestRunWizard_HappyPath(t *testing.T) {
 		confSrv.URL, // Confluence base URL
 		"ENG",       // Confluence space key
 		// Confluence connection test happens automatically
+		"n",       // Enable GitHub?
 		"myagent", // Agent name
 		"n",       // Quality tracking
 		"n",       // Watch daemon
@@ -128,6 +129,7 @@ func TestRunWizard_JiraConnFail_SaveAnyway(t *testing.T) {
 		"BAD",          // project key
 		"y",            // save anyway after 401
 		"n",            // disable Confluence
+		"n",            // disable GitHub
 		"",             // agent name (keep default)
 		"n",            // quality
 		"n",            // watch daemon
@@ -194,6 +196,7 @@ func TestRunWizard_SkipConfluenceFlag(t *testing.T) {
 		"SOLO",                  // Jira project key
 		// Jira connection test happens automatically
 		// NO Confluence prompt — initSkipConfluence=true bypasses it
+		"n", // Enable GitHub?
 		"",  // Agent name (keep default)
 		"n", // Quality tracking
 		"n", // Watch daemon
@@ -243,6 +246,7 @@ func TestConfluencePromptDefaultsToNo(t *testing.T) {
 		"tok",        // Jira token
 		"PROJ",       // project key
 		"",           // Enable Confluence? → empty = N (default no)
+		"",           // Enable GitHub? → empty = N
 		"",           // Agent name
 		"n",          // quality
 		"n",          // watch daemon
@@ -278,6 +282,52 @@ func TestSkipConfluenceFlagRegistered(t *testing.T) {
 	}
 	if !strings.Contains(out, "skip-confluence") {
 		t.Error("init --help should list --skip-confluence flag")
+	}
+	if !strings.Contains(out, "skip-github") {
+		t.Error("init --help should list --skip-github flag")
+	}
+}
+
+// TestRunWizard_SkipGitHubFlag verifies --skip-github bypasses the GitHub
+// prompt entirely and leaves GitHub disabled.
+func TestRunWizard_SkipGitHubFlag(t *testing.T) {
+	jiraSrv := setupJiraServer(t, 200, `{"accountId":"u1","displayName":"Solo"}`)
+	defer jiraSrv.Close()
+
+	lines := []string{
+		"",          // Server URL
+		jiraSrv.URL, // Jira base URL
+		"u@e.com",   // Jira email
+		"tok",       // Jira token
+		"PROJ",      // project key
+		"n",         // Disable Confluence
+		// NO GitHub prompt — initSkipGitHub=true bypasses it
+		"",  // Agent name
+		"n", // quality
+		"n", // watch daemon
+	}
+	stdinContent := strings.Join(lines, "\n") + "\n"
+
+	r, w, _ := os.Pipe()
+	_, _ = w.WriteString(stdinContent)
+	w.Close()
+	origStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = origStdin }()
+
+	origSkip := initSkipGitHub
+	initSkipGitHub = true
+	defer func() { initSkipGitHub = origSkip }()
+
+	cfg := config.DefaultConfig()
+	if err := runWizard(cfg); err != nil {
+		t.Fatalf("runWizard with --skip-github returned error: %v", err)
+	}
+	if cfg.GitHub.Enabled {
+		t.Error("--skip-github should leave GitHub disabled")
+	}
+	if cfg.GitHub.Repo != "" || cfg.GitHub.Token != "" {
+		t.Errorf("--skip-github should not capture repo/token, got %+v", cfg.GitHub)
 	}
 }
 

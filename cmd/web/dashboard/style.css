@@ -893,10 +893,10 @@
         .run-drawer-events li:last-child { border-bottom: none; }
 
         /* ---- v0.11.2 Fix A — Solo KPI strip (Engineering view top) ----
-           v0.12: grid widened to 4 cols (Trust Index added). */
+           v0.12: 4 cols (Trust added). v0.13: 5 cols (PR Cycle Time added). */
         .solo-kpi-strip {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 12px;
             margin-bottom: 20px;
         }
@@ -963,6 +963,9 @@
         @media (min-width: 901px) and (max-width: 1200px) {
             .solo-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
+        @media (min-width: 1201px) and (max-width: 1500px) {
+            .solo-kpi-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
 
         /* ---- v0.12 — Trust Index tile (band-coloured chip + breakdown) ---- */
         .trust-band-chip {
@@ -1000,6 +1003,33 @@
             color: var(--text-muted);
             margin-top: auto;
             line-height: 1.5;
+        }
+        /* v0.13 — CFR proxy-fallback badge inside Trust breakdown line. */
+        .cfr-proxy-badge {
+            display: inline-block;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            padding: 1px 5px;
+            margin-left: 4px;
+            border-radius: 3px;
+            background: rgba(127, 127, 127, 0.15);
+            color: var(--text-muted);
+            border: 1px solid rgba(127, 127, 127, 0.3);
+            vertical-align: middle;
+        }
+        /* v0.13 — PR Review Cycle Time tile (compact, diagnostic). */
+        .pr-cycle-breakdown {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: auto;
+            line-height: 1.5;
+        }
+        .pr-cycle-secondary {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
         }
 
         /* ---- v0.11.2 Fix B — Trend slope label (prominent, accent color) ---- */

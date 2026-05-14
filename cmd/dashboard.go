@@ -156,6 +156,9 @@ func newDashboardMux(store *db.LocalDB, jiraBaseURL string) *http.ServeMux {
 	// v0.12 — Trust Index composite KR.
 	server.RegisterTrustRoutes(mux, store)
 
+	// v0.13 — PR Review Cycle Time diagnostic.
+	server.RegisterPRCycleRoutes(mux, store)
+
 	// Phase 04 Audit View endpoints (event stream, audit log, hash-chain verify).
 	server.RegisterAuditRoutes(mux, store)
 

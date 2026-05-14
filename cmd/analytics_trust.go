@@ -72,10 +72,18 @@ func runAnalyticsTrust(_ *cobra.Command, _ []string) error {
 	fmt.Fprintln(w, "COMPONENT\tVALUE\tWEIGHT")
 	fmt.Fprintln(w, "---------\t-----\t------")
 	fmt.Fprintf(w, "Code Acceptance\t%.1f%%\t40%%\n", res.Components.Acceptance*100)
-	fmt.Fprintf(w, "AI CFR (proxy)\t%.1f%%\t35%%\n", res.Components.AICFR*100)
+	cfrLabel := "AI CFR"
+	if res.Components.CFRSource == "proxy" {
+		cfrLabel = "AI CFR (proxy fallback)"
+	}
+	fmt.Fprintf(w, "%s\t%.1f%%\t35%%\n", cfrLabel, res.Components.AICFR*100)
 	fmt.Fprintf(w, "Human Intervention\t%.2f / run\t25%%\n", res.Components.InterventionRate)
 	if err := w.Flush(); err != nil {
 		return err
+	}
+
+	if res.Components.CFRSource == "proxy" {
+		fmt.Println("  CFR fallback: GitHub sync disabled or no PRs merged in window.")
 	}
 
 	fmt.Println()

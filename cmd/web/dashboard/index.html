@@ -509,6 +509,16 @@
                         <div class="trust-breakdown"></div>
                         <p class="solo-kpi-empty" hidden>Need ≥1 attributed task and ≥1 run in the last 28 days.</p>
                     </div>
+                    <!-- v0.13 — Tile 5: PR Review Cycle Time (diagnostic). Rendered by widgets/pr-cycle.js. -->
+                    <div class="solo-kpi-tile" id="solo-kpi-pr-cycle">
+                        <div class="solo-kpi-label">PR Cycle · p50 / p75 · 28d</div>
+                        <div class="solo-kpi-row">
+                            <div class="solo-kpi-value">—</div>
+                            <span class="pr-cycle-secondary"></span>
+                        </div>
+                        <div class="pr-cycle-breakdown"></div>
+                        <p class="solo-kpi-empty" hidden>No approved PRs in window (solo / auto-merge).</p>
+                    </div>
                 </div>
 
                 <div class="persona-tabs" role="tablist" aria-label="Engineering View sub-tabs">
@@ -1111,6 +1121,8 @@
         import { renderSoloKpiStrip } from '/static/widgets/solo-kpi.js';
         // v0.12 — Trust Index tile (4th tile on the KPI strip).
         import { renderTrustTile } from '/static/widgets/trust.js';
+        // v0.13 — PR Review Cycle Time tile (5th tile, diagnostic).
+        import { renderPRCycleTile } from '/static/widgets/pr-cycle.js';
         window.loadQAView = loadQAView;
         window.loadAuditView = loadAuditView;
         window.reloadEventStream = reloadEventStream;
@@ -1119,6 +1131,7 @@
         window.renderTrendChart = renderTrendChart;
         window.renderSoloKpiStrip = renderSoloKpiStrip;
         window.renderTrustTile = renderTrustTile;
+        window.renderPRCycleTile = renderPRCycleTile;
         // Module scripts are always deferred — app.js's initial loadAll()
         // (classic script) may have already fired before these globals
         // existed and skipped the QA/Audit loaders via the optional-chain
@@ -1128,6 +1141,7 @@
         if (!document.getElementById('engineering-section')?.hidden) {
             renderSoloKpiStrip();
             renderTrustTile();
+            renderPRCycleTile();
             renderAgentTaskAffinity();
             renderTrendChart();
         }

@@ -264,4 +264,204 @@ func TestGetTrustIndex_ReopenedTaskAffectsCFR(t *testing.T) {
 	if got.Components.AICFR < 0.24 || got.Components.AICFR > 0.26 {
 		t.Errorf("ai_cfr = %.3f, want ~0.25", got.Components.AICFR)
 	}
+	if got.Components.CFRSource != "proxy" {
+		t.Errorf("cfr_source = %q, want proxy (no pr_events)", got.Components.CFRSource)
+	}
+}
+
+// ---------- true AI-CFR (pr_events path) ----------
+
+// seedTrustBaseline puts the DB in a "has data" state for acceptance +
+// intervention components so pr_events behaviour is the only variable.
+func seedTrustBaseline(t *testing.T, d *LocalDB, now time.Time) {
+	t.Helper()
+	insertTaskAttribution(t, d, "FEAT-A", 80, 20, now)
+	insertTrendRun(t, d, "rA", 0, 1.0, now, "FEAT-A")
+}
+
+// upsertPRMerged inserts a merged pr_events row anchored at `mergedAt`.
+// closedAt mirrors mergedAt by convention (GitHub closes a PR on merge).
+func upsertPRMerged(t *testing.T, d *LocalDB, num int, title string, mergedAt time.Time) {
+	t.Helper()
+	ts := mergedAt.UTC().Format(time.RFC3339)
+	if err := d.UpsertPR(PREvent{
+		Repo: "o/r", PRNumber: num, Title: title, State: "merged",
+		CreatedAt: ts, SubmittedAt: ts,
+		MergedAt: &ts, ClosedAt: &ts,
+	}); err != nil {
+		t.Fatalf("upsert pr#%d: %v", num, err)
+	}
+}
+
+func TestQueryAICFR_NoMergedPRs(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	since := time.Now().UTC().AddDate(0, 0, -28).Format(time.RFC3339)
+	cfr, has, err := d.queryAICFR(since)
+	if err != nil {
+		t.Fatalf("queryAICFR: %v", err)
+	}
+	if has {
+		t.Error("hasMerged should be false on empty pr_events")
+	}
+	if cfr != 0 {
+		t.Errorf("cfr = %f, want 0", cfr)
+	}
+}
+
+func TestGetTrustIndex_PREventsPath_NoFailures(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	seedTrustBaseline(t, d, now)
+
+	// 4 merged PRs, none reverted, none reopened → cfr = 0/4 = 0.
+	for i, title := range []string{"feat: a", "feat: b", "feat: c", "feat: d"} {
+		upsertPRMerged(t, d, i+1, title, now.Add(-time.Duration(i+1)*24*time.Hour))
+	}
+
+	got, err := d.GetTrustIndex(28)
+	if err != nil {
+		t.Fatalf("trust: %v", err)
+	}
+	if !got.HasData {
+		t.Fatal("HasData=false")
+	}
+	if got.Components.AICFR != 0 {
+		t.Errorf("ai_cfr = %.3f, want 0", got.Components.AICFR)
+	}
+	if got.Components.CFRSource != "pr_events" {
+		t.Errorf("cfr_source = %q, want pr_events", got.Components.CFRSource)
+	}
+}
+
+func TestGetTrustIndex_PREventsPath_RevertedCounts(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	seedTrustBaseline(t, d, now)
+
+	for i, title := range []string{"feat: a", "feat: b", "feat: c", "feat: d"} {
+		upsertPRMerged(t, d, i+1, title, now.Add(-time.Duration(i+1)*24*time.Hour))
+	}
+	// PR#1 reverted by PR#9 post-merge → counts in numerator.
+	if err := d.MarkReverted("o/r", 1, 9); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := d.GetTrustIndex(28)
+	want := 1.0 / 4.0
+	if got.Components.AICFR < want-0.01 || got.Components.AICFR > want+0.01 {
+		t.Errorf("ai_cfr = %.3f, want ~0.25 (1/4)", got.Components.AICFR)
+	}
+	if got.Components.CFRSource != "pr_events" {
+		t.Errorf("cfr_source = %q, want pr_events", got.Components.CFRSource)
+	}
+}
+
+func TestGetTrustIndex_PREventsPath_ReopenedWithin7d(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	seedTrustBaseline(t, d, now)
+
+	for i, title := range []string{"feat: a", "feat: b"} {
+		upsertPRMerged(t, d, i+1, title, now.Add(-time.Duration(i+1)*24*time.Hour))
+	}
+	// PR#1: closed 5d ago, reopened today → diff = 5d ≤ 7d → counts.
+	reopen := now.Format(time.RFC3339)
+	if err := d.MarkReopened("o/r", 1, reopen); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := d.GetTrustIndex(28)
+	want := 1.0 / 2.0
+	if got.Components.AICFR < want-0.01 || got.Components.AICFR > want+0.01 {
+		t.Errorf("ai_cfr = %.3f, want ~0.50 (1/2)", got.Components.AICFR)
+	}
+}
+
+func TestGetTrustIndex_PREventsPath_ReopenBeyond7d_NotCounted(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	seedTrustBaseline(t, d, now)
+
+	// Closed 10 days ago, reopened today → 10 > 7, should NOT count.
+	merged := now.Add(-10 * 24 * time.Hour)
+	upsertPRMerged(t, d, 1, "feat: a", merged)
+	upsertPRMerged(t, d, 2, "feat: b", now.Add(-3*24*time.Hour))
+	if err := d.MarkReopened("o/r", 1, now.Format(time.RFC3339)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := d.GetTrustIndex(28)
+	if got.Components.AICFR != 0 {
+		t.Errorf("ai_cfr = %.3f, want 0 (reopen >7d should be ignored)", got.Components.AICFR)
+	}
+}
+
+func TestGetTrustIndex_PREventsPath_DedupRevertAndReopen(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	seedTrustBaseline(t, d, now)
+
+	// 2 merged PRs. PR#1 is BOTH reverted AND reopened-within-7d.
+	// COUNT(DISTINCT pr_number) must dedup → numerator = 1 (not 2).
+	for i, title := range []string{"feat: a", "feat: b"} {
+		upsertPRMerged(t, d, i+1, title, now.Add(-time.Duration(i+1)*24*time.Hour))
+	}
+	if err := d.MarkReverted("o/r", 1, 9); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.MarkReopened("o/r", 1, now.Format(time.RFC3339)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := d.GetTrustIndex(28)
+	want := 1.0 / 2.0 // 1 distinct PR / 2 merged
+	if got.Components.AICFR < want-0.01 || got.Components.AICFR > want+0.01 {
+		t.Errorf("ai_cfr = %.3f, want ~0.50 (dedup), got components: %+v",
+			got.Components.AICFR, got.Components)
+	}
+}
+
+func TestGetTrustIndex_FallbackUsedWhenNoMergedPRs(t *testing.T) {
+	// task_attribution + runs present, pr_events empty → fallback to proxy.
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	now := time.Now().UTC()
+	insertTaskAttribution(t, d, "FEAT-1", 100, 0, now)
+	insertTaskAttribution(t, d, "FEAT-2", 100, 0, now)
+	if _, err := d.Exec(`UPDATE task_attribution SET total_iterations = 2 WHERE jira_issue_key = ?`, "FEAT-2"); err != nil {
+		t.Fatal(err)
+	}
+	insertTrendRun(t, d, "r1", 0, 1.0, now, "FEAT-1")
+
+	got, _ := d.GetTrustIndex(28)
+	if !got.HasData {
+		t.Fatal("HasData=false")
+	}
+	if got.Components.CFRSource != "proxy" {
+		t.Errorf("cfr_source = %q, want proxy", got.Components.CFRSource)
+	}
+	// proxy cfr = 1/2 = 0.5
+	if got.Components.AICFR < 0.49 || got.Components.AICFR > 0.51 {
+		t.Errorf("proxy ai_cfr = %.3f, want ~0.5", got.Components.AICFR)
+	}
 }

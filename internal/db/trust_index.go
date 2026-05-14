@@ -15,9 +15,17 @@
 //	< 60  → "copilot"     (human leads; agent assists)
 //	no-data → "no-data"   (≥ 1 component lacks data in the window)
 //
-// AI-CFR is the v0.12 INTERIM proxy: SUM(total_iterations > 1) / COUNT(tasks)
-// over task_attribution windowed by jira_done_at. True AI-CFR (DORA-style
-// "reverted within 7d") lands in v0.13 alongside PR/deploy event capture.
+// AI-CFR (v0.13+) is the DORA-style ratio over `pr_events`:
+//
+//	cfr = COUNT(DISTINCT PRs where reopened_within_7d OR reverted_post_deploy)
+//	      / COUNT(merged PRs in window)
+//
+// When the window has no merged PRs (GitHub disabled, or simply a quiet
+// period for users who DO have GitHub on), the calculation falls back to
+// the v0.12 proxy SUM(total_iterations > 1) / COUNT(tasks) over
+// task_attribution. The fallback preserves Trust scores for users not yet
+// on GitHub integration. `CFRSource` in TrustComponents records which
+// path produced the number so CLI + dashboard can flag the fallback.
 package db
 
 import (
@@ -27,10 +35,15 @@ import (
 )
 
 // TrustComponents are the 3 raw inputs (each 0..1 ratio, NOT percent).
+// CFRSource records which path produced AICFR:
+//   - "pr_events" — true DORA ratio over pr_events table (v0.13+)
+//   - "proxy"     — v0.12 iteration-based fallback
+//   - "none"      — neither source had usable data
 type TrustComponents struct {
 	Acceptance       float64 `json:"acceptance"`        // 0..1, agent-line share
-	AICFR            float64 `json:"ai_cfr"`            // 0..1, proxy for now
+	AICFR            float64 `json:"ai_cfr"`            // 0..1
 	InterventionRate float64 `json:"intervention_rate"` // 0..1, clamped
+	CFRSource        string  `json:"cfr_source"`        // pr_events|proxy|none
 }
 
 // TrustResult is one window's composite. HasData=false when any input had
@@ -123,12 +136,13 @@ func (l *LocalDB) GetTrustIndex(days int) (TrustResult, error) {
 	return composeTrust(c, days, hasData), nil
 }
 
-// fetchTrustComponents runs two cheap queries (task_attribution + runs) and
-// returns the 3 ratios. hasData is false when EITHER source has zero rows.
+// fetchTrustComponents runs three cheap queries (task_attribution, runs,
+// pr_events) and returns the 3 ratios. hasData is false when the inputs
+// can't produce any of the components — see in-line HasData rule.
 func (l *LocalDB) fetchTrustComponents(since string) (TrustComponents, bool, error) {
 	var c TrustComponents
 
-	// task_attribution → acceptance + cfr proxy
+	// task_attribution → acceptance + cfr proxy (fallback source)
 	var (
 		agentLines, humanLines int
 		tasks, reopenedTasks   int
@@ -160,14 +174,64 @@ func (l *LocalDB) fetchTrustComponents(since string) (TrustComponents, bool, err
 		return c, false, fmt.Errorf("trust: runs scan: %w", err)
 	}
 
+	// pr_events → true AI-CFR. Returns zeros + hasMerged=false when no PRs
+	// merged in window (GitHub disabled OR quiet window).
+	cfr, hasMerged, err := l.queryAICFR(since)
+	if err != nil {
+		return c, false, fmt.Errorf("trust: pr_events scan: %w", err)
+	}
+
 	// HasData rule: need ≥ 1 task with non-zero line attribution AND ≥ 1 run.
+	// pr_events absence is acceptable — we fall back to the iteration proxy.
 	totalLines := agentLines + humanLines
 	if totalLines == 0 || tasks == 0 || runs == 0 {
+		c.CFRSource = "none"
 		return c, false, nil
 	}
 
 	c.Acceptance = float64(agentLines) / float64(totalLines)
-	c.AICFR = float64(reopenedTasks) / float64(tasks)
 	c.InterventionRate = float64(interventions) / float64(runs)
+
+	switch {
+	case hasMerged:
+		c.AICFR = cfr
+		c.CFRSource = "pr_events"
+	default:
+		c.AICFR = float64(reopenedTasks) / float64(tasks)
+		c.CFRSource = "proxy"
+	}
 	return c, true, nil
+}
+
+// queryAICFR computes the true DORA-style AI Change Failure Rate from
+// pr_events in the [since, now) window. Returns (cfr, true, nil) when at
+// least one PR was merged in window; (0, false, nil) when no merged PRs
+// exist — callers fall back to the iteration proxy.
+//
+// Numerator dedup via COUNT(DISTINCT pr_number): a PR that was both
+// reopened (within 7d) AND reverted counts once. Boundary: reopen exactly
+// at 7 days IS counted; 7d+1s is not (`<= 7` uses julianday math, which
+// treats 7.0 as the inclusive edge).
+func (l *LocalDB) queryAICFR(since string) (float64, bool, error) {
+	var merged, failed int
+	row := l.QueryRow(`
+		SELECT
+			COUNT(*) AS merged_prs,
+			COUNT(DISTINCT CASE
+				WHEN is_reverted = 1 AND reverted_at IS NOT NULL
+				     AND reverted_at >= merged_at THEN pr_number
+				WHEN reopened_at IS NOT NULL AND closed_at IS NOT NULL
+				     AND julianday(reopened_at) - julianday(closed_at) <= 7
+				THEN pr_number
+			END) AS failed_prs
+		FROM pr_events
+		WHERE merged_at IS NOT NULL AND merged_at >= ?
+	`, since)
+	if err := row.Scan(&merged, &failed); err != nil {
+		return 0, false, err
+	}
+	if merged == 0 {
+		return 0, false, nil
+	}
+	return float64(failed) / float64(merged), true, nil
 }

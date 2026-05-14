@@ -2199,6 +2199,8 @@
             window.renderSoloKpiStrip?.();
             // v0.12 — Trust Index tile (4th tile on the KPI strip).
             window.renderTrustTile?.();
+            // v0.13 — PR Review Cycle Time tile (5th tile, diagnostic).
+            window.renderPRCycleTile?.();
             // v0.11 Phase 01 — affinity heatmap (ES6 module, may not be ready yet).
             window.renderAgentTaskAffinity?.();
             // v0.11 Phase 03 — trend line chart.
