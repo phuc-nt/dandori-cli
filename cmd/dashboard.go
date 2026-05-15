@@ -159,6 +159,9 @@ func newDashboardMux(store *db.LocalDB, jiraBaseURL string) *http.ServeMux {
 	// v0.13 — PR Review Cycle Time diagnostic.
 	server.RegisterPRCycleRoutes(mux, store)
 
+	// v0.14 — multi-repo breakdown (dropdown source).
+	server.RegisterReposRoute(mux, store)
+
 	// Phase 04 Audit View endpoints (event stream, audit log, hash-chain verify).
 	server.RegisterAuditRoutes(mux, store)
 

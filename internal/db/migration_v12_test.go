@@ -104,7 +104,11 @@ func TestMigrationV12_SchemaVersionBumped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("schema version: %v", err)
 	}
-	if v != 12 {
-		t.Errorf("schema_version = %d, want 12", v)
+	// Migrate runs all incremental steps to SchemaVersion. As of v0.14 a v11
+	// DB ends up at v13 because v12→v13 is the latest step. The check below
+	// just confirms we got past v12; the v13-specific column assertions
+	// live in migration_v13_test.go.
+	if v < 12 {
+		t.Errorf("schema_version = %d, want ≥ 12", v)
 	}
 }

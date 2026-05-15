@@ -36,11 +36,15 @@ Examples:
 	RunE: runAnalyticsTrust,
 }
 
-var analyticsTrustDays int
+var (
+	analyticsTrustDays int
+	analyticsTrustRepo string
+)
 
 func init() {
 	analyticsCmd.AddCommand(analyticsTrustCmd)
 	analyticsTrustCmd.Flags().IntVar(&analyticsTrustDays, "days", 28, "Lookback window in days (default 28)")
+	analyticsTrustCmd.Flags().StringVar(&analyticsTrustRepo, "repo", "", "Scope AI-CFR to a single repo (owner/name); Acceptance + Intervention remain org-wide")
 }
 
 func runAnalyticsTrust(_ *cobra.Command, _ []string) error {
@@ -50,7 +54,7 @@ func runAnalyticsTrust(_ *cobra.Command, _ []string) error {
 	}
 	defer store.Close()
 
-	res, err := store.GetTrustIndex(analyticsTrustDays)
+	res, err := store.GetTrustIndexByRepo(analyticsTrustDays, analyticsTrustRepo)
 	if err != nil {
 		return fmt.Errorf("trust: %w", err)
 	}

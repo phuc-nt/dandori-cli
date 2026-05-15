@@ -29,6 +29,7 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	"math"
 	"time"
@@ -55,6 +56,14 @@ type TrustResult struct {
 	Components TrustComponents `json:"components"`
 	WindowDays int             `json:"window_days"`
 	HasData    bool            `json:"has_data"`
+	// Repo is the per-repo filter applied (v0.14+). Empty when the
+	// caller asked for an org-wide aggregate.
+	Repo string `json:"repo,omitempty"`
+	// RepoScope flags how broadly Repo applied — "all" when Repo is
+	// empty, "cfr_only" when set (Acceptance + Intervention come from
+	// task_attribution / runs which have no repo column yet, so they
+	// remain org-wide). Surfaced so the dashboard can show a tooltip.
+	RepoScope string `json:"repo_scope,omitempty"`
 }
 
 // trustWeight is the §3 mix; kept as a struct so tests can document intent.
@@ -123,23 +132,42 @@ func composeTrust(c TrustComponents, days int, hasData bool) TrustResult {
 // GetTrustIndex computes the composite over a [now − days, now) window.
 // Returns HasData=false (band="no-data") when the window has no task_attribution
 // rows or no runs — Trust is undefined in those cases, not zero.
+//
+// Equivalent to GetTrustIndexByRepo(days, "") — kept for back-compat with
+// existing call sites and the legacy `dandori analytics trust` CLI.
 func (l *LocalDB) GetTrustIndex(days int) (TrustResult, error) {
+	return l.GetTrustIndexByRepo(days, "")
+}
+
+// GetTrustIndexByRepo is the v0.14 multi-repo variant. When repo is
+// non-empty the AI-CFR term is scoped to `pr_events.repo = ?`; the other
+// two components (Acceptance, Intervention) come from tables that don't
+// yet carry a repo column and therefore stay org-wide. Result advertises
+// this honestly via RepoScope = "cfr_only".
+func (l *LocalDB) GetTrustIndexByRepo(days int, repo string) (TrustResult, error) {
 	if days <= 0 {
 		days = 28
 	}
 	since := time.Now().UTC().AddDate(0, 0, -days).Format(time.RFC3339)
 
-	c, hasData, err := l.fetchTrustComponents(since)
+	c, hasData, err := l.fetchTrustComponents(since, repo)
 	if err != nil {
 		return TrustResult{}, err
 	}
-	return composeTrust(c, days, hasData), nil
+	res := composeTrust(c, days, hasData)
+	if repo != "" {
+		res.Repo = repo
+		res.RepoScope = "cfr_only"
+	} else {
+		res.RepoScope = "all"
+	}
+	return res, nil
 }
 
 // fetchTrustComponents runs three cheap queries (task_attribution, runs,
 // pr_events) and returns the 3 ratios. hasData is false when the inputs
 // can't produce any of the components — see in-line HasData rule.
-func (l *LocalDB) fetchTrustComponents(since string) (TrustComponents, bool, error) {
+func (l *LocalDB) fetchTrustComponents(since, repo string) (TrustComponents, bool, error) {
 	var c TrustComponents
 
 	// task_attribution → acceptance + cfr proxy (fallback source)
@@ -176,7 +204,7 @@ func (l *LocalDB) fetchTrustComponents(since string) (TrustComponents, bool, err
 
 	// pr_events → true AI-CFR. Returns zeros + hasMerged=false when no PRs
 	// merged in window (GitHub disabled OR quiet window).
-	cfr, hasMerged, err := l.queryAICFR(since)
+	cfr, hasMerged, err := l.queryAICFR(since, repo)
 	if err != nil {
 		return c, false, fmt.Errorf("trust: pr_events scan: %w", err)
 	}
@@ -212,21 +240,41 @@ func (l *LocalDB) fetchTrustComponents(since string) (TrustComponents, bool, err
 // reopened (within 7d) AND reverted counts once. Boundary: reopen exactly
 // at 7 days IS counted; 7d+1s is not (`<= 7` uses julianday math, which
 // treats 7.0 as the inclusive edge).
-func (l *LocalDB) queryAICFR(since string) (float64, bool, error) {
+func (l *LocalDB) queryAICFR(since, repo string) (float64, bool, error) {
 	var merged, failed int
-	row := l.QueryRow(`
-		SELECT
-			COUNT(*) AS merged_prs,
-			COUNT(DISTINCT CASE
-				WHEN is_reverted = 1 AND reverted_at IS NOT NULL
-				     AND reverted_at >= merged_at THEN pr_number
-				WHEN reopened_at IS NOT NULL AND closed_at IS NOT NULL
-				     AND julianday(reopened_at) - julianday(closed_at) <= 7
-				THEN pr_number
-			END) AS failed_prs
-		FROM pr_events
-		WHERE merged_at IS NOT NULL AND merged_at >= ?
-	`, since)
+	// Two literal queries keeps the prepared statement boring and the
+	// repo filter parameterised (no string concat). KISS over a clever
+	// builder for one optional WHERE.
+	var row *sql.Row
+	if repo == "" {
+		row = l.QueryRow(`
+			SELECT
+				COUNT(*) AS merged_prs,
+				COUNT(DISTINCT CASE
+					WHEN is_reverted = 1 AND reverted_at IS NOT NULL
+					     AND reverted_at >= merged_at THEN pr_number
+					WHEN reopened_at IS NOT NULL AND closed_at IS NOT NULL
+					     AND julianday(reopened_at) - julianday(closed_at) <= 7
+					THEN pr_number
+				END) AS failed_prs
+			FROM pr_events
+			WHERE merged_at IS NOT NULL AND merged_at >= ?
+		`, since)
+	} else {
+		row = l.QueryRow(`
+			SELECT
+				COUNT(*) AS merged_prs,
+				COUNT(DISTINCT CASE
+					WHEN is_reverted = 1 AND reverted_at IS NOT NULL
+					     AND reverted_at >= merged_at THEN pr_number
+					WHEN reopened_at IS NOT NULL AND closed_at IS NOT NULL
+					     AND julianday(reopened_at) - julianday(closed_at) <= 7
+					THEN pr_number
+				END) AS failed_prs
+			FROM pr_events
+			WHERE merged_at IS NOT NULL AND merged_at >= ? AND repo = ?
+		`, since, repo)
+	}
 	if err := row.Scan(&merged, &failed); err != nil {
 		return 0, false, err
 	}

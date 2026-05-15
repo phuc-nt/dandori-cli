@@ -34,15 +34,26 @@ type Summary struct {
 	ReviewsFetched   int
 	RevertsDetected  int
 	ReopensDetected  int
+	DetailsFetched   int
 	WatermarkUpdated string
 	Duration         time.Duration
+}
+
+// PullOptions controls optional per-PR detail fetches.
+type PullOptions struct {
+	BackfillDays int
+	// FetchDetail triggers an extra `GET /pulls/{n}` per PR to capture
+	// additions/deletions (v0.14). Best-effort — a per-PR failure logs
+	// and continues without size data rather than aborting the sync.
+	FetchDetail bool
 }
 
 // PullPREvents walks PRs updated since the stored watermark (or
 // now-backfillDays on first run) and persists them via the supplied
 // LocalDB. Failure modes are aggregated into the returned error; partial
 // progress is preserved (each PR is committed in its own statement).
-func PullPREvents(client *Client, store *db.LocalDB, backfillDays int) (Summary, error) {
+func PullPREvents(client *Client, store *db.LocalDB, opts PullOptions) (Summary, error) {
+	backfillDays := opts.BackfillDays
 	start := time.Now()
 	var s Summary
 
@@ -73,6 +84,18 @@ func PullPREvents(client *Client, store *db.LocalDB, backfillDays int) (Summary,
 		s.ReviewsFetched += reviewCount
 
 		event := buildPREvent(client.repo, pr, firstApprovalAt)
+
+		if opts.FetchDetail {
+			if detail, derr := client.GetPRDetail(pr.Number); derr == nil {
+				add, del := detail.Additions, detail.Deletions
+				event.Additions = &add
+				event.Deletions = &del
+				s.DetailsFetched++
+			}
+			// Best-effort: a 404/rate-limit here leaves size NULL and
+			// the next sync will retry. No need to fail the run.
+		}
+
 		if err := store.UpsertPR(event); err != nil {
 			return s, fmt.Errorf("upsert pr#%d: %w", pr.Number, err)
 		}

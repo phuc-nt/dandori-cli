@@ -1,6 +1,6 @@
 package db
 
-const SchemaVersion = 12
+const SchemaVersion = 13
 
 const SchemaSQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -191,6 +191,8 @@ CREATE TABLE IF NOT EXISTS pr_events (
     reopened_at TEXT,
     jira_issue_keys TEXT NOT NULL DEFAULT '',
     last_synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+    additions INTEGER,
+    deletions INTEGER,
     UNIQUE(repo, pr_number)
 );
 

@@ -27,6 +27,12 @@ type PR struct {
 	User           User      `json:"user"`
 	Base           Ref       `json:"base"`
 	Head           Ref       `json:"head"`
+	// Additions/Deletions are only populated by GetPRDetail (the
+	// /pulls list endpoint omits them). Zero values from list calls
+	// must be treated as "unknown", not "no changes" — sync stores
+	// them as NULL on pr_events until detail is fetched.
+	Additions int `json:"additions"`
+	Deletions int `json:"deletions"`
 }
 
 // User is the minimum identification used in PRs and reviews.

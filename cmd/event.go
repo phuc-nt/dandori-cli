@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/phuc-nt/dandori-cli/internal/config"
 	"github.com/phuc-nt/dandori-cli/internal/db"
@@ -10,6 +12,27 @@ import (
 	"github.com/phuc-nt/dandori-cli/internal/model"
 	"github.com/spf13/cobra"
 )
+
+// interventionReasons is the closed set accepted by --reason. Currently
+// the 3 v0.14 intervention buckets — wrapper-emitted reasons (test_fail,
+// lint_fail, etc.) are detected from events automatically and aren't valid
+// here.
+var interventionReasons = map[string]db.RunOutcomeReason{
+	string(db.ReasonWrongApproach):         db.ReasonWrongApproach,
+	string(db.ReasonScopeMisunderstanding): db.ReasonScopeMisunderstanding,
+	string(db.ReasonMissingContext):        db.ReasonMissingContext,
+}
+
+// sortedInterventionReasons returns reason strings in deterministic order
+// for error messages.
+func sortedInterventionReasons() []string {
+	out := make([]string, 0, len(interventionReasons))
+	for k := range interventionReasons {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
 
 var eventCmd = &cobra.Command{
 	Use:   "event",
@@ -24,21 +47,39 @@ Examples:
 }
 
 var (
-	eventRunID string
-	eventType  string
-	eventData  string
+	eventRunID  string
+	eventType   string
+	eventData   string
+	eventReason string
 )
 
 func init() {
 	eventCmd.Flags().StringVar(&eventRunID, "run", "", "Run ID to link event to (required)")
-	eventCmd.Flags().StringVar(&eventType, "type", "", "Event type (decision, file_change, task_link, custom)")
+	eventCmd.Flags().StringVar(&eventType, "type", "", "Event type (decision, file_change, task_link, custom). Omit when --reason is set.")
 	eventCmd.Flags().StringVar(&eventData, "data", "{}", "JSON payload")
+	eventCmd.Flags().StringVar(&eventReason, "reason", "", "Intervention reason: "+strings.Join(sortedInterventionReasons(), ", ")+". Mutually exclusive with --type.")
 	eventCmd.MarkFlagRequired("run")
-	eventCmd.MarkFlagRequired("type")
 	rootCmd.AddCommand(eventCmd)
 }
 
 func runEvent(cmd *cobra.Command, args []string) error {
+	// Resolve --reason into a canonical event_type. Validate up-front so a
+	// typo doesn't silently fall through as a free-text event.
+	resolvedType := eventType
+	switch {
+	case eventReason != "" && eventType != "":
+		return fmt.Errorf("--reason and --type are mutually exclusive")
+	case eventReason != "":
+		canon, ok := interventionReasons[eventReason]
+		if !ok {
+			return fmt.Errorf("invalid --reason %q (valid: %s)",
+				eventReason, strings.Join(sortedInterventionReasons(), ", "))
+		}
+		resolvedType = "intervention." + string(canon)
+	case eventType == "":
+		return fmt.Errorf("either --type or --reason is required")
+	}
+
 	dbPath, err := config.DBPath()
 	if err != nil {
 		return err
@@ -65,10 +106,10 @@ func runEvent(cmd *cobra.Command, args []string) error {
 	}
 
 	recorder := event.NewRecorder(localDB)
-	if err := recorder.RecordEvent(eventRunID, model.LayerSkill, eventType, data); err != nil {
+	if err := recorder.RecordEvent(eventRunID, model.LayerSkill, resolvedType, data); err != nil {
 		return fmt.Errorf("record event: %w", err)
 	}
 
-	fmt.Printf("Event recorded: run=%s type=%s\n", eventRunID, eventType)
+	fmt.Printf("Event recorded: run=%s type=%s\n", eventRunID, resolvedType)
 	return nil
 }

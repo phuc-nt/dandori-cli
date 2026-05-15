@@ -20,7 +20,12 @@ func RegisterPRCycleRoutes(mux *http.ServeMux, store *db.LocalDB) {
 func handlePRCycleTime(store *db.LocalDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		days := parseDaysParam(r.URL.Query().Get("days"), 28, 365)
-		res, err := store.GetPRReviewCycleTime(days)
+		repo, ok := validateRepoParam(r.URL.Query().Get("repo"))
+		if !ok {
+			writeError(w, http.StatusBadRequest, "invalid repo: expected owner/name")
+			return
+		}
+		res, err := store.GetPRReviewCycleTimeByRepo(days, repo)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "pr-cycle-time query failed: "+err.Error())
 			return

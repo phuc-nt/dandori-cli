@@ -22,7 +22,12 @@ func RegisterTrustRoutes(mux *http.ServeMux, store *db.LocalDB) {
 func handleTrustIndex(store *db.LocalDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		days := parseDaysParam(r.URL.Query().Get("days"), 28, 365)
-		res, err := store.GetTrustIndex(days)
+		repo, ok := validateRepoParam(r.URL.Query().Get("repo"))
+		if !ok {
+			writeError(w, http.StatusBadRequest, "invalid repo: expected owner/name")
+			return
+		}
+		res, err := store.GetTrustIndexByRepo(days, repo)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "trust-index query failed: "+err.Error())
 			return

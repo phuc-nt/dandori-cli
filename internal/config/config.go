@@ -49,6 +49,11 @@ type GitHubConfig struct {
 	Token           string `yaml:"token"`
 	Enabled         bool   `yaml:"enabled"`
 	PollIntervalSec int    `yaml:"poll_interval_sec"` // default 300
+	// FetchPRSize enables v0.14's per-PR additions/deletions capture.
+	// Costs one extra GitHub API call per PR in the sync batch; gated
+	// behind a flag so users on tight rate-limit budgets can opt out.
+	// Defaults to true on fresh installs (see DefaultConfig).
+	FetchPRSize bool `yaml:"fetch_pr_size"`
 }
 
 // MetricConfig drives `dandori metric export`. All fields optional; defaults
@@ -185,6 +190,7 @@ func DefaultConfig() *Config {
 		GitHub: GitHubConfig{
 			Enabled:         false,
 			PollIntervalSec: 300,
+			FetchPRSize:     true,
 		},
 	}
 }

@@ -299,7 +299,7 @@ func TestQueryAICFR_NoMergedPRs(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	since := time.Now().UTC().AddDate(0, 0, -28).Format(time.RFC3339)
-	cfr, has, err := d.queryAICFR(since)
+	cfr, has, err := d.queryAICFR(since, "")
 	if err != nil {
 		t.Fatalf("queryAICFR: %v", err)
 	}

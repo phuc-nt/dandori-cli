@@ -109,12 +109,15 @@ func runGitHubPull(cfg *config.Config, localDB *db.LocalDB) error {
 		Repo:  cfg.GitHub.Repo,
 		Token: cfg.GitHub.Token,
 	})
-	summary, err := githubclient.PullPREvents(client, localDB, githubclient.DefaultBackfillDays)
+	summary, err := githubclient.PullPREvents(client, localDB, githubclient.PullOptions{
+		BackfillDays: githubclient.DefaultBackfillDays,
+		FetchDetail:  cfg.GitHub.FetchPRSize,
+	})
 	if err != nil {
 		return err
 	}
-	fmt.Printf("GitHub: pulled %d PRs (%d reviews), %d reverts, %d reopens [%s]\n",
-		summary.PRsPulled, summary.ReviewsFetched,
+	fmt.Printf("GitHub: pulled %d PRs (%d reviews, %d details), %d reverts, %d reopens [%s]\n",
+		summary.PRsPulled, summary.ReviewsFetched, summary.DetailsFetched,
 		summary.RevertsDetected, summary.ReopensDetected,
 		summary.Duration.Round(1e6))
 	return nil

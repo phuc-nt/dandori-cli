@@ -14,8 +14,13 @@
 // Empty state: shown when has_data=false (no task_attribution rows or no runs).
 
 import { safeFetch } from './shared.js';
+import { getCurrentRepoFilter } from './repo-filter.js';
 
-const ENDPOINT = '/api/metrics/trust-index?days=28';
+const ENDPOINT_BASE = '/api/metrics/trust-index?days=28';
+
+function endpointFor(repo) {
+    return repo ? `${ENDPOINT_BASE}&repo=${encodeURIComponent(repo)}` : ENDPOINT_BASE;
+}
 
 // Band → CSS class on the .trust-band-chip element.
 function bandClass(band) {
@@ -47,7 +52,8 @@ export async function renderTrustTile() {
     const breakdownEl = tile.querySelector('.trust-breakdown');
     const emptyEl  = tile.querySelector('.solo-kpi-empty');
 
-    const res = await safeFetch(ENDPOINT);
+    const repo = getCurrentRepoFilter();
+    const res = await safeFetch(endpointFor(repo));
     const data = res.data;
 
     if (!data || data.has_data === false) {
@@ -78,9 +84,15 @@ export async function renderTrustTile() {
         const proxyBadge = cfrSource === 'proxy'
             ? ` <span class="cfr-proxy-badge" title="${cfrTitle}">proxy</span>`
             : '';
+        const scopeBadge = data.repo_scope === 'cfr_only'
+            ? ` <span class="cfr-proxy-badge" title="Repo filter applies to AI-CFR only — Acceptance and Intervention are org-wide (no repo column on those data sources).">cfr-only</span>`
+            : '';
         breakdownEl.innerHTML =
             `<span title="Code Acceptance Rate (weight 40%)">Acc ${acc.toFixed(0)}%</span>` +
             ` · <span title="${cfrTitle}">CFR ${cfr.toFixed(0)}%</span>${proxyBadge}` +
-            ` · <span title="Avg human interventions per run (weight 25%)">Intv ${intv.toFixed(2)}</span>`;
+            ` · <span title="Avg human interventions per run (weight 25%)">Intv ${intv.toFixed(2)}</span>` +
+            scopeBadge;
     }
 }
+
+document.addEventListener('dandori:repo-change', () => { renderTrustTile(); });

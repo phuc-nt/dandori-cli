@@ -194,6 +194,17 @@ func (c *Client) ListPRs(since time.Time, state string) ([]PR, error) {
 	return out, nil
 }
 
+// GetPRDetail fetches a single PR with the full schema, including
+// additions/deletions which the list endpoint omits.
+func (c *Client) GetPRDetail(prNumber int) (*PR, error) {
+	url := fmt.Sprintf("%s/repos/%s/pulls/%d", c.baseURL, c.repo, prNumber)
+	var out PR
+	if _, err := c.get(url, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // GetPRReviews returns all reviews on a single PR.
 func (c *Client) GetPRReviews(prNumber int) ([]Review, error) {
 	url := fmt.Sprintf("%s/repos/%s/pulls/%d/reviews?per_page=100",

@@ -217,14 +217,28 @@ export async function renderQARework() {
     if (empty) empty.hidden = true;
     canvas.style.display = '';
     const filtered = (data || []).filter(c => (c.count || 0) > 0);
-    const labels = filtered.map(c => c.cause);
+    // v0.14 — display labels (mirrors db.ReasonLabel). KISS: hardcoded
+    // since the enum is <15 values and changes rarely.
+    const labelMap = {
+        test_fail: 'Test failure', lint_fail: 'Lint failure',
+        human_reject: 'Human reject',
+        wrong_approach: 'Wrong approach',
+        scope_misunderstanding: 'Scope misunderstanding',
+        missing_context: 'Missing context',
+        timeout: 'Timeout', policy_violation: 'Policy violation',
+        error: 'Error', user_interrupted: 'User interrupted',
+        agent_finished: 'Agent finished', other: 'Other',
+    };
+    const labels = filtered.map(c => labelMap[c.cause] || c.cause);
     const counts = filtered.map(c => c.count);
     const palette = {
         test_fail: '#ef4444', lint_fail: '#f97316', human_reject: '#eab308',
+        // v0.14 — intervention buckets adjacent to human_reject in the yellow/amber band.
+        wrong_approach: '#f59e0b', scope_misunderstanding: '#d97706', missing_context: '#b45309',
         timeout: '#6366f1', policy_violation: '#a855f7', error: '#dc2626',
         user_interrupted: '#0ea5e9', agent_finished: '#22c55e', other: '#94a3b8',
     };
-    const colors = labels.map(l => palette[l] || '#94a3b8');
+    const colors = filtered.map(c => palette[c.cause] || '#94a3b8');
 
     // Build cause → RCA enrichment map for tooltip (Phase 02).
     const rcaMap = {};
@@ -242,7 +256,9 @@ export async function renderQARework() {
                 tooltip: {
                     callbacks: {
                         afterLabel(ctx) {
-                            const cause = ctx.label;
+                            // ctx.label is now the display label (v0.14); look up
+                            // the canonical cause via dataIndex into `filtered`.
+                            const cause = filtered[ctx.dataIndex]?.cause;
                             const rca = rcaMap[cause];
                             if (!rca) return '';
                             const lines = [];

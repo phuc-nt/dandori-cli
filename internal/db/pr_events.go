@@ -32,6 +32,11 @@ type PREvent struct {
 	ReopenedAt      *string
 	JiraIssueKeys   string
 	LastSyncedAt    string
+	// Additions/Deletions are pointers so NULL ("detail not fetched yet")
+	// stays distinct from 0 ("PR is a no-op"). Populated by sync when
+	// github.fetch_pr_size is enabled.
+	Additions *int
+	Deletions *int
 }
 
 // UpsertPR inserts or updates a PR row keyed by (repo, pr_number).
@@ -50,8 +55,8 @@ func (l *LocalDB) UpsertPR(p PREvent) error {
 			repo, pr_number, title, state, author,
 			created_at, submitted_at, merged_at, closed_at, first_approval_at,
 			merge_commit_sha, is_reverted, reverted_by_pr, reverted_at, reopened_at,
-			jira_issue_keys, last_synced_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			jira_issue_keys, last_synced_at, additions, deletions
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(repo, pr_number) DO UPDATE SET
 			title             = excluded.title,
 			state             = excluded.state,
@@ -59,12 +64,14 @@ func (l *LocalDB) UpsertPR(p PREvent) error {
 			closed_at         = excluded.closed_at,
 			first_approval_at = excluded.first_approval_at,
 			merge_commit_sha  = excluded.merge_commit_sha,
-			last_synced_at    = excluded.last_synced_at
+			last_synced_at    = excluded.last_synced_at,
+			additions         = COALESCE(excluded.additions, pr_events.additions),
+			deletions         = COALESCE(excluded.deletions, pr_events.deletions)
 	`,
 		p.Repo, p.PRNumber, p.Title, p.State, p.Author,
 		p.CreatedAt, p.SubmittedAt, p.MergedAt, p.ClosedAt, p.FirstApprovalAt,
 		p.MergeCommitSHA, boolToInt(p.IsReverted), p.RevertedByPR, p.RevertedAt, p.ReopenedAt,
-		p.JiraIssueKeys, p.LastSyncedAt,
+		p.JiraIssueKeys, p.LastSyncedAt, p.Additions, p.Deletions,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert pr_events: %w", err)
@@ -78,7 +85,7 @@ func (l *LocalDB) GetPRByNumber(repo string, prNumber int) (*PREvent, error) {
 		SELECT id, repo, pr_number, title, state, author,
 		       created_at, submitted_at, merged_at, closed_at, first_approval_at,
 		       merge_commit_sha, is_reverted, reverted_by_pr, reverted_at, reopened_at,
-		       jira_issue_keys, last_synced_at
+		       jira_issue_keys, last_synced_at, additions, deletions
 		FROM pr_events WHERE repo = ? AND pr_number = ?
 	`, repo, prNumber)
 	return scanPREvent(row)
@@ -98,7 +105,7 @@ func (l *LocalDB) GetPRByTitle(repo, title string, sinceDays int) (*PREvent, err
 		SELECT id, repo, pr_number, title, state, author,
 		       created_at, submitted_at, merged_at, closed_at, first_approval_at,
 		       merge_commit_sha, is_reverted, reverted_by_pr, reverted_at, reopened_at,
-		       jira_issue_keys, last_synced_at
+		       jira_issue_keys, last_synced_at, additions, deletions
 		FROM pr_events
 		WHERE repo = ? AND title = ? AND merged_at IS NOT NULL AND merged_at >= ?
 		ORDER BY merged_at DESC
@@ -190,7 +197,7 @@ func scanPREvent(row *sql.Row) (*PREvent, error) {
 		&p.ID, &p.Repo, &p.PRNumber, &p.Title, &p.State, &p.Author,
 		&p.CreatedAt, &p.SubmittedAt, &p.MergedAt, &p.ClosedAt, &p.FirstApprovalAt,
 		&p.MergeCommitSHA, &isReverted, &p.RevertedByPR, &p.RevertedAt, &p.ReopenedAt,
-		&p.JiraIssueKeys, &p.LastSyncedAt,
+		&p.JiraIssueKeys, &p.LastSyncedAt, &p.Additions, &p.Deletions,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

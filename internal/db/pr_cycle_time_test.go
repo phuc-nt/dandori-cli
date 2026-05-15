@@ -180,6 +180,70 @@ func TestGetPRReviewCycleTime_WindowExcludesOldPRs(t *testing.T) {
 	}
 }
 
+// seedMergedPRWithSize is like seedMergedPRWithApproval but also stamps
+// additions/deletions so MedianLinesChanged paths can be exercised.
+func seedMergedPRWithSize(t *testing.T, d *LocalDB, num int, mergedAt time.Time, approvalDelay time.Duration, add, del int) {
+	t.Helper()
+	submitted := mergedAt.Add(-approvalDelay - time.Hour)
+	approval := submitted.Add(approvalDelay)
+	subStr := submitted.UTC().Format(time.RFC3339)
+	mergedStr := mergedAt.UTC().Format(time.RFC3339)
+	approvalStr := approval.UTC().Format(time.RFC3339)
+	a, dl := add, del
+	if err := d.UpsertPR(PREvent{
+		Repo: "o/r", PRNumber: num, Title: "feat: sized", State: "merged",
+		CreatedAt: subStr, SubmittedAt: subStr,
+		MergedAt: &mergedStr, ClosedAt: &mergedStr,
+		FirstApprovalAt: &approvalStr,
+		Additions:       &a,
+		Deletions:       &dl,
+	}); err != nil {
+		t.Fatalf("upsert pr#%d: %v", num, err)
+	}
+}
+
+func TestGetPRReviewCycleTime_MedianLinesChanged(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	// totals: 10, 30, 50 → median 30
+	seedMergedPRWithSize(t, d, 1, now.Add(-3*24*time.Hour), 2*time.Hour, 5, 5)
+	seedMergedPRWithSize(t, d, 2, now.Add(-2*24*time.Hour), 4*time.Hour, 20, 10)
+	seedMergedPRWithSize(t, d, 3, now.Add(-1*24*time.Hour), 6*time.Hour, 30, 20)
+
+	res, err := d.GetPRReviewCycleTime(28)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.HasLinesData {
+		t.Fatal("HasLinesData=false")
+	}
+	if res.MedianLinesChanged != 30 {
+		t.Errorf("MedianLinesChanged = %d, want 30", res.MedianLinesChanged)
+	}
+}
+
+func TestGetPRReviewCycleTime_LinesAbsentWhenAllNull(t *testing.T) {
+	d := newEmptyLocalDB(t)
+	if err := d.Migrate(); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	// PRs without size data — HasLinesData should remain false.
+	seedMergedPRWithApproval(t, d, 1, now.Add(-2*24*time.Hour), 3*time.Hour)
+	seedMergedPRWithApproval(t, d, 2, now.Add(-1*24*time.Hour), 5*time.Hour)
+
+	res, _ := d.GetPRReviewCycleTime(28)
+	if res.HasLinesData {
+		t.Error("HasLinesData should be false when no rows have size data")
+	}
+	if res.MedianLinesChanged != 0 {
+		t.Errorf("MedianLinesChanged = %d, want 0", res.MedianLinesChanged)
+	}
+}
+
 func TestPercentile_EdgeCases(t *testing.T) {
 	if percentileFloat(nil, 0.5) != 0 {
 		t.Error("nil → 0")

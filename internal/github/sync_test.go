@@ -86,7 +86,7 @@ func TestPullPREvents_HappyPath_UpsertsAndWatermark(t *testing.T) {
 	client := NewClient(ClientConfig{Repo: "o/r", Token: "t", BaseURL: srv.URL})
 	store := newTestDB(t)
 
-	s, err := PullPREvents(client, store, 90)
+	s, err := PullPREvents(client, store, PullOptions{BackfillDays: 90})
 	if err != nil {
 		t.Fatalf("pull: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestPullPREvents_Idempotent_NoNewRows(t *testing.T) {
 	store := newTestDB(t)
 
 	for i := 0; i < 3; i++ {
-		if _, err := PullPREvents(client, store, 90); err != nil {
+		if _, err := PullPREvents(client, store, PullOptions{BackfillDays: 90}); err != nil {
 			t.Fatalf("pull #%d: %v", i, err)
 		}
 	}
@@ -152,7 +152,7 @@ func TestPullPREvents_RevertDetection(t *testing.T) {
 	client := NewClient(ClientConfig{Repo: "o/r", Token: "t", BaseURL: srv.URL})
 	store := newTestDB(t)
 
-	s, err := PullPREvents(client, store, 90)
+	s, err := PullPREvents(client, store, PullOptions{BackfillDays: 90})
 	if err != nil {
 		t.Fatalf("pull: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestPullPREvents_ReopenDetection(t *testing.T) {
 	defer srv.Close()
 	client := NewClient(ClientConfig{Repo: "o/r", Token: "t", BaseURL: srv.URL})
 
-	s, err := PullPREvents(client, store, 90)
+	s, err := PullPREvents(client, store, PullOptions{BackfillDays: 90})
 	if err != nil {
 		t.Fatalf("pull: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestPullPREvents_WatermarkFiltersOlderPRs(t *testing.T) {
 	if err := store.SetSyncState(SyncStateKey, "2026-05-05T00:00:00Z"); err != nil {
 		t.Fatal(err)
 	}
-	s, err := PullPREvents(client, store, 90)
+	s, err := PullPREvents(client, store, PullOptions{BackfillDays: 90})
 	if err != nil {
 		t.Fatalf("pull: %v", err)
 	}

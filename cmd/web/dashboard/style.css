@@ -892,6 +892,32 @@
         }
         .run-drawer-events li:last-child { border-bottom: none; }
 
+        /* ---- v0.14 — Multi-repo dropdown above the KPI strip. Hidden when
+           the user has only one active repo (row.hidden set by renderRepoFilter). */
+        .repo-filter-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            font-size: 13px;
+            color: var(--text-secondary, #aaa);
+        }
+        .repo-filter-label { font-weight: 500; }
+        .repo-filter-select {
+            background: var(--bg-secondary);
+            color: var(--text-primary, #eee);
+            border: 1px solid var(--border, rgba(255,255,255,0.1));
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 13px;
+            min-width: 200px;
+        }
+        .repo-filter-hint {
+            font-size: 12px;
+            color: var(--text-tertiary, #888);
+            cursor: help;
+        }
+
         /* ---- v0.11.2 Fix A — Solo KPI strip (Engineering view top) ----
            v0.12: 4 cols (Trust added). v0.13: 5 cols (PR Cycle Time added). */
         .solo-kpi-strip {

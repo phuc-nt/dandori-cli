@@ -159,7 +159,7 @@ Use this when reading the dashboard to interpret combinations:
 | v0.12 | **Trust Index composite** | ✅ | `internal/db/trust_index.go` + dashboard tile |
 | v0.13 | **AI-CFR (true)** — `COUNT(DISTINCT reopened_within_7d OR reverted_post_deploy) / merged_PRs` | ✅ | `internal/github/` pull sync + `pr_events` table; proxy fallback retained when GitHub sync disabled |
 | v0.13 | **PR Review Cycle Time** (diagnostic, p50/p75) | ✅ | `internal/db/pr_cycle_time.go` + `/api/metrics/pr-cycle-time` + dashboard tile |
-| v0.14+ | Intervention classification | ❌ → add | extend `failure_root_cause` enum |
+| v0.14 | **Intervention classification** (wrong_approach / scope_misunderstanding / missing_context) | ✅ | `internal/db/run_outcome_reason.go` enum + `dandori event --reason` |
 | Existing | Deployment Frequency, Rework Rate, MTTR, Cost/Run | ✅ | `internal/metric/` G6 |
 | Existing | AI-CFR (proxy fallback: `total_iterations>1`) | ✅ retained | `task_attribution.total_iterations` from G7 — auto-fallback when no merged PRs in window |
 | Existing | Human Intervention Rate | ✅ | G7 `internal/attribution/` |
@@ -181,6 +181,24 @@ AI-CFR = COUNT(DISTINCT PRs where reopened_within_7d OR reverted_post_deploy)
 **Proxy fallback** (`cfr_source = "proxy"`): when `merged_PRs == 0` (no GitHub sync run yet, or no merges in window) the Trust Index falls back to the v0.12 proxy `SUM(total_iterations>1) / COUNT(tasks)` so the score is still computable on a fresh install. The dashboard surfaces a `proxy` badge next to the CFR component in this case; `dandori analytics trust` prints "AI CFR (proxy fallback)".
 
 Trust Index weights are **unchanged** across the upgrade — only the source of the `ai_cfr` term swaps. Historical scores remain comparable.
+
+### Note on Intervention classification (v0.14)
+
+Pre-v0.14, mid-run human interventions collapsed to `human_reject` or `other`. v0.14 adds three buckets that capture *why a human stepped in to redirect rather than reject*:
+
+- `wrong_approach` — the agent picked a viable approach but not the one the human wanted (architecture, library choice, pattern).
+- `scope_misunderstanding` — the agent solved the wrong problem; scope of the requested change was different from what was implemented.
+- `missing_context` — the agent lacked a fact/file/constraint the human had to supply mid-run.
+
+**Emission.** Agent-integration scripts emit one of these via `dandori event --run <id> --reason wrong_approach`. The CLI records it as `event_type = intervention.<reason>`, which the existing RCA aggregator (`ClassifyRunOutcome` in [`run_outcome_reason.go`](../../internal/db/run_outcome_reason.go)) folds into `task_attribution.session_outcomes`. No schema change.
+
+**When to emit** (suggested triggers):
+- Test failure → `--type test.fail` (auto, no `--reason` needed).
+- User says "no, do it differently" → `--reason wrong_approach`.
+- User clarifies scope ("only the API, not the UI") → `--reason scope_misunderstanding`.
+- User pastes a missing file or config → `--reason missing_context`.
+
+Historical rows tagged `human_reject` continue to render unchanged — new buckets are additive.
 
 ### Note on PR Review Cycle Time (v0.13, diagnostic)
 

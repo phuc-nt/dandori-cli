@@ -34,11 +34,15 @@ Examples:
 	RunE: runAnalyticsPRCycle,
 }
 
-var analyticsPRCycleDays int
+var (
+	analyticsPRCycleDays int
+	analyticsPRCycleRepo string
+)
 
 func init() {
 	analyticsCmd.AddCommand(analyticsPRCycleCmd)
 	analyticsPRCycleCmd.Flags().IntVar(&analyticsPRCycleDays, "days", 28, "Lookback window in days (default 28)")
+	analyticsPRCycleCmd.Flags().StringVar(&analyticsPRCycleRepo, "repo", "", "Scope to a single repo (owner/name)")
 }
 
 func runAnalyticsPRCycle(_ *cobra.Command, _ []string) error {
@@ -48,7 +52,7 @@ func runAnalyticsPRCycle(_ *cobra.Command, _ []string) error {
 	}
 	defer store.Close()
 
-	res, err := store.GetPRReviewCycleTime(analyticsPRCycleDays)
+	res, err := store.GetPRReviewCycleTimeByRepo(analyticsPRCycleDays, analyticsPRCycleRepo)
 	if err != nil {
 		return fmt.Errorf("pr-cycle: %w", err)
 	}
@@ -76,5 +80,8 @@ func runAnalyticsPRCycle(_ *cobra.Command, _ []string) error {
 	fmt.Fprintf(w, "Median (p50)\t%.1f h\n", res.MedianHours)
 	fmt.Fprintf(w, "p75\t%.1f h\n", res.P75Hours)
 	fmt.Fprintf(w, "Coverage\t%d / %d merged PRs reviewed\n", res.WithApproval, res.MergedTotal)
+	if res.HasLinesData {
+		fmt.Fprintf(w, "Median lines changed\t%d (additions + deletions)\n", res.MedianLinesChanged)
+	}
 	return w.Flush()
 }

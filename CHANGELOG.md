@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-05-14
+
+Continues v0.13's `pr_events` pipeline with three additive features: PR size capture (diagnostic), per-repo Trust + PR-Cycle breakdown, and intervention RCA buckets. No new external integrations; same `dandori sync --github-only` data path.
+
+### Added
+
+- **PR size capture** — `additions` + `deletions` columns on `pr_events` (schema v13, additive ALTER, idempotent migration probes `pragma_table_info` first since SQLite lacks `ADD COLUMN IF NOT EXISTS`). `GetPRDetail` REST call per merged PR populates them best-effort, gated by `github.fetch_pr_size: true` (default true). Median lines/PR surfaces on `/api/metrics/pr-cycle-time` (`median_lines_changed`, `has_lines_data`), `dandori analytics pr-cycle`, and the dashboard tile's breakdown line. NULL stays distinct from 0 (`*int`) so "detail not fetched" doesn't collide with a no-op PR.
+- **Multi-repo breakdown** — `?repo=<owner/name>` filter on `/api/metrics/trust-index` and `/api/metrics/pr-cycle-time`; new `GET /api/metrics/repos?days=N` returns active repos ordered by merged count desc. `TrustResult.RepoScope` is `"cfr_only"` when filtered (AI-CFR scopes to the repo; Acceptance + Intervention remain org-wide — those tables have no `repo` column) or `"all"` unfiltered. Dashboard renders a `<select id="repo-filter">` above the KPI strip when ≥ 2 active repos in the window; on change, dispatches `dandori:repo-change` CustomEvent which Trust + PR-Cycle widgets refetch from. CLI parity: `dandori analytics trust --repo <r>` and `dandori analytics pr-cycle --repo <r>`. Repo values validated against `^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+
+
+ at the endpoint boundary; 400 on malformed.
+- **Intervention RCA buckets** — three new `RunOutcomeReason` constants: `wrong_approach`, `scope_misunderstanding`, `missing_context`. Emitted manually via `dandori event --run <id> --reason <bucket>` (validates against a closed set, errors list valid values). The CLI records `event_type = intervention.<reason>`; `ClassifyRunOutcome` folds them into `task_attribution.session_outcomes` via the existing aggregator — no schema change. RCA doughnut widget gets a display-label map mirroring `db.ReasonLabel` so legend shows "Wrong approach" instead of `wrong_approach`. Closes the framework §9 ❌ row.
+
+### Changed
+
+- `PullPREvents` signature: now takes `PullOptions{BackfillDays int, FetchDetail bool}` instead of a bare `backfillDays`. Existing call sites updated.
+- `GetTrustIndex(days)` and `GetPRReviewCycleTime(days)` delegate to new `*ByRepo(days, repo)` variants. Public signatures preserved for back-compat.
+
+### Notes
+
+- Per-repo Trust is intentionally partial: only AI-CFR scopes to the selected repo because `task_attribution` (Acceptance) and `runs` (Intervention) have no `repo` column. A `cfr-only` badge on the dashboard tooltip surfaces this. Adding a repo column to those tables is deferred — would require backfill logic and the partial signal is already actionable.
+- Intervention buckets are emission-only — no auto-detection. Agent-integration scripts must emit them (see `docs/reference/04-metric-framework.md` "Note on Intervention classification" for triggers). Historical `human_reject` rows render unchanged.
+
 ## [0.13.0] — 2026-05-13
 
 Closes the v0.12 "interim proxy" gap: AI-CFR is now computed from real GitHub PR events (reverts + reopens within 7d), and a new diagnostic — PR Review Cycle Time — exposes review-latency p50/p75 so framework §8 can disambiguate "high Trust + low Deploy" between process and capacity bottlenecks. Both ship under one release because they share the same `pr_events` pipeline.

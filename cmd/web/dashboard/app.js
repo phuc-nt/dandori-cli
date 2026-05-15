@@ -2195,6 +2195,9 @@
             renderEngCostPerTask();
             renderEngSessionEnd();
             renderEngDuration();
+            // v0.14 — multi-repo dropdown (must render before tiles so scope
+            // is established before they fetch).
+            window.renderRepoFilter?.();
             // v0.11.2 Fix A — solo KPI hero strip (ES6 module).
             window.renderSoloKpiStrip?.();
             // v0.12 — Trust Index tile (4th tile on the KPI strip).

@@ -10,8 +10,13 @@
 // review (solo engineer / auto-merge teams).
 
 import { safeFetch } from './shared.js';
+import { getCurrentRepoFilter } from './repo-filter.js';
 
-const ENDPOINT = '/api/metrics/pr-cycle-time?days=28';
+const ENDPOINT_BASE = '/api/metrics/pr-cycle-time?days=28';
+
+function endpointFor(repo) {
+    return repo ? `${ENDPOINT_BASE}&repo=${encodeURIComponent(repo)}` : ENDPOINT_BASE;
+}
 
 // Format hours into a compact label: "4.2h", "1.8d" past 48h.
 function formatHours(h) {
@@ -29,7 +34,8 @@ export async function renderPRCycleTile() {
     const breakdownEl = tile.querySelector('.pr-cycle-breakdown');
     const emptyEl     = tile.querySelector('.solo-kpi-empty');
 
-    const res = await safeFetch(ENDPOINT);
+    const repo = getCurrentRepoFilter();
+    const res = await safeFetch(endpointFor(repo));
     const data = res.data;
 
     if (!data || data.has_data === false) {
@@ -51,7 +57,12 @@ export async function renderPRCycleTile() {
     if (valueEl)     valueEl.textContent = formatHours(data.median_hours);
     if (secondaryEl) secondaryEl.textContent = `p75 ${formatHours(data.p75_hours)}`;
     if (breakdownEl) {
-        breakdownEl.textContent =
-            `${data.with_approval} / ${data.merged_total} PRs reviewed`;
+        let line = `${data.with_approval} / ${data.merged_total} PRs reviewed`;
+        if (data.has_lines_data) {
+            line += ` · ~${data.median_lines_changed} LoC/PR`;
+        }
+        breakdownEl.textContent = line;
     }
 }
+
+document.addEventListener('dandori:repo-change', () => { renderPRCycleTile(); });

@@ -466,6 +466,15 @@
             <!-- Phase 03 — Engineering View section (Agents / Autonomy / Cache / Session-health sub-tabs). -->
             <section id="engineering-section" class="persona-section fade-in" hidden>
 
+                <!-- v0.14 — multi-repo dropdown. Hidden until /api/metrics/repos
+                     returns ≥ 2 entries (solo-repo users see no UI noise).
+                     Populated + wired by widgets/repo-filter.js. -->
+                <div class="repo-filter-row" id="repo-filter-row" hidden>
+                    <label for="repo-filter" class="repo-filter-label">Repo scope</label>
+                    <select id="repo-filter" class="repo-filter-select"></select>
+                    <span class="repo-filter-hint" title="Acceptance + Intervention remain org-wide; only AI-CFR + PR Cycle scope to the selected repo.">ℹ</span>
+                </div>
+
                 <!-- v0.11.2 Fix A — Solo KPI hero strip: 3 tiles at the top of Engineering view.
                      Rendered by widgets/solo-kpi.js via renderSoloKpiStrip(). -->
                 <div class="solo-kpi-strip" id="solo-kpi-strip" aria-label="Solo engineer KPIs">
@@ -1123,6 +1132,8 @@
         import { renderTrustTile } from '/static/widgets/trust.js';
         // v0.13 — PR Review Cycle Time tile (5th tile, diagnostic).
         import { renderPRCycleTile } from '/static/widgets/pr-cycle.js';
+        // v0.14 — multi-repo dropdown above the KPI strip.
+        import { renderRepoFilter } from '/static/widgets/repo-filter.js';
         window.loadQAView = loadQAView;
         window.loadAuditView = loadAuditView;
         window.reloadEventStream = reloadEventStream;
@@ -1132,6 +1143,7 @@
         window.renderSoloKpiStrip = renderSoloKpiStrip;
         window.renderTrustTile = renderTrustTile;
         window.renderPRCycleTile = renderPRCycleTile;
+        window.renderRepoFilter = renderRepoFilter;
         // Module scripts are always deferred — app.js's initial loadAll()
         // (classic script) may have already fired before these globals
         // existed and skipped the QA/Audit loaders via the optional-chain
@@ -1139,6 +1151,7 @@
         if (!document.getElementById('qa-section')?.hidden)    loadQAView();
         if (!document.getElementById('audit-section')?.hidden) loadAuditView();
         if (!document.getElementById('engineering-section')?.hidden) {
+            renderRepoFilter();
             renderSoloKpiStrip();
             renderTrustTile();
             renderPRCycleTile();
